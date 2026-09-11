@@ -1,0 +1,244 @@
+package com.example.diapilot.data
+
+import android.database.sqlite.SQLiteDatabase
+import com.diapilot.core.collector.CollectorStore
+import com.diapilot.core.physio.AssembledProfileV1
+import com.diapilot.core.physio.InsulinShapeV1
+import com.diapilot.core.physio.PersonalInsulinCurveV1
+import com.diapilot.core.physio.SegmentLandmarkReaderV1
+import com.diapilot.core.physio.SegmentLandmarksV1
+import com.diapilot.core.physio.isTrustedDosePurposeV1
+import java.time.Instant
+import java.time.ZoneId
+
+/**
+ * THE insulin timing profile — one implementation, one path to the model.
+ *
+ * The method, settled with the user:
+ *
+ *  1. **Every dose is a candidate**, not only labelled corrections. Shape is
+ *     normalized to its own amplitude, so a wrong carb count barely moves it;
+ *     n is what matters and n is 5–8× larger.
+ *  2. **Each landmark is admitted on its own horizon** — onset needs 45 clean
+ *     minutes, the tail needs 200. One dose can contribute a good onset and no
+ *     tail, and that is the point.
+ *  3. **A landmark is confounded by food acting AT IT**, not by food anywhere in
+ *     the window and not by the pre-dose slope. Both of the other two were tried
+ *     and both were wrong: the slope cannot see a pre-meal bolus, and
+ *     window-wide contamination collapsed the clean arm to n=7.
+ *  4. **The curve is built on the food-free arm.** Not because it is cleaner but
+ *     because it is the only arm that is IDENTIFIED: with food on board the
+ *     trace is `insulin − carbs`, and a uniform shift of one trades exactly
+ *     against the other. The confounded arm is reported beside it as what the
+ *     user will actually see when injecting onto a meal.
+ *  5. **Amplitude does NOT come from here.** ISF stays on trusted corrections
+ *     (D-03), because amplitude is exactly what a wrong carb count corrupts.
+ *
+ * This replaces the receipt-CDF aggregation that used to feed `person.insulin`.
+ * Keeping both would have been a fifth representation of insulin in an app that
+ * has already paid for having four.
+ */
+object InsulinProfileRuntime {
+    private const val CAP_MS = 240 * 60_000L
+    private const val FOOD_LOOKBACK_MS = 6 * 3_600_000L
+
+    /** Air shots deliver nothing to the body, so they neither confound a window
+     * nor carry an action to read. */
+    private fun isAir(purpose: String?) = purpose?.trim().equals("воздух", ignoreCase = true)
+
+    data class State(
+        val curve: PersonalInsulinCurveV1?,
+        val profile: AssembledProfileV1?,
+        /** Doses that produced no landmark at all, by named reason. */
+        val refusals: Map<String, Int>,
+        val dosesConsidered: Int,
+    )
+
+    /**
+     * Raw inputs, read ONCE and then filtered in memory.
+     *
+     * The doses, meals and readings do not depend on the causal cutoff; only
+     * which of them are in scope does.
+     */
+    private data class Inputs(
+        val boluses: List<com.diapilot.core.collector.BolusPoint>,
+        val foods: List<Long>,
+        val readings: List<com.diapilot.core.collector.GlucosePoint>,
+    )
+    private data class InputKey(val dbPath: String, val doses: Int, val lastBolus: Long, val fromMs: Long)
+    @Volatile private var inputs: Pair<InputKey, Inputs>? = null
+
+    private fun inputs(store: CollectorStore, db: SQLiteDatabase, upToMs: Long): Inputs {
+        val from = FoodEraSettings.current().startMs
+        val all = store.boluses(from, upToMs).filter { it.units > 0.0 && !isAir(it.purpose) }
+        val key = InputKey(db.path, all.size, all.lastOrNull()?.tsMs ?: 0L, from)
+        inputs?.takeIf { it.first == key }?.let { return it.second }
+        return Inputs(
+            boluses = all,
+            foods = store.annotations(from - FOOD_LOOKBACK_MS, upToMs)
+                .filter { it.kind == "food" }.map { it.tsMs }.sorted(),
+            // The SAME single calibration the amplitude is measured on — see
+            // [MeasurementStream]. Landmarks are read as departures from the
+            // pre-dose inertia, so a stream that alternates between two
+            // calibrations 1.4 mmol apart manufactures departures where the
+            // glucose did nothing, and the whole earlier corpus was on such
+            // a stream.
+            readings = MeasurementStream.choose(store, from - CAP_MS, upToMs).readings,
+        ).also { inputs = key to it }
+    }
+
+    private data class Key(val dbPath: String, val doses: Int, val lastBolus: Long)
+    @Volatile private var cached: Pair<Key, State>? = null
+
+    /**
+     * The profile is computed ONCE per data revision, NOT per causal cutoff.
+     *
+     * This is a deliberate departure from the receipt's usual known-at
+     * discipline, and it is worth stating plainly rather than burying.
+     *
+     * The closed-episode rebuild asks for the artifact once per FOOD and BOLUS
+     * event, each with its own `knownAt`. Reading the profile at each of those
+     * cutoffs is O(days x doses x readings) — the segment reader scans the
+     * reading list per dose — and it does not merely cost: a live measurement
+     * keyed on the exact millisecond held 90% of a core for many minutes
+     * without finishing a pass; bucketed to the day and with inputs cached it
+     * still completed only a fraction of the windows inside its budget. Two
+     * attempts to make it causal-per-event both left the device unable to
+     * finish a single rebuild.
+     *
+     * What is given up: a receipt records the timing profile as it stands when
+     * the receipt is DERIVED, not as it stood at the event's own known-at. What
+     * that costs is bounded, because the profile is a person-level, timing-only
+     * quantity that needs >=3 independent days to exist and moves on the scale
+     * of weeks — and because every generation change re-derives the whole
+     * history anyway, so receipts are never a mixture of profile vintages.
+     *
+     * What is kept, and matters more: ONE curve, everywhere. The forecast, IOB,
+     * deconvolution, What-if and every counterfactual integrate the same object.
+     */
+    fun state(store: CollectorStore, db: SQLiteDatabase, @Suppress("UNUSED_PARAMETER") asOfMs: Long): State {
+        val now = System.currentTimeMillis()
+        val all = inputs(store, db, now)
+        val key = Key(
+            db.path, all.boluses.size, all.boluses.lastOrNull()?.tsMs ?: 0L,
+        )
+        cached?.takeIf { it.first == key }?.let { return it.second }
+        return compute(db, all, all.boluses, now).also {
+            cached = key to it
+            // The profile is otherwise invisible outside the settings screen,
+            // and a change of measurement stream has to be checkable against the
+            // previous build without tapping through the UI.
+            android.util.Log.i("InsulinProfile", explain(it))
+        }
+    }
+
+    private fun compute(
+        db: SQLiteDatabase,
+        all: Inputs,
+        boluses: List<com.diapilot.core.collector.BolusPoint>,
+        asOfMs: Long,
+    ): State {
+        val foods = all.foods.filter { it <= asOfMs }
+        val readings = all.readings.filter { it.tsMs <= asOfMs }
+
+        /**
+         * The dose's own interval ends at the next INJECTION — food does not
+         * close it.
+         *
+         * A meal used to end the window, and that silently discarded every
+         * pre-meal bolus: dose at 0, meal at 15, window 15 minutes, nothing
+         * measurable — even though the onset at ~12 min happens BEFORE the meal
+         * and is perfectly clean. Food is not a wall, it is a confounder with a
+         * time extent, and per-landmark confounding is exactly the mechanism
+         * that expresses that. A second injection IS a wall: two insulin actions
+         * overlapping are not separable from one trace.
+         */
+        fun cleanUntil(tsMs: Long): Long {
+            val cap = tsMs + CAP_MS
+            return boluses.firstOrNull { it.tsMs > tsMs && it.tsMs <= cap }?.tsMs ?: cap
+        }
+
+        val refusals = LinkedHashMap<String, Int>()
+        val samples = mutableListOf<SegmentLandmarksV1>()
+        val contributingDays = LinkedHashSet<Long>()
+        boluses.forEach { b ->
+            // VERDICTS WERE REMOVED along with the review card: the user
+            // judged doses once, and there is no longer a screen to judge new
+            // ones. A handful of previously rejected doses return to the
+            // shape-fitting corpus — the effect was measured live and
+            // recorded in the commit.
+            val until = cleanUntil(b.tsMs)
+            val foodMinutes = foods
+                .filter { it >= b.tsMs - FOOD_LOOKBACK_MS && it <= until }
+                .map { (it - b.tsMs) / 60_000.0 }
+            val seg = SegmentLandmarkReaderV1.read(readings, b.tsMs, until, foodMinutes)
+            if (seg.any) {
+                samples += seg
+                contributingDays += Instant.ofEpochMilli(b.tsMs)
+                    .atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+            } else seg.refusal?.let { refusals[it] = (refusals[it] ?: 0) + 1 }
+        }
+
+        if (samples.isEmpty()) return State(null, null, refusals, boluses.size)
+        val profile = SegmentLandmarkReaderV1.assemble(samples)
+        val measured = profile.landmarks
+            ?: return State(null, profile, refusals, boluses.size)
+        // Coerce INTO the artifact's domain and name what moved.
+        //
+        // Losing this in the rewrite is what the screen caught: a user's own
+        // measured end of action can fall under the population floor, so the
+        // curve was built, displayed, and then refused by the code that
+        // installs it. A population bound may move a measurement; it may not
+        // silently discard one.
+        val (landmarks, coerced) = InsulinShapeV1.coerceIntoDomain(measured)
+        // ONE shape implementation: the same rate-then-integrate construction
+        // the manual (P1) path uses, so the curve drawn, the curve forecast and
+        // the curve deconvolution subtracts are the same object.
+        val knots = InsulinShapeV1.synthesize(landmarks)
+            ?: return State(null, profile, refusals, boluses.size)
+        val curve = PersonalInsulinCurveV1(
+            knots = knots,
+            observations = samples.size,
+            independentDays = contributingDays.size,
+            supportWeight = samples.size.toDouble(),
+            landmarks = landmarks,
+            measuredKnots = knots,
+            coerced = coerced,
+            usesUntagged = samples.isNotEmpty() &&
+                boluses.none { isTrustedDosePurposeV1(it.purpose) },
+        )
+        return State(curve, profile, refusals, boluses.size)
+    }
+
+    /** One line for the screen: what is in use, or precisely what is missing. */
+    fun explain(state: State): String {
+        val p = state.profile
+        val curve = state.curve
+        return when {
+            curve != null && p != null ->
+                "измерено по %d уколам, %d дней · старт %.0f · пик %.0f · активно до %.0f · конец %.0f мин"
+                    .format(
+                        curve.observations, curve.independentDays,
+                        curve.landmarks.onsetMin, curve.landmarks.peakMin,
+                        curve.landmarks.activeEndMin, curve.landmarks.tailMin,
+                    ) +
+                    // The arm is part of the answer. When it flips, the profile
+                    // can move by several minutes in one step, and without this
+                    // the user would read that as the model changing its mind
+                    // about their body rather than as one population replacing
+                    // another.
+                    (if (p.arm == com.diapilot.core.physio.ProfileArmV1.FOOD_FREE)
+                        " · по уколам без действующей еды"
+                    else " · по всем уколам (чистых пока мало)") +
+                    (if (curve.coerced.isEmpty()) ""
+                    else " · приведено к границам модели: ${curve.coerced.joinToString(", ")}")
+            p?.orderingConflict != null -> "кривая не построена: ${p.orderingConflict}"
+            p != null -> "ориентиров не хватает: " + listOf(
+                p.onset.on(p.arm)?.let { "старт ${it.samples}" } ?: "старта нет",
+                p.peakRate.on(p.arm)?.let { "пик ${it.samples}" } ?: "пика нет",
+                p.tailEnd?.let { "конец ${it.samples}" } ?: "конца нет",
+            ).joinToString(" · ")
+            else -> "пока приор: ни один укол не дал ориентиров из ${state.dosesConsidered}"
+        }
+    }
+}

@@ -1,0 +1,270 @@
+{
+ "_": "SYNTHETIC EXAMPLE. A proposal, not a record: nothing here enters the database until the user explicitly accepts it (no auto-teach). Dishes, counts and fractions are illustrative, not anyone's diary.",
+ "_blind": "blind=false means the observed time-to-peak of the dish was known when its estimate was made; such rows must not be used in a confirmatory test. blind=true rows were estimated from composition only.",
+ "_units": "fast/medium/slow are fractions of the recorded CARBOHYDRATE, not of dish mass. fiber/protein/fat are grams per typical portion.",
+ "dishes": [
+  {
+   "id": "apple_juice",
+   "title": "яблочный сок",
+   "aliases": [
+    "яблочный сок",
+    "стакан яблочного сока",
+    "сок"
+   ],
+   "intakes": 12,
+   "carbs_g": 24,
+   "protein_g": 0,
+   "fat_g": 0,
+   "fiber_g": 0.2,
+   "form": "LIQUID",
+   "fast": 1.0,
+   "medium": 0.0,
+   "slow": 0.0,
+   "confidence": 0.7,
+   "blind": true,
+   "why": "сок — свободные сахара, жевать нечего; форма LIQUID",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "oatmeal_banana",
+   "title": "овсянка с бананом",
+   "aliases": [
+    "овсянка с бананом",
+    "каша овсяная с бананом"
+   ],
+   "intakes": 18,
+   "carbs_g": 55,
+   "protein_g": 9,
+   "fat_g": 6,
+   "fiber_g": 7,
+   "form": "SOFT_SOLID",
+   "fast": 0.35,
+   "medium": 0.45,
+   "slow": 0.2,
+   "confidence": 0.6,
+   "blind": true,
+   "why": "банан даёт быстрые сахара, овёс — средний и медленный крахмал с клетчаткой",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "cheese_sandwich",
+   "title": "бутерброд с сыром",
+   "aliases": [
+    "бутерброд с сыром",
+    "2 бутерброда с сыром"
+   ],
+   "intakes": 15,
+   "carbs_g": 30,
+   "protein_g": 12,
+   "fat_g": 14,
+   "fiber_g": 2,
+   "form": "SOLID",
+   "fast": 0.8,
+   "medium": 0.2,
+   "slow": 0.0,
+   "confidence": 0.6,
+   "blind": true,
+   "why": "белый хлеб — быстрый крахмал; жир сыра учитывается числом",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "yogurt_granola",
+   "title": "йогурт с мюсли",
+   "aliases": [
+    "йогурт с мюсли",
+    "йогурт и мюсли"
+   ],
+   "intakes": 9,
+   "carbs_g": 35,
+   "protein_g": 10,
+   "fat_g": 8,
+   "fiber_g": 4,
+   "form": "PUREE",
+   "fast": 0.6,
+   "medium": 0.3,
+   "slow": 0.1,
+   "confidence": 0.55,
+   "blind": true,
+   "why": "сахар йогурта быстрый, мюсли добавляют средний крахмал",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "buckwheat_chicken",
+   "title": "гречка с курицей",
+   "aliases": [
+    "гречка с курицей",
+    "гречка и курица"
+   ],
+   "intakes": 11,
+   "carbs_g": 45,
+   "protein_g": 30,
+   "fat_g": 10,
+   "fiber_g": 5,
+   "form": "SOFT_SOLID",
+   "fast": 0.1,
+   "medium": 0.6,
+   "slow": 0.3,
+   "confidence": 0.55,
+   "blind": true,
+   "why": "гречка — средний и медленный крахмал; курица несёт белок, не углеводы",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "pasta_tomato",
+   "title": "паста с томатным соусом",
+   "aliases": [
+    "паста с томатным соусом",
+    "макароны с соусом"
+   ],
+   "intakes": 8,
+   "carbs_g": 70,
+   "protein_g": 12,
+   "fat_g": 9,
+   "fiber_g": 4,
+   "form": "SOFT_SOLID",
+   "fast": 0.2,
+   "medium": 0.7,
+   "slow": 0.1,
+   "confidence": 0.5,
+   "blind": true,
+   "why": "паста — средний крахмал; соус добавляет немного быстрых сахаров",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "icecream",
+   "title": "мороженое",
+   "aliases": [
+    "мороженое",
+    "немного мороженого"
+   ],
+   "intakes": 6,
+   "carbs_g": 28,
+   "protein_g": 4,
+   "fat_g": 12,
+   "fiber_g": 0,
+   "form": "PUREE",
+   "fast": 1.0,
+   "medium": 0.0,
+   "slow": 0.0,
+   "confidence": 0.6,
+   "blind": true,
+   "why": "сахар мороженого быстрый; жир учтён отдельно",
+   "intake_duration_min": 0.0,
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "pancakes_plain",
+   "title": "блины простые (2 шт)",
+   "aliases": [
+    "2 блина",
+    "2 блина по 80г"
+   ],
+   "intakes": 3,
+   "carbs_g": 50,
+   "protein_g": 10,
+   "fat_g": 10,
+   "fiber_g": 1,
+   "form": "SOFT_SOLID",
+   "fast": 1.0,
+   "medium": 0.0,
+   "slow": 0.0,
+   "confidence": 0.7,
+   "blind": false,
+   "why": "тесто из белой муки — быстрый крахмал; жир учитывается числом, а не замедлением скорости",
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "pancakes_ham_cheese",
+   "title": "блины с сыром и ветчиной (2 шт)",
+   "aliases": [
+    "2 блина с сыром, ветчиной, горчицей и кетчупом",
+    "2 блина с сыром, ветчиной, горчицей, кетчупом"
+   ],
+   "intakes": 3,
+   "carbs_g": 50,
+   "protein_g": 25,
+   "fat_g": 30,
+   "fiber_g": 2,
+   "form": "SOFT_SOLID",
+   "fast": 0.956,
+   "medium": 0.022,
+   "slow": 0.022,
+   "confidence": 0.7,
+   "blind": false,
+   "why": "углеводы почти целиком из теста; жир учитывается отдельно и не понижает скорость крахмала",
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "pancake_pistachio",
+   "title": "блин с фисташковой пастой",
+   "aliases": [
+    "блин с фисташковой пастой",
+    "блин 70г с фисташковой пастой"
+   ],
+   "intakes": 2,
+   "carbs_g": 29,
+   "protein_g": 10,
+   "fat_g": 15,
+   "fiber_g": 1.5,
+   "form": "SOFT_SOLID",
+   "fast": 1.0,
+   "medium": 0.0,
+   "slow": 0.0,
+   "confidence": 0.6,
+   "blind": false,
+   "why": "тесто плюс сахар пасты — оба быстрые; жир пасты учтён числом",
+   "preview_now": "—",
+   "preview_then": "—"
+  },
+  {
+   "id": "pancake_jam",
+   "title": "блин с вареньем",
+   "aliases": [
+    "блин 70г с клубничным вареньем",
+    "блин с клубничным вареньем"
+   ],
+   "intakes": 2,
+   "carbs_g": 34,
+   "protein_g": 5,
+   "fat_g": 10,
+   "fiber_g": 1,
+   "form": "SOFT_SOLID",
+   "fast": 1.0,
+   "medium": 0.0,
+   "slow": 0.0,
+   "confidence": 0.62,
+   "blind": false,
+   "why": "тесто плюс сахар варенья, оба быстрые; жира мало",
+   "preview_now": "—",
+   "preview_then": "—"
+  }
+ ],
+ "excluded": [
+  {
+   "id": "dextrose",
+   "title": "декстроза (все дозировки)",
+   "intakes": 7,
+   "why": "спасательное лечение, а не приём пищи: у него свой путь в модели (rescueTreatment), и подъём при гипо частично печёночный — приписывать его углеводам нельзя."
+  }
+ ],
+ "_duration": "intake_duration_min is the median recorded meal duration for the dish, not an estimate.",
+ "_preview": "preview_now/preview_then are start/peak/90% in minutes computed by the engine for display; '—' means not computed for this example. The UI only shows them.",
+ "_canonical": "The pancake rows are canonical consensus rows (three draws of the structured prompt: mode of categorical fields, median of numeric ones).",
+ "_recomputed_v4": "Example rows; not recomputed against any real history.",
+ "_recomputed_v3": "Example rows; not recomputed against any real history."
+}

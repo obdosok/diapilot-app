@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model_version": "v11",
+  "person_model_id": "person-84f31d0aab33e660",
+  "source_model_sha256": "2bd25b364cbd2bf29843adb5c60071e9500fe260613542c0dd1e26c71ee4dfac",
+  "training_provenance": {
+    "eligible_from": "2025-01-06",
+    "eligible_timezone": "UTC",
+    "trained_through": "2025-02-23",
+    "days": 49
+  },
+  "runtime": {
+    "horizon_min": 180,
+    "step_min": 5
+  },
+  "insulin": {
+    "isf": 1.85,
+    "isf_low": 1.45,
+    "isf_high": 2.35,
+    "onset_min": 20,
+    "peak_min": 75,
+    "short_duration_min": 145,
+    "tail_duration_min": 175,
+    "tail_weight": 0.7,
+    "tail_weight_per_unit": 0.15,
+    "tail_reference_units": 3.0
+  },
+  "food": {
+    "global_factor": 0.17,
+    "calibration": 1.0,
+    "default_shape": {
+      "delay_min": 20.0,
+      "peak_min": 80.0,
+      "duration_min": 170.0
+    },
+    "group_factors": {
+      "global": 0.17,
+      "cluster_006": 0.14,
+      "cluster_007": 0.26
+    },
+    "group_shapes": {
+      "global": {
+        "delay_min": 20.0,
+        "peak_min": 80.0,
+        "duration_min": 170.0
+      },
+      "cluster_006": {
+        "delay_min": 15.0,
+        "peak_min": 45.0,
+        "duration_min": 150.0
+      },
+      "cluster_007": {
+        "delay_min": 20.0,
+        "peak_min": 80.0,
+        "duration_min": 170.0
+      }
+    },
+    "component_factors": {
+      "unknown_component": 0.17,
+      "рис": 0.13
+    },
+    "component_shapes": {},
+    "similarity_threshold": 0.5,
+    "promoted_prototypes": [
+      {
+        "group": "cluster_006",
+        "tokens": [
+          "сок"
+        ]
+      },
+      {
+        "group": "cluster_007",
+        "tokens": [
+          "декстроза"
+        ]
+      }
+    ],
+    "late_tail_enabled": false,
+    "group_tails": {},
+    "component_tails": {}
+  },
+  "activity": {
+    "iob_gamma": 0.4,
+    "tau_min": 150.0,
+    "food_gamma": 0.0,
+    "food_tau_min": 90.0
+  },
+  "basal": {
+    "onset_min": 60.0,
+    "peak_min": 720.0,
+    "duration_min": 1440.0,
+    "reference_units_24h": 24.0,
+    "sensitivity_mmol_per_action_unit": 0.42,
+    "scale": 0.0
+  },
+  "joint": {
+    "coefficients": {
+      "intercept": 0.28,
+      "sin24": 0.0,
+      "cos24": 0.0,
+      "sin12": 0.0,
+      "cos12": 0.0,
+      "state_reversion": 0.022,
+      "activity_direct": 0.38,
+      "sleep": -0.25,
+      "sleep_debt": -0.04,
+      "hours_since_wake": -0.015
+    },
+    "target_glucose": 6.9,
+    "background_scale": 0.3
+  },
+  "trend": {
+    "window_min": 60,
+    "tau_min": 30.0,
+    "horizon_weights": {
+      "60": 0.5,
+      "120": 0.75,
+      "180": 0.75
+    }
+  },
+  "uncertainty": {
+    "sigma_per_sqrt_hour": 1.4,
+    "food_fraction": 0.68,
+    "unknown_food_extra_fraction": 0.35
+  }
+}

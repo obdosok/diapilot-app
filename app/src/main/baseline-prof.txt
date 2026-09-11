@@ -1,0 +1,62 @@
+# Baseline profile — the startup and forecast path, AOT-compiled at install.
+#
+# WHY THIS FILE EXISTS, measured on a test device: a cold open cost
+# 18–26 s against 1.3 s warm, and logcat named the reason directly —
+#
+#   Compiler allocated 19MB to compile ClosedEpisodeRuntime.rebuildBody
+#   Compiler allocated 8011KB to compile HybridShadow.forecast
+#   Compiler allocated 12MB to compile TwinCache.get
+#
+# Those methods are far past ART's instruction limit, so on a cold process they
+# run INTERPRETED until the JIT catches up. `MainState.loadState` had the same
+# disease and was fixed by outlining its `run { }` blocks; these three cannot be
+# fixed that way — they are straight-line code over dozens of interdependent
+# locals, and threading those through parameter lists would be a large risky
+# diff for a mechanical problem.
+#
+# A baseline profile fixes the whole class at once and needs no code change:
+# ART compiles the listed methods when the app is installed instead of when the
+# patient is waiting for a number.
+#
+# Deliberately WILDCARDED per class rather than per method. A hand-listed method
+# set goes stale silently — the profile keeps loading, just without the method
+# that was renamed — and this file must not become another comment that stopped
+# describing the code.
+#
+# Flags: H = hot, S = startup, P = post-startup.
+
+# ---- the state pass and the screens it fills ------------------------------
+HSPLcom/example/diapilot/MainState;->**(**)**
+HSPLcom/example/diapilot/MainActivity;->**(**)**
+HSPLcom/example/diapilot/TodayScreen*;->**(**)**
+HSPLcom/example/diapilot/LabelScreen*;->**(**)**
+
+# ---- the forecast itself --------------------------------------------------
+HSPLcom/example/diapilot/data/Forecaster;->**(**)**
+HSPLcom/example/diapilot/data/HybridShadow*;->**(**)**
+HSPLcom/example/diapilot/data/PhysioRuntime*;->**(**)**
+HSPLcom/example/diapilot/data/HybridRuntimeMetrics*;->**(**)**
+HSPLcom/example/diapilot/data/FoodSources*;->**(**)**
+HSPLcom/diapilot/core/hybrid/HybridForecastEngine;->**(**)**
+HSPLcom/diapilot/core/hybrid/MealClusterKineticsV1*;->**(**)**
+HSPLcom/diapilot/core/physio/PhysioV1*;->**(**)**
+HSPLcom/diapilot/core/twin/ForecastEngineKt;->**(**)**
+HSPLcom/diapilot/core/twin/Simulator*;->**(**)**
+
+# ---- the model the forecast reads -----------------------------------------
+HSPLcom/example/diapilot/data/TwinCache*;->**(**)**
+HSPLcom/example/diapilot/data/TwinSnapshot*;->**(**)**
+HSPLcom/example/diapilot/data/SqliteCollectorStore;->**(**)**
+HSPLcom/example/diapilot/data/MeterCalCache*;->**(**)**
+HSPLcom/example/diapilot/data/MinuteCalCache*;->**(**)**
+
+# ---- the learning sidecar, which is what allocated 19 MB -------------------
+HSPLcom/example/diapilot/data/ClosedEpisodeRuntime*;->**(**)**
+HSPLcom/example/diapilot/data/Stage9EpisodeRuntime*;->**(**)**
+HSPLcom/diapilot/core/physio/ClosedCausalEpisodeV1*;->**(**)**
+HSPLcom/diapilot/core/physio/JointMealAttributionV1*;->**(**)**
+HSPLcom/diapilot/core/analysis/FoodCurve*;->**(**)**
+
+# ---- the alert path: it must never be the one waiting on the JIT ----------
+HSPLcom/example/diapilot/collect/HypoAlertNotifier*;->**(**)**
+HSPLcom/diapilot/core/twin/HypoAlert*;->**(**)**

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "model_version": "v11",
+  "person_model_id": "person-84f31d0aab33e660",
+  "source_model_sha256": "43384a5b833cecfb3ab87b0bbfe345563852fdfa64e38ec390a2a92fdfc9e072",
+  "training_provenance": {
+    "eligible_from": "2025-01-06",
+    "eligible_timezone": "UTC",
+    "trained_through": "2025-02-23",
+    "days": 49
+  },
+  "runtime": {
+    "horizon_min": 180,
+    "step_min": 5
+  },
+  "insulin": {
+    "isf": 1.8,
+    "isf_low": 1.45,
+    "isf_high": 2.35,
+    "onset_min": 20,
+    "peak_min": 75,
+    "short_duration_min": 140,
+    "tail_duration_min": 175,
+    "tail_weight": 0.7,
+    "tail_weight_per_unit": 0.15,
+    "tail_reference_units": 3.0
+  },
+  "food": {
+    "global_factor": 0.165,
+    "calibration": 1.0,
+    "default_shape": {
+      "delay_min": 15.0,
+      "peak_min": 70.0,
+      "duration_min": 210.0
+    }
+  },
+  "activity": {
+    "iob_gamma": 0.0,
+    "tau_min": 150.0,
+    "food_gamma": 0.0,
+    "food_tau_min": 200.0
+  },
+  "basal": {
+    "onset_min": 60.0,
+    "peak_min": 720.0,
+    "duration_min": 1440.0,
+    "reference_units_24h": 24.0,
+    "sensitivity_mmol_per_action_unit": 0.42,
+    "scale": 0.2
+  },
+  "joint": {
+    "coefficients": {
+      "intercept": 0.09,
+      "sin24": 0.0,
+      "cos24": 0.0,
+      "sin12": 0.0,
+      "cos12": 0.0,
+      "state_reversion": 0.034,
+      "activity_direct": 0.0,
+      "sleep": 0.0,
+      "sleep_debt": 0.0,
+      "hours_since_wake": 0.0
+    },
+    "target_glucose": 6.9,
+    "background_scale": 0.4
+  },
+  "trend": {
+    "window_min": 60,
+    "tau_min": 30.0,
+    "horizon_weights": {
+      "60": 0.5,
+      "120": 0.75,
+      "180": 0.75
+    }
+  },
+  "uncertainty": {
+    "sigma_per_sqrt_hour": 1.4,
+    "food_fraction": 0.66,
+    "unknown_food_extra_fraction": 0.35,
+    "include_active_bolus_isf": true
+  }
+}

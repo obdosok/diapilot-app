@@ -1,0 +1,31 @@
+*.iml
+.gradle
+/local.properties
+local.properties
+/.idea/
+/.kotlin/
+.DS_Store
+build/
+/app/build-*/
+/captures
+.externalNativeBuild
+.cxx
+__pycache__/
+*.pyc
+
+# Private medical data. Glucose exports, device dumps, settings exports and
+# companion-server state carry real patient data or live credentials, so none
+# of them may ever be committed.
+*.sqlite
+*.sqlite3
+*.db
+export*.db
+snap*.json
+diag*.json
+prefs*.xml
+server/data/
+/data/
+local/
+.env
+.env.*
+*.csv

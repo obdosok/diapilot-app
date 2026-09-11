@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext allowed only for the xDrip loopback web service; anything on
+     the open internet stays HTTPS-only — use a tunnel/reverse proxy there.
+     A companion server on the home LAN needs its own host added here
+     (network-security-config cannot express subnets, so a LAN host must be
+     listed literally). -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

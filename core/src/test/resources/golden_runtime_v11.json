@@ -1,0 +1,707 @@
+{
+  "contract_version": 1,
+  "model_sha256": "2bd25b364cbd2bf29843adb5c60071e9500fe260613542c0dd1e26c71ee4dfac",
+  "tolerance": 1e-09,
+  "kernel_cases": [
+    {
+      "t": -5.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 0.0
+    },
+    {
+      "t": 0.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 0.0
+    },
+    {
+      "t": 0.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 0.0
+    },
+    {
+      "t": 60.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 0.3333333333333333
+    },
+    {
+      "t": 180.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 1.0
+    },
+    {
+      "t": 185.0,
+      "onset": 0.0,
+      "peak": 60.0,
+      "duration": 180.0,
+      "expected": 1.0
+    },
+    {
+      "t": -5.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 0.0
+    },
+    {
+      "t": 0.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 0.0
+    },
+    {
+      "t": 25.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 0.0
+    },
+    {
+      "t": 120.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 0.6333333333333333
+    },
+    {
+      "t": 175.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 1.0
+    },
+    {
+      "t": 180.0,
+      "onset": 25.0,
+      "peak": 120.0,
+      "duration": 175.0,
+      "expected": 1.0
+    }
+  ],
+  "forecast_case": {
+    "input": {
+      "now_ms": 1800000000000,
+      "glucose_history": [
+        [
+          1799996400000,
+          7.4
+        ],
+        [
+          1799996700000,
+          7.42
+        ],
+        [
+          1799997000000,
+          7.44
+        ],
+        [
+          1799997300000,
+          7.46
+        ],
+        [
+          1799997600000,
+          7.48
+        ],
+        [
+          1799997900000,
+          7.5
+        ],
+        [
+          1799998200000,
+          7.5200000000000005
+        ],
+        [
+          1799998500000,
+          7.54
+        ],
+        [
+          1799998800000,
+          7.5600000000000005
+        ],
+        [
+          1799999100000,
+          7.58
+        ],
+        [
+          1799999400000,
+          7.6000000000000005
+        ],
+        [
+          1799999700000,
+          7.62
+        ],
+        [
+          1800000000000,
+          7.640000000000001
+        ]
+      ],
+      "food_history": [
+        {
+          "ts_ms": 1799997900000,
+          "carbs_g": 42.0,
+          "text": "unseen mixed meal",
+          "components": {
+            "unknown_component": 42.0
+          }
+        }
+      ],
+      "bolus_history": [
+        {
+          "ts_ms": 1799997000000,
+          "units": 3.0
+        },
+        {
+          "ts_ms": 1799999400000,
+          "units": 0.5
+        }
+      ],
+      "basal_history": [
+        {
+          "ts_ms": 1799971200000,
+          "units": 20.0
+        }
+      ],
+      "activity_exposure": 0.35,
+      "asleep": 0.0,
+      "sleep_debt_hours": 1.5,
+      "hours_since_wake": 6.0,
+      "hypothetical_insulin_units": 1.0
+    },
+    "expected": {
+      "model_version": "v11",
+      "person_model_id": "person-84f31d0aab33e660",
+      "anchor_mmol": 7.640000000000001,
+      "hypothetical_insulin_units": 1.0,
+      "points": [
+        {
+          "minutes": 0,
+          "ts_ms": 1800000000000,
+          "baseline": 7.640000000000001,
+          "scenario": 7.640000000000001,
+          "low": 7.640000000000001,
+          "high": 7.640000000000001,
+          "food_delta": 0.0,
+          "insulin_actual_delta": 0.0,
+          "insulin_scenario_delta": 0.0,
+          "residual_drift": 0.0,
+          "background_delta": 0.0,
+          "activity_direct_delta": 0.0
+        },
+        {
+          "minutes": 5,
+          "ts_ms": 1800000300000,
+          "baseline": 7.540395514232898,
+          "scenario": 7.540395514232898,
+          "low": 7.04556204455016,
+          "high": 8.035228983915637,
+          "food_delta": 0.088046875,
+          "insulin_actual_delta": -0.24729939353814562,
+          "insulin_scenario_delta": 0.0,
+          "residual_drift": 0.06320542550021949,
+          "background_delta": -0.0009639999999999985,
+          "activity_direct_delta": -0.006649999999999999
+        },
+        {
+          "minutes": 10,
+          "ts_ms": 1800000600000,
+          "baseline": 7.425191961978452,
+          "scenario": 7.425191961978452,
+          "low": 6.651426386579044,
+          "high": 8.198957537377861,
+          "food_delta": 0.19632812500000002,
+          "insulin_actual_delta": -0.5192445266364338,
+          "insulin_scenario_delta": 0.0,
+          "residual_drift": 0.11670766310009051,
+          "background_delta": -0.001600422133861521,
+          "activity_direct_delta": -0.013081987068205337
+        },
+        {
+          "minutes": 15,
+          "ts_ms": 1800000900000,
+          "baseline": 7.2945408343203475,
+          "scenario": 7.2945408343203475,
+          "low": 6.262204896820347,
+          "high": 8.326876771820348,
+          "food_delta": 0.32265625000000003,
+          "insulin_actual_delta": -0.8155898838348974,
+          "insulin_scenario_delta": 0.0,
+          "residual_drift": 0.1619963294691368,
+          "background_delta": -0.0018992547424980756,
+          "activity_direct_delta": -0.019303108518665596
+        },
+        {
+          "minutes": 20,
+          "ts_ms": 1800001200000,
+          "baseline": 7.148651635857636,
+          "scenario": 7.148651635857636,
+          "low": 5.86157219649216,
+          "high": 8.435731075223112,
+          "food_delta": 0.46484375,
+          "insulin_actual_delta": -1.1356539695295873,
+          "insulin_scenario_delta": 0.0,
+          "residual_drift": 0.20033235789520265,
+          "background_delta": -0.0018504184901895844,
+          "activity_direct_delta": -0.025320277348604727
+        },
+        {
+          "minutes": 25,
+          "ts_ms": 1800001500000,
+          "baseline": 6.990672235749823,
+          "scenario": 6.985123714376778,
+          "low": 5.44060378114062,
+          "high": 8.529643647612936,
+          "food_delta": 0.620703125,
+          "insulin_actual_delta": -1.4755047960471073,
+          "insulin_scenario_delta": -0.005548521373045309,
+          "residual_drift": 0.23278310536275448,
+          "background_delta": -0.0014438378612685826,
+          "activity_direct_delta": -0.03114017992024033
+        },
+        {
+          "minutes": 30,
+          "ts_ms": 1800001800000,
+          "baseline": 6.847528321884144,
+          "scenario": 6.826251065607546,
+          "low": 5.018861443721588,
+          "high": 8.633640687493505,
+          "food_delta": 0.788046875,
+          "insulin_actual_delta": -1.8071725512331436,
+          "insulin_scenario_delta": -0.021281833806730557,
+          "residual_drift": 0.2602520700530775,
+          "background_delta": -0.0006726807911159703,
+          "activity_direct_delta": -0.036769283390762915
+        },
+        {
+          "minutes": 35,
+          "ts_ms": 1800002100000,
+          "baseline": 6.741718300784406,
+          "scenario": 6.695752330651247,
+          "low": 4.620427590469982,
+          "high": 8.771077070832513,
+          "food_delta": 0.9646875000000001,
+          "insulin_actual_delta": -2.1068818352974525,
+          "insulin_scenario_delta": -0.045987126192140446,
+          "residual_drift": 0.2835040466651015,
+          "background_delta": 0.00044047854684289573,
+          "activity_direct_delta": -0.04221384289873149
+        },
+        {
+          "minutes": 40,
+          "ts_ms": 1800002400000,
+          "baseline": 6.67008194815055,
+          "scenario": 6.5916736036500545,
+          "low": 4.2444814926654075,
+          "high": 8.938865714634701,
+          "food_delta": 1.1484375,
+          "insulin_actual_delta": -2.3763284662797486,
+          "insulin_scenario_delta": -0.07846320893757502,
+          "residual_drift": 0.30318641993476375,
+          "background_delta": 0.0018485227998404539,
+          "activity_direct_delta": -0.04747990851487109
+        },
+        {
+          "minutes": 45,
+          "ts_ms": 1800002700000,
+          "baseline": 6.629349088240987,
+          "scenario": 6.5119382557449565,
+          "low": 3.8905179794210794,
+          "high": 9.133358532068833,
+          "food_delta": 1.337109375,
+          "insulin_actual_delta": -2.6171833609906576,
+          "insulin_scenario_delta": -0.11751960266995432,
+          "residual_drift": 0.3198471892100084,
+          "background_delta": 0.003508009206749936,
+          "activity_direct_delta": -0.05257333196499601
+        },
+        {
+          "minutes": 50,
+          "ts_ms": 1800003000000,
+          "baseline": 6.616162806711873,
+          "scenario": 6.454371229645837,
+          "low": 3.5582036226565363,
+          "high": 9.350538836635137,
+          "food_delta": 1.528515625,
+          "insulin_actual_delta": -2.8310942409236555,
+          "insulin_scenario_delta": -0.161975685857478,
+          "residual_drift": 0.33395022592412205,
+          "background_delta": 0.005379284042151429,
+          "activity_direct_delta": -0.05749977313252943
+        },
+        {
+          "minutes": 55,
+          "ts_ms": 1800003300000,
+          "baseline": 6.627098280011126,
+          "scenario": 6.4167188916292,
+          "low": 3.2473030207059925,
+          "high": 9.586134762552408,
+          "food_delta": 1.7204687500000002,
+          "insulin_actual_delta": -3.019687236667585,
+          "insulin_scenario_delta": -0.21065989798803647,
+          "residual_drift": 0.3458881887680806,
+          "background_delta": 0.007426571739452672,
+          "activity_direct_delta": -0.06226470634784513
+        },
+        {
+          "minutes": 60,
+          "ts_ms": 1800003600000,
+          "baseline": 6.65867798995164,
+          "scenario": 6.396665213107104,
+          "low": 2.9576391755762237,
+          "high": 9.835691250637984,
+          "food_delta": 1.91078125,
+          "insulin_actual_delta": -3.1845683963011946,
+          "insulin_scenario_delta": -0.2624089951142563,
+          "residual_drift": 0.35599345614791467,
+          "background_delta": 0.009618043507865598,
+          "activity_direct_delta": -0.06687342647141997
+        },
+        {
+          "minutes": 65,
+          "ts_ms": 1800003900000,
+          "baseline": 6.714025683633481,
+          "scenario": 6.391187609605773,
+          "low": 2.660244047892545,
+          "high": 10.122131171319001,
+          "food_delta": 2.1226953125000003,
+          "insulin_actual_delta": -3.3467919266126245,
+          "insulin_scenario_delta": -0.32338440378416156,
+          "residual_drift": 0.3645473803100775,
+          "background_delta": 0.011925869412781794,
+          "activity_direct_delta": -0.07133105477755697
+        },
+        {
+          "minutes": 70,
+          "ts_ms": 1800004200000,
+          "baseline": 6.784832297713788,
+          "scenario": 6.391441917162175,
+          "low": 2.3585555737083865,
+          "high": 10.424328260615964,
+          "food_delta": 2.3438758680555556,
+          "insulin_actual_delta": -3.5023841885327176,
+          "insulin_scenario_delta": -0.39412906799384195,
+          "residual_drift": 0.37178812078944856,
+          "background_delta": 0.014318951293124927,
+          "activity_direct_delta": -0.07564254464521701
+        },
+        {
+          "minutes": 75,
+          "ts_ms": 1800004500000,
+          "baseline": 6.861593488437225,
+          "scenario": 6.387390562754296,
+          "low": 2.0564630746982697,
+          "high": 10.718318050810323,
+          "food_delta": 2.560438368055555,
+          "insulin_actual_delta": -3.647014952116356,
+          "insulin_scenario_delta": -0.47518502342312385,
+          "residual_drift": 0.3779172752799119,
+          "background_delta": 0.016775493348573943,
+          "activity_direct_delta": -0.07981268706228284
+        },
+        {
+          "minutes": 80,
+          "ts_ms": 1800004800000,
+          "baseline": 6.944559061641314,
+          "scenario": 6.385603459654989,
+          "low": 2.0,
+          "high": 11.008153872706421,
+          "food_delta": 2.7714105902777773,
+          "insulin_actual_delta": -3.7795115385333116,
+          "insulin_scenario_delta": -0.5602419799371664,
+          "residual_drift": 0.3831054925451204,
+          "background_delta": 0.019284311624203986,
+          "activity_direct_delta": -0.08384611594937186
+        },
+        {
+          "minutes": 85,
+          "ts_ms": 1800005100000,
+          "baseline": 7.03396928978633,
+          "scenario": 6.393337813583418,
+          "low": 2.0,
+          "high": 11.298357745379022,
+          "food_delta": 2.9758203125,
+          "insulin_actual_delta": -3.8987048668687305,
+          "insulin_scenario_delta": -0.6422893267309074,
+          "residual_drift": 0.3874972236448813,
+          "background_delta": 0.02183409929665683,
+          "activity_direct_delta": -0.08774731330911358
+        },
+        {
+          "minutes": 90,
+          "ts_ms": 1800005400000,
+          "baseline": 7.130055673814817,
+          "scenario": 6.411212403332982,
+          "low": 2.0,
+          "high": 11.588580464115589,
+          "food_delta": 3.1726953124999993,
+          "insulin_actual_delta": -4.003429015965441,
+          "insulin_scenario_delta": -0.7209415551497202,
+          "residual_drift": 0.3912147437614627,
+          "background_delta": 0.024413432180391794,
+          "activity_direct_delta": -0.09152061420661366
+        },
+        {
+          "minutes": 95,
+          "ts_ms": 1800005700000,
+          "baseline": 7.233041691881054,
+          "scenario": 6.439836257602445,
+          "low": 2.0,
+          "high": 11.87844453380876,
+          "food_delta": 3.361063368055555,
+          "insulin_actual_delta": -4.092520819721442,
+          "insulin_scenario_delta": -0.7958143971865651,
+          "residual_drift": 0.39436155660206207,
+          "background_delta": 0.027010773559170222,
+          "activity_direct_delta": -0.09517021158663894
+        },
+        {
+          "minutes": 100,
+          "ts_ms": 1800006000000,
+          "baseline": 7.339636115796088,
+          "scenario": 6.476302082680252,
+          "low": 2.0,
+          "high": 12.16404099502503,
+          "food_delta": 3.539952256944444,
+          "insulin_actual_delta": -4.168326900931238,
+          "insulin_scenario_delta": -0.8665246800089299,
+          "residual_drift": 0.39702527616328054,
+          "background_delta": 0.029614478351863673,
+          "activity_direct_delta": -0.09870016093287633
+        },
+        {
+          "minutes": 105,
+          "ts_ms": 1800006300000,
+          "baseline": 7.446230355224875,
+          "scenario": 6.517383707079362,
+          "low": 2.0,
+          "high": 12.44112950458577,
+          "food_delta": 3.708389756944444,
+          "insulin_actual_delta": -4.233509325874856,
+          "insulin_scenario_delta": -0.9326901914011512,
+          "residual_drift": 0.3992800660920856,
+          "background_delta": 0.03221665478292124,
+          "activity_direct_delta": -0.10211438477444307
+        },
+        {
+          "minutes": 110,
+          "ts_ms": 1800006600000,
+          "baseline": 7.5526190494047425,
+          "scenario": 6.5632567635573675,
+          "low": 2.0,
+          "high": 12.708861089428423,
+          "food_delta": 3.8654036458333327,
+          "insulin_actual_delta": -4.287325911322339,
+          "insulin_scenario_delta": -0.9939295554496923,
+          "residual_drift": 0.4011887045602865,
+          "background_delta": 0.034813509121961,
+          "activity_direct_delta": -0.10541667704465595
+        },
+        {
+          "minutes": 115,
+          "ts_ms": 1800006900000,
+          "baseline": 7.658592782222318,
+          "scenario": 6.614091484988915,
+          "low": 2.0,
+          "high": 12.966372590434363,
+          "food_delta": 4.010021701388888,
+          "insulin_actual_delta": -4.329035443917939,
+          "insulin_scenario_delta": -1.0498621178358272,
+          "residual_drift": 0.4028043321430418,
+          "background_delta": 0.03740159791536862,
+          "activity_direct_delta": -0.10861070729690311
+        },
+        {
+          "minutes": 120,
+          "ts_ms": 1800007200000,
+          "baseline": 7.763938595615958,
+          "scenario": 6.670053289653449,
+          "low": 2.0,
+          "high": 13.212788572686108,
+          "food_delta": 4.141271701388889,
+          "insulin_actual_delta": -4.357897502782189,
+          "insulin_scenario_delta": -1.1001078401351512,
+          "residual_drift": 0.4041719313660733,
+          "background_delta": 0.039977828369524016,
+          "activity_direct_delta": -0.11170002478230318
+        },
+        {
+          "minutes": 125,
+          "ts_ms": 1800007500000,
+          "baseline": 7.865616091903365,
+          "scenario": 6.72964791571906,
+          "low": 2.0,
+          "high": 13.441990309160431,
+          "food_delta": 4.255021701388888,
+          "insulin_actual_delta": -4.372759464756816,
+          "insulin_scenario_delta": -1.1430931657343666,
+          "residual_drift": 0.4053295791153442,
+          "background_delta": 0.042539458302966945,
+          "activity_direct_delta": -0.1146880623936827
+        },
+        {
+          "minutes": 130,
+          "ts_ms": 1800007800000,
+          "baseline": 7.958446679950807,
+          "scenario": 6.787667760853423,
+          "low": 2.0,
+          "high": 13.648827513371142,
+          "food_delta": 4.351271701388888,
+          "insulin_actual_delta": -4.378824630616339,
+          "insulin_scenario_delta": -1.1788410823927973,
+          "residual_drift": 0.40630950677896266,
+          "background_delta": 0.04508720251530118,
+          "activity_direct_delta": -0.11757814048025478
+        },
+        {
+          "minutes": 135,
+          "ts_ms": 1800008100000,
+          "baseline": 8.037273029795639,
+          "scenario": 6.838927955519096,
+          "low": 2.0,
+          "high": 13.828167370160516,
+          "food_delta": 4.4300217013888865,
+          "insulin_actual_delta": -4.381275682862036,
+          "insulin_scenario_delta": -1.2073731301802113,
+          "residual_drift": 0.4071389976379305,
+          "background_delta": 0.04762758111037256,
+          "activity_direct_delta": -0.12037347053723751
+        },
+        {
+          "minutes": 140,
+          "ts_ms": 1800008400000,
+          "baseline": 8.100647499971044,
+          "scenario": 6.88195471185078,
+          "low": 2.0,
+          "high": 13.978583531488711,
+          "food_delta": 4.491271701388888,
+          "insulin_actual_delta": -4.381586807898904,
+          "insulin_scenario_delta": -1.2287094787102124,
+          "residual_drift": 0.40784114649101055,
+          "background_delta": 0.05017289254032238,
+          "activity_direct_delta": -0.1230771587745125
+        },
+        {
+          "minutes": 145,
+          "ts_ms": 1800008700000,
+          "baseline": 8.147126400995763,
+          "scenario": 6.915279512500448,
+          "low": 2.0,
+          "high": 14.098650851364013,
+          "food_delta": 4.535021701388887,
+          "insulin_actual_delta": -4.381226851720591,
+          "insulin_scenario_delta": -1.242869000635461,
+          "residual_drift": 0.40843550266329576,
+          "background_delta": 0.05273712949657806,
+          "activity_direct_delta": -0.1256922095682887
+        },
+        {
+          "minutes": 150,
+          "ts_ms": 1800009000000,
+          "baseline": 8.176736028163987,
+          "scenario": 6.936298749057236,
+          "low": 2.0,
+          "high": 14.186509900073197,
+          "food_delta": 4.561271701388887,
+          "insulin_actual_delta": -4.380193689576493,
+          "insulin_scenario_delta": -1.2524756649299058,
+          "residual_drift": 0.4089386143012111,
+          "background_delta": 0.05533597122416415,
+          "activity_direct_delta": -0.12822152879960727
+        },
+        {
+          "minutes": 155,
+          "ts_ms": 1800009300000,
+          "baseline": 8.189500817853778,
+          "scenario": 6.942418316686555,
+          "low": 2.0,
+          "high": 14.240305373099872,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.3784852000559304,
+          "insulin_scenario_delta": -1.2601442477456413,
+          "residual_drift": 0.4093644891082862,
+          "background_delta": 0.05798516330939368,
+          "activity_direct_delta": -0.13066792708339736
+        },
+        {
+          "minutes": 160,
+          "ts_ms": 1800009600000,
+          "baseline": 8.194193636474616,
+          "scenario": 6.942405545142256,
+          "low": 2.0,
+          "high": 14.277847697406724,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.37609926783512,
+          "insulin_scenario_delta": -1.2658786809742397,
+          "residual_drift": 0.4097249843495666,
+          "background_delta": 0.0607005166014812,
+          "activity_direct_delta": -0.1330341228916707
+        },
+        {
+          "minutes": 165,
+          "ts_ms": 1800009900000,
+          "baseline": 8.199578805804812,
+          "scenario": 6.945019505732977,
+          "low": 2.0,
+          "high": 14.316936674895842,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.37303378621808,
+          "insulin_scenario_delta": -1.2696826148890654,
+          "residual_drift": 0.41003013698322055,
+          "background_delta": 0.06348828091870413,
+          "activity_direct_delta": -0.13532274557432566
+        },
+        {
+          "minutes": 170,
+          "ts_ms": 1800010200000,
+          "baseline": 8.205265003849993,
+          "scenario": 6.949863896134123,
+          "low": 2.0,
+          "high": 14.35720211272907,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.369683970723933,
+          "insulin_scenario_delta": -1.2715594339556593,
+          "residual_drift": 0.4102884431109108,
+          "background_delta": 0.06634515152572662,
+          "activity_direct_delta": -0.13753633828091788
+        },
+        {
+          "minutes": 175,
+          "ts_ms": 1800010500000,
+          "baseline": 8.210861377384495,
+          "scenario": 6.956543137681512,
+          "low": 2.0,
+          "high": 14.39827263420263,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.366443975244349,
+          "insulin_scenario_delta": -1.2715122718566372,
+          "residual_drift": 0.41050709452742784,
+          "background_delta": 0.06926833751576608,
+          "activity_direct_delta": -0.13967736078664342
+        },
+        {
+          "minutes": 180,
+          "ts_ms": 1800010800000,
+          "baseline": 8.216374382283371,
+          "scenario": 6.964082505418877,
+          "low": 2.0,
+          "high": 14.439459967247455,
+          "food_delta": 4.570021701388887,
+          "insulin_actual_delta": -4.363310199451008,
+          "insulin_scenario_delta": -1.270520721565905,
+          "residual_drift": 0.410692178955631,
+          "background_delta": 0.07225555856161106,
+          "activity_direct_delta": -0.1417481922256755
+        }
+      ]
+    }
+  }
+}
