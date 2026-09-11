@@ -549,8 +549,8 @@ data class ForecastResult(
     val corridor: Corridor,
     val momentumUsed: Boolean,
     val health: ForecastHealth,
-    /** Human-readable reasons behind a non-TRUSTED health. */
-    val healthReasons: List<String>,
+    /** Why the health is not TRUSTED, as data; the app renders the text. */
+    val healthReasons: List<HealthReason>,
     val modelVersion: String,
     /** Autosens dial actually applied to the kernel this forecast — so a
      *  what-if increment can use the SAME effective sensitivity. */

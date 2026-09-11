@@ -5,7 +5,7 @@ package com.example.diapilot.collect
  * written by the collector components, read by the UI.
  */
 object DiagState {
-    @Volatile var bleStatus: String = "выключен"
+    @Volatile var bleStatus: String = ""
     @Volatile var bleLastPacketMs: Long = 0
     @Volatile var serviceStartedMs: Long = 0
     @Volatile var watchServerUp: Boolean = false

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- InsulinShapeSpark.kt -->
+    <string name="insulin_shape_spark_caption">action rate · verticals: onset and peak · grid — hours, %1$.0f min total</string>
+
+    <!-- WatchServer.kt: placeholder food-note content when the watch sends carbs with no dish name -->
+    <string name="watch_server_food_from_watch">Food from watch</string>
+
+    <!-- MainState.kt -->
+    <string name="main_state_meter_cal_prefix">🩸 Meter calibration: %1$s</string>
+    <!-- %1$s: signed glucose delta with unit; %2$d: number of checks -->
+    <plurals name="main_state_meter_cal_checks">
+        <item quantity="one">%1$s (from %2$d check)</item>
+        <item quantity="other">%1$s (from %2$d checks)</item>
+    </plurals>
+    <!-- %1$.2f: slope multiplier; %2$s: signed glucose delta with unit; %3$d: number of checks -->
+    <plurals name="main_state_meter_cal_checks_slope">
+        <item quantity="one">×%1$.2f %2$s (from %3$d check)</item>
+        <item quantity="other">×%1$.2f %2$s (from %3$d checks)</item>
+    </plurals>
+    <string name="main_state_meter_cal_fading">%1$s (fading)</string>
+    <string name="main_state_generic_food_label">food</string>
+    <string name="main_state_isf_source_hour">physio, hour %1$d</string>
+    <string name="main_state_isf_source_manual">%1$s · your setting</string>
+    <string name="main_state_sensitivity_stronger">⚡ Insulin has been acting stronger than usual over the last few hours (×%1$.1f) — sensitivity may have changed</string>
+    <string name="main_state_sensitivity_weaker">⚡ Insulin has been acting weaker than usual over the last few hours (×%1$.1f)</string>
+    <string name="main_state_isf_unit_mgdl">%1$.0f mg/dL per U</string>
+    <string name="main_state_isf_unit_mmol">%1$.1f mmol/L per U</string>
+    <string name="main_state_isf_factor_tod">time of day ×%1$.2f</string>
+    <string name="main_state_isf_factor_autosens">autosens ×%1$.2f</string>
+    <string name="main_state_applied_isf_plain">Forecast used %1$s (base, no adjustments)</string>
+    <!-- %1$s: effective ISF text; %2$s: base ISF text; %3$s: factor list joined with " × " -->
+    <string name="main_state_applied_isf_factors">Forecast used %1$s = base %2$s × %3$s</string>
+
+    <!-- GlucoseChart.kt -->
+    <string name="glucose_chart_conditional_bolus_scenario">Conditional scenario: only the %1$.1f U injection is removed; other observed and hidden processes are assumed unchanged</string>
+    <string name="glucose_chart_span_3h">3h</string>
+    <string name="glucose_chart_span_6h">6h</string>
+    <string name="glucose_chart_span_24h">24h</string>
+    <string name="glucose_chart_span_3d">3d</string>
+    <string name="glucose_chart_cd_return_to_now">Return to now</string>
+    <string name="glucose_chart_cd_pick_date">Pick chart date</string>
+    <string name="glucose_chart_dashed_line">Dashed: %1$s</string>
+    <string name="glucose_chart_dashed_line_with_landmarks">Dashed: %1$s · start %2$.0f · rate peak %3$.0f · tail %4$.0f min</string>
+    <string name="glucose_chart_audit_underexplained">Consistent with the retrospective CGM profile: %1$.1f–%2$.1f of the %3$.1f mmol/L drop; %4$.1f remains causally unassigned</string>
+    <string name="glucose_chart_audit_explained">Observed drop %1$.1f; retrospective CGM profile interval %2$.1f–%3$.1f mmol/L</string>
+    <string name="glucose_chart_audit_caveat">Observed shape is consistent with bolus timing, but does not prove causation. A different ISF/timing today, hidden activity, basal/hepatic background, a food or sensor error are all possible. After it ends, see the episode receipt in “Analysis”.</string>
+    <string name="glucose_chart_restore">Restore</string>
+    <string name="glucose_chart_basal_short_label">B%1$.0f</string>
+    <string name="glucose_chart_explain_food">How it was calculated</string>
+    <string name="glucose_chart_bolus_dialog_title">💉 Injection</string>
+    <string name="glucose_chart_dose_units_label">Dose, U</string>
+    <string name="glucose_chart_purpose_label">Purpose:</string>
+    <string name="glucose_chart_restore_actual_line">Restore actual line</string>
+    <string name="glucose_chart_hide_bolus_conditionally">Conditionally remove only this injection</string>
+    <string name="glucose_chart_no_personal_curve">Personal insulin curve not yet determined</string>
+    <string name="glucose_chart_delete_bolus">🗑 Delete injection</string>
+    <string name="glucose_chart_save">Save</string>
+    <string name="glucose_chart_cancel">Cancel</string>
+    <string name="glucose_chart_delete_note_title">Delete note?</string>
+    <string name="glucose_chart_delete_confirm">Delete</string>
+    <string name="glucose_chart_basal_dialog_title">🌙 Basal</string>
+    <string name="glucose_chart_delete_basal">🗑 Delete</string>
+    <string name="glucose_chart_show">Show</string>
+    <string name="glucose_chart_sel_meal_ate_rise">%1$s %2$s (ate) · rise from %3$s</string>
+    <string name="glucose_chart_sel_meal_bg_change">%1$s → %2$s in %3$.0f min</string>
+    <string name="glucose_chart_sel_no_bolus">no bolus</string>
+    <string name="glucose_chart_sel_bolus_row">💉 %1$s · %2$.1f U</string>
+    <string name="glucose_chart_sel_basal_row">🕐 %1$s · basal %2$.0f U</string>
+</resources>

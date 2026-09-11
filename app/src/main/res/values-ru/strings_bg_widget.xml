@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bg_widget_no_data">нет данных</string>
+    <string name="bg_widget_age_min">%1$d мин</string>
+    <string name="bg_widget_ago_min">%1$dм</string>
+    <string name="bg_widget_ago_hm">%1$dч%2$dм</string>
+    <string name="bg_widget_last_dose">укол %1$s ед · %2$s</string>
+</resources>

@@ -12,6 +12,8 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.util.UUID
 
 /**
@@ -95,7 +97,7 @@ class LibreBleClient(private val context: Context) {
         private set
 
     @Volatile
-    var status: String = "выключен"
+    var status: String = context.localized().getString(R.string.libre_ble_client_status_off)
         private set(value) {
             field = value
             DiagState.bleStatus = value
@@ -172,7 +174,7 @@ class LibreBleClient(private val context: Context) {
 
     fun stop() {
         running = false
-        status = "выключен"
+        status = context.localized().getString(R.string.libre_ble_client_status_off)
         handler.removeCallbacksAndMessages(null)
         runCatching { gatt?.disconnect(); gatt?.close() }
         gatt = null
@@ -184,7 +186,7 @@ class LibreBleClient(private val context: Context) {
     private fun forceReconnect(reason: String) {
         val g = gatt
         Log.w(TAG, "watchdog: $reason — forcing reconnect")
-        status = "поток завис — переподключаюсь"
+        status = context.localized().getString(R.string.libre_ble_client_status_stream_stalled)
         loginSentThisSession = false        // not a login reject; don't advance the probe
         reconnectDelayMs = RECONNECT_DELAY_MS  // sensor was reachable — retry fast
         runCatching { g?.disconnect() }
@@ -216,19 +218,24 @@ class LibreBleClient(private val context: Context) {
         if (!running) return
         val state = com.example.diapilot.data.Libre2State.load(context)
         if (state == null || state.mac.isBlank()) {
-            status = "нет MAC — отсканируйте сенсор"
+            status = context.localized().getString(R.string.libre_ble_client_status_no_mac)
             return
         }
         val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
         if (adapter == null || !adapter.isEnabled) {
-            status = "Bluetooth выключен"
+            status = context.localized().getString(R.string.libre_ble_client_status_bluetooth_off)
             scheduleReconnect()
             return
         }
         try {
             val device = adapter.getRemoteDevice(state.mac)
             val auto = autoConnectMode
-            status = if (auto) "сенсор молчит — дежурю в эфире" else "подключаюсь к ${state.mac}"
+            val text = context.localized()
+            status = if (auto) {
+                text.getString(R.string.libre_ble_client_status_listening)
+            } else {
+                text.getString(R.string.libre_ble_client_status_connecting, state.mac)
+            }
             Log.i(TAG, "connecting to ${state.mac}, connectionIndex=${state.connectionIndex}, auto=$auto")
             bufferFilled = 0
             packetsThisSession = 0
@@ -298,13 +305,13 @@ class LibreBleClient(private val context: Context) {
                 linkUp = true
                 autoConnectMode = false   // reachable again — next cycle starts fast/direct
                 markProgress()
-                status = "подключён, ищу сервисы"
+                status = context.localized().getString(R.string.libre_ble_client_status_discovering)
                 if (!g.discoverServices()) {
                     Log.w(TAG, "discoverServices() rejected — reconnecting")
                     g.disconnect()
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                status = "отключён, переподключение…"
+                status = context.localized().getString(R.string.libre_ble_client_status_reconnecting)
                 runCatching { g.close() }
                 if (gatt !== g && gatt != null) {
                     // A STALE gatt's callback (client already reconnected) —
@@ -336,7 +343,7 @@ class LibreBleClient(private val context: Context) {
                         // out of the probe range (today: sensor at 1, we at
                         // 79). Reconnecting harder won't help; tell the user.
                         StreamStallNotifier.maybeNotify(
-                            context, "BLE-логин отвергнут на всех соседних индексах",
+                            context, R.string.stream_stall_notifier_reason_login_rejected,
                         )
                     }
                 } else if (!linkUp) {
@@ -386,7 +393,7 @@ class LibreBleClient(private val context: Context) {
                 g.disconnect()
                 return
             }
-            status = "подписка на данные…"
+            status = context.localized().getString(R.string.libre_ble_client_status_subscribing)
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, s: Int) {
@@ -423,7 +430,7 @@ class LibreBleClient(private val context: Context) {
             probedIndex = state.connectionIndex + probeOffsets[probeIdx]
             val unlock = state.unlockArray.getOrNull(probedIndex - state.unlockStartIndex)
             if (unlock == null) {
-                status = "unlock-буферы кончились — пересканируйте сенсор"
+                status = context.localized().getString(R.string.libre_ble_client_status_unlock_exhausted)
                 Log.w(TAG, "no unlock buffer for index $probedIndex")
                 probeIdx = (probeIdx + 1) % probeOffsets.size
                 g.disconnect()
@@ -445,18 +452,18 @@ class LibreBleClient(private val context: Context) {
                 return
             }
             loginSentThisSession = true
-            status = "логин отправлен (nonce $probedIndex)"
+            status = context.localized().getString(R.string.libre_ble_client_status_login_sent, probedIndex)
             Log.i(TAG, "login sent first, ${unlock.size} bytes, index=$probedIndex")
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, s: Int) {
             Log.i(TAG, "descriptor write status=$s")
             if (s != BluetoothGatt.GATT_SUCCESS) {
-                status = "не удалось подписаться (status=$s)"
+                status = context.localized().getString(R.string.libre_ble_client_status_subscribe_failed, s)
                 g.disconnect()
             } else {
                 markProgress()
-                status = "жду поток…"
+                status = context.localized().getString(R.string.libre_ble_client_status_waiting_stream)
             }
         }
 
@@ -490,7 +497,10 @@ class LibreBleClient(private val context: Context) {
             lastPacketMs = now
             markProgress()
             DiagState.bleLastPacketMs = now
-            status = "поток идёт (пакет ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(now)})"
+            status = context.localized().getString(
+                R.string.libre_ble_client_status_streaming,
+                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(now),
+            )
             val packet = buffer.copyOf()
             // The sensor repeats/re-fragments within the minute and each
             // transmission is re-encrypted (different ciphertext) — dedup by

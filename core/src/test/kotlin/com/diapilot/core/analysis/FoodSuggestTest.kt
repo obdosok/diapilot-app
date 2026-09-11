@@ -59,7 +59,7 @@ class FoodSuggestTest {
             boluses = listOf(BolusPoint(now - 20 * 60_000, 4.5, null)), zone = UTC,
         )
         assertEquals(1, s.size)
-        assertEquals("укол", s[0].trigger)
+        assertEquals(SuggestTrigger.DOSE, s[0].trigger)
         assertEquals(4.5, s[0].units!!, 1e-9)
         assertEquals("смузи", s[0].prediction!!.dish)
     }
@@ -97,7 +97,7 @@ class FoodSuggestTest {
             zone = UTC,
         )
         assertEquals(1, s.size)
-        assertEquals("детект", s[0].trigger)          // onset wins as the food time
+        assertEquals(SuggestTrigger.DETECTED_RISE, s[0].trigger)   // onset wins as the food time
         assertEquals(5.0, s[0].units!!, 1e-9)         // the dose tags along
         assertEquals("смузи", s[0].prediction!!.dish)
     }

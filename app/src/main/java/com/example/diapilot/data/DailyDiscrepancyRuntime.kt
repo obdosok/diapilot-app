@@ -1,8 +1,11 @@
 package com.example.diapilot.data
 
+import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.physio.*
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.util.Calendar
 import kotlin.math.abs
 
@@ -174,6 +177,7 @@ object DailyDiscrepancyRuntime {
         now: Long,
         matrix: List<FactorEvidenceV1> = emptyList(),
         store: CollectorStore? = null,
+        context: Context? = null,
     ): TodayDiscrepancyView? = db.rawQuery(
         "SELECT known_at_ms,kind,payload_json FROM physio_daily_checkpoints WHERE known_at_ms>=? ORDER BY known_at_ms",
         arrayOf(maxOf(dayStart(now),FoodEraSettings.current().startMs).toString()),
@@ -215,12 +219,44 @@ object DailyDiscrepancyRuntime {
             "sensor age/epoch/change, lag/compression/calibration/process and gaps: never relabelled ISF; interval coefficient=${v.sensorProcess}",
         )
         val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        // Localized when a Context is available (the caller does not always
+        // have one yet); otherwise falls back to the English default text.
+        val res = context?.localized()
+        val thresholdCrossed = last.optBoolean("practical_threshold_crossed")
+        val thresholdWord = res?.getString(
+            if (thresholdCrossed) R.string.daily_discrepancy_runtime_threshold_crossed
+            else R.string.daily_discrepancy_runtime_threshold_not_crossed,
+        ) ?: if (thresholdCrossed) "crossed" else "not crossed"
+        val effectiveLine = res?.getString(
+            R.string.daily_discrepancy_runtime_effective_line,
+            e.getDouble("median"), e.getDouble("p10"), e.getDouble("p90"),
+            100 * last.optDouble("change_probability_positive", .5),
+            100 * last.optDouble("rolling_probability_positive", .5),
+            thresholdWord,
+        ) ?: ("Observed combined food and insulin response: %+.0f%% [%.0f…%.0f] vs. the previous/inertial " +
+            "state; P(increase)=%.0f%%, vs. rolling baseline %.0f%%; practical threshold: %s").format(
+            e.getDouble("median"), e.getDouble("p10"), e.getDouble("p90"),
+            100 * last.optDouble("change_probability_positive", .5),
+            100 * last.optDouble("rolling_probability_positive", .5),
+            thresholdWord,
+        )
+        val identifiedIsfLine = if (last.getString("isf_status") == EvidenceStatus.NOT_IDENTIFIABLE.name) {
+            res?.getString(R.string.daily_discrepancy_runtime_isf_unclear) ?: "Pure ISF can't be separated out yet"
+        } else {
+            "ISF posterior: %+.0f%% [%.0f…%.0f], n=%d".format(i.getDouble("median"), i.getDouble("p10"), i.getDouble("p90"), i.getInt("n"))
+        }
+        val mixedDataLine = res?.getString(
+            R.string.daily_discrepancy_runtime_residual_line,
+            last.getDouble("observed_delta"), last.getDouble("predicted_delta"), last.getString("episode"),
+        ) ?: "Residual: observed %+.2f, expected %+.2f mmol/L; provenance: %s".format(
+            last.getDouble("observed_delta"), last.getDouble("predicted_delta"), last.getString("episode"),
+        )
         TodayDiscrepancyView(
             rows.map { "${fmt.format(java.util.Date(it.first))} · ${it.second.lowercase()}" },
-            "Наблюдаемый совместный ответ еды и инсулина: %+.0f%% [%.0f…%.0f] к предыдущему/инерционному состоянию; P(рост)=%.0f%%, против rolling baseline %.0f%%; practical threshold: %s".format(e.getDouble("median"), e.getDouble("p10"), e.getDouble("p90"), 100*last.optDouble("change_probability_positive",.5),100*last.optDouble("rolling_probability_positive",.5), if(last.optBoolean("practical_threshold_crossed")) "пересечён" else "не пересечён"),
-            if (last.getString("isf_status") == EvidenceStatus.NOT_IDENTIFIABLE.name) "Чистый ISF пока невозможно отделить" else "ISF posterior: %+.0f%% [%.0f…%.0f], n=%d".format(i.getDouble("median"), i.getDouble("p10"), i.getDouble("p90"), i.getInt("n")),
+            effectiveLine,
+            identifiedIsfLine,
             "$coverage Unsupported hypotheses contribute 0 to median and remain visible in the registry.",
-            "Residual: наблюдалось %+.2f, ожидалось %+.2f ммоль/л; provenance: ${last.getString("episode")}".format(last.getDouble("observed_delta"), last.getDouble("predicted_delta")),
+            mixedDataLine,
             PhysioRuntime.artifact()?.baseMechanics?.let { person ->
                 com.diapilot.core.hybrid.HybridForecastEngine(person).insulinLandmarks().let{
                     "Insulin kinetics prior: onset %.0f, rate peak %.0f, tail %.0f min; exact selected-engine CDF; identifying n=0, current state carried from prior.".format(it.onsetMin,it.ratePeakMin,it.effectEndMin)

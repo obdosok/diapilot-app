@@ -14,7 +14,7 @@ import java.security.MessageDigest
  */
 object HistoryFoodProjectionCache {
     // v2: the key and the payload both carry the meal. See [key] and [toJson].
-    private const val CONTRACT = "history-food-projection-v2"
+    private const val CONTRACT = "history-food-projection-v3"
 
     /**
      * How far a neighbour can still be part of the same meal.
@@ -126,7 +126,13 @@ object HistoryFoodProjectionCache {
         put("amplitude_basis", r.amplitudeBasis); put("timing_basis", r.timingBasis)
         put("template", r.timingTemplateId ?: JSONObject.NULL)
         put("source", r.timingSource ?: JSONObject.NULL)
-        put("kinetics", r.kineticsSummary ?: JSONObject.NULL)
+        put(
+            "kinetics",
+            r.kinetics?.let { k ->
+                JSONObject().put("fast", k.fastPct).put("medium", k.mediumPct).put("slow", k.slowPct)
+                    .put("form", k.form).put("tail", k.tailEndMin ?: JSONObject.NULL)
+            } ?: JSONObject.NULL,
+        )
         // WHAT THE CARD ACTUALLY PRINTS. `half` was missing entirely, so a
         // cached row silently fell back to `peakMin` — the very number the card
         // stopped showing because it jumps between humps. The
@@ -153,7 +159,12 @@ object HistoryFoodProjectionCache {
         timingBasis = o.getString("timing_basis"),
         timingTemplateId = if (o.isNull("template")) null else o.optString("template").takeIf { it.isNotBlank() },
         timingSource = if (o.isNull("source")) null else o.optString("source").takeIf { it.isNotBlank() },
-        kineticsSummary = if (o.isNull("kinetics")) null else o.optString("kinetics").takeIf { it.isNotBlank() },
+        kinetics = o.optJSONObject("kinetics")?.let { k ->
+            FoodKineticsLine(
+                k.getInt("fast"), k.getInt("medium"), k.getInt("slow"), k.getString("form"),
+                if (k.isNull("tail")) null else k.getInt("tail"),
+            )
+        },
         halfArrivalMin = if (o.isNull("half")) o.getInt("peak") else o.getInt("half"),
         proteinG = if (o.isNull("protein")) null else o.getDouble("protein"),
         mixtureCurveMmol = o.optJSONArray("mixture_curve")?.let { a ->

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bg_widget_no_data">no data</string>
+    <string name="bg_widget_age_min">%1$d min</string>
+    <string name="bg_widget_ago_min">%1$dm</string>
+    <string name="bg_widget_ago_hm">%1$dh%2$dm</string>
+    <!-- %1$s: units, already formatted; %2$s: time since the dose. -->
+    <string name="bg_widget_last_dose">injection %1$s U · %2$s ago</string>
+</resources>

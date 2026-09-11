@@ -99,14 +99,15 @@ fun readBits(buffer: ByteArray, byteOffset: Int, bitOffset: Int, bitCount: Int):
     return res
 }
 
-enum class LibreStatus(val code: Int, val labelRu: String, val usable: Boolean) {
-    NOT_STARTED(0x01, "не запущен", false),
-    STARTING(0x02, "прогрев", true),
-    READY(0x03, "работает", true),
-    EXPIRED(0x04, "истёк", false),
-    SHUTDOWN(0x05, "остановлен", false),
-    FAILURE(0x06, "сбой", false),
-    UNKNOWN(-1, "неизвестно", false);
+/** Sensor state from the FRAM header; the app renders its label (i18n.LibreText). */
+enum class LibreStatus(val code: Int, val usable: Boolean) {
+    NOT_STARTED(0x01, false),
+    STARTING(0x02, true),
+    READY(0x03, true),
+    EXPIRED(0x04, false),
+    SHUTDOWN(0x05, false),
+    FAILURE(0x06, false),
+    UNKNOWN(-1, false);
 
     companion object {
         fun of(code: Int): LibreStatus = entries.firstOrNull { it.code == code } ?: UNKNOWN

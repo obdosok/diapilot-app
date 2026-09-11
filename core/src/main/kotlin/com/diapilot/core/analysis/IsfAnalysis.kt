@@ -54,21 +54,23 @@ data class IsfConfig(
     val maxPostBolusRiseMmol: Double = 1.8,
 )
 
-enum class TodBucket(val labelRu: String, val range: IntRange) {
-    NIGHT("ночь 00–06", 0..5),
-    MORNING("утро 06–12", 6..11),
-    DAY("день 12–18", 12..17),
-    EVENING("вечер 18–24", 18..23);
+/** Time-of-day slot; the app renders its label ("night 00–06"). */
+enum class TodBucket(val range: IntRange) {
+    NIGHT(0..5),
+    MORNING(6..11),
+    DAY(12..17),
+    EVENING(18..23);
 
     companion object {
         fun of(hour: Int): TodBucket = entries.firstOrNull { hour in it.range } ?: NIGHT
     }
 }
 
-enum class Confidence(val labelRu: String) {
-    INSUFFICIENT("данных недостаточно"),   // < 5 valid episodes
-    PRELIMINARY("предварительная оценка"), // 5..14
-    STABLE("устойчивая оценка");           // >= 15
+/** How much the ISF estimate rests on; the app renders its label. */
+enum class Confidence {
+    INSUFFICIENT,   // < 5 valid episodes
+    PRELIMINARY,    // 5..14
+    STABLE;         // >= 15
 
     companion object {
         fun of(n: Int): Confidence = when {
@@ -111,6 +113,7 @@ data class IsfDetection(
 )
 
 // Rejection reasons, in the order filters are applied (mirrors REASONS).
+// The codes are language-neutral; the app renders them (i18n.IsfText).
 object Reject {
     const val DOSE_TOO_SMALL = "dose_too_small"
     const val DOSE_TOO_LARGE = "dose_too_large"
@@ -124,18 +127,11 @@ object Reject {
     const val LIKELY_UNLOGGED_FOOD = "likely_unlogged_food"
     const val ACTIVITY_IN_WINDOW = "activity_in_window"
 
-    val LABELS_RU = mapOf(
-        DOSE_TOO_SMALL to "доза слишком мала",
-        ACTIVITY_IN_WINDOW to "активность рядом (сенситизация)",
-        DOSE_TOO_LARGE to "доза слишком велика",
-        OTHER_BOLUS_IN_WINDOW to "другой болюс в окне",
-        FOOD_IN_WINDOW to "еда в окне (детект)",
-        NO_PRE_BOLUS_READINGS to "нет показаний перед болюсом",
-        START_BG_TOO_LOW to "стартовый сахар ниже порога",
-        INSUFFICIENT_CGM_COVERAGE to "мало точек CGM в окне",
-        HYPO_IN_WINDOW to "гипо в окне наблюдения",
-        NO_END_WINDOW_READINGS to "нет показаний в конце окна",
-        LIKELY_UNLOGGED_FOOD to "похоже на незалогированную еду (сахар рос после укола)",
+    /** Every code, for renderers that must cover them all. */
+    val ALL = listOf(
+        DOSE_TOO_SMALL, ACTIVITY_IN_WINDOW, DOSE_TOO_LARGE, OTHER_BOLUS_IN_WINDOW,
+        FOOD_IN_WINDOW, NO_PRE_BOLUS_READINGS, START_BG_TOO_LOW, INSUFFICIENT_CGM_COVERAGE,
+        HYPO_IN_WINDOW, NO_END_WINDOW_READINGS, LIKELY_UNLOGGED_FOOD,
     )
 }
 

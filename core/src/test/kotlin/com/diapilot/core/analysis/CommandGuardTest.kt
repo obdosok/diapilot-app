@@ -1,5 +1,6 @@
 package com.diapilot.core.analysis
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -55,5 +56,22 @@ class CommandGuardTest {
         assertNotNull(validateCommandValues("food", food = "х".repeat(200)))
         assertNotNull(validateCommandValues("activity", activity = ""))
         assertNotNull(validateCommandValues("food", food = "торт", grams = 500.0))
+    }
+
+    @Test
+    fun eachBlockNamesItsReason() {
+        val fuse = com.diapilot.core.PersonalParams.DEFAULT.commandMaxBolusUnits
+        assertEquals(CommandBlock.BolusAboveFuse(100.0, fuse), validateCommandValues("bolus", units = 100.0))
+        assertEquals(CommandBlock.NotANumber, validateCommandValues("bolus", units = Double.NaN))
+        assertEquals(CommandBlock.DoseMissing, validateCommandValues("basal", units = null))
+        assertEquals(CommandBlock.GlucoseOutOfRange, validateCommandValues("meter", mmol = 500.0))
+        assertEquals(CommandBlock.GlucoseMissing, validateCommandValues("meter", mmol = null))
+        assertEquals(CommandBlock.UnknownPurpose("профилактика"), validateCommandValues("bolus", units = 2.0, purpose = "профилактика"))
+        assertEquals(CommandBlock.UnknownAction("hack_the_db"), validateCommandValues("hack_the_db"))
+        assertEquals(CommandBlock.FoodEmpty, validateCommandValues("food", food = ""))
+        assertEquals(CommandBlock.FoodTooLong, validateCommandValues("food", food = "х".repeat(200)))
+        assertEquals(CommandBlock.CarbsImplausible, validateCommandValues("food", food = "торт", grams = 500.0))
+        assertEquals(CommandBlock.ActivityEmpty, validateCommandValues("activity", activity = ""))
+        assertEquals(CommandBlock.ActivityTooLong, validateCommandValues("activity", activity = "б".repeat(41)))
     }
 }

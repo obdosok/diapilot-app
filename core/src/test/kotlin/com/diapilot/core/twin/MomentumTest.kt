@@ -38,7 +38,7 @@ class MomentumTest {
             },
             now,
         )!!
-        assertEquals("ускоряется", accel.nuance)
+        assertEquals(TrendNuance.ACCELERATING, accel.nuance)
 
         // Decelerating fall: last −0.3 after −0.9.
         val decel = trendReadout(
@@ -51,7 +51,7 @@ class MomentumTest {
             },
             now,
         )!!
-        assertEquals("замедляется", decel.nuance)
+        assertEquals(TrendNuance.DECELERATING,decel.nuance)
 
         // NOISE (±1 mg/dL teeth): delta ~0, no nuance, no phantom arrows —
         // the exact field failure (132→129 over 4 min displayed as −17).
@@ -72,7 +72,7 @@ class MomentumTest {
             },
             now,
         )!!
-        assertEquals("развернулся", turn.nuance)
+        assertEquals(TrendNuance.REVERSED, turn.nuance)
 
         // Thin/stale data refuses.
         assertNull(trendReadout(emptyList(), now))
@@ -99,7 +99,7 @@ class MomentumTest {
         )
         val r = gridTrendReadout(grid, now)!!
         assertEquals(-0.23, r.delta5Mmol, 0.03)
-        assertEquals("замедляется", r.nuance)
+        assertEquals(TrendNuance.DECELERATING,r.nuance)
 
         // Stale grid (newest 8 min old) refuses → caller falls back.
         assertNull(

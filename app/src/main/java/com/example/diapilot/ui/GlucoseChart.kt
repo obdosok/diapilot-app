@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -55,14 +56,17 @@ import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.collector.GlucosePoint
 import com.diapilot.core.collector.MealEvent
 import com.diapilot.core.twin.PredictedPoint
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
+import com.example.diapilot.i18n.resolve
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
 
-internal fun conditionalBolusScenarioLabel(units:Double)=
-    "Условный сценарий: убран только укол ${"%.1f".format(units)} ед; остальные наблюдаемые и скрытые процессы считаются неизменными"
+internal fun conditionalBolusScenarioLabel(units:Double): com.example.diapilot.i18n.UiText =
+    com.example.diapilot.i18n.UiText.res(R.string.glucose_chart_conditional_bolus_scenario, units)
 
 /** Target glycemic range, mmol/L (chart band; not medical advice — display only). */
 private const val RANGE_LO = 3.9
@@ -284,6 +288,7 @@ fun GlucoseChart(
     val measurer = rememberTextMeasurer()
     val tickStyle = TextStyle(fontSize = 10.sp, color = textColor)
     val density = LocalDensity.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Viewport: anchorTo == null means "follow live data edge".
     var anchorTo by remember { mutableStateOf<Long?>(null) }
@@ -359,8 +364,10 @@ fun GlucoseChart(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             listOf(
-                "3ч" to 3 * HOUR_MS, "6ч" to 6 * HOUR_MS,
-                "24ч" to 24 * HOUR_MS, "3д" to 72 * HOUR_MS,
+                stringResource(R.string.glucose_chart_span_3h) to 3 * HOUR_MS,
+                stringResource(R.string.glucose_chart_span_6h) to 6 * HOUR_MS,
+                stringResource(R.string.glucose_chart_span_24h) to 24 * HOUR_MS,
+                stringResource(R.string.glucose_chart_span_3d) to 72 * HOUR_MS,
             ).forEach { (label, span) ->
                 val selected = spanMs == span.coerceAtMost(fullSpan)
                 Text(
@@ -381,7 +388,7 @@ fun GlucoseChart(
             if (anchorTo != null) {
                 ChartToolButton(
                     ChartTool.NOW,
-                    contentDescription = "Вернуться к текущему времени",
+                    contentDescription = stringResource(R.string.glucose_chart_cd_return_to_now),
                     onClick = { anchorTo = null },
                 )
             }
@@ -390,14 +397,14 @@ fun GlucoseChart(
             var showDatePicker by remember { mutableStateOf(false) }
             ChartToolButton(
                 ChartTool.DATE,
-                contentDescription = "Выбрать дату графика",
+                contentDescription = stringResource(R.string.glucose_chart_cd_pick_date),
                 active = navActive,
                 onClick = { showDatePicker = true },
             )
             if (navActive) {
                 ChartToolButton(
                     ChartTool.NOW,
-                    contentDescription = "Вернуться к текущему времени",
+                    contentDescription = stringResource(R.string.glucose_chart_cd_return_to_now),
                     onClick = { onHistoryNav(null) },
                 )
             }
@@ -418,27 +425,35 @@ fun GlucoseChart(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Пунктир: ${conditionalBolusScenarioLabel(b.units)}"+
-                                (lm?.let{" · старт %.0f · пик скорости %.0f · хвост %.0f мин".format(it.first,it.second,it.third)}?:""),
+                            lm?.let{
+                                stringResource(
+                                    R.string.glucose_chart_dashed_line_with_landmarks,
+                                    conditionalBolusScenarioLabel(b.units).resolve(), it.first, it.second, it.third,
+                                )
+                            } ?: stringResource(R.string.glucose_chart_dashed_line, conditionalBolusScenarioLabel(b.units).resolve()),
                             style=MaterialTheme.typography.labelSmall,color=bolusColor,
                         )
                         audit?.let{a->
                             Text(
                                 if(a.materiallyUnderExplained)
-                                    "С ретроспективным CGM-профилем совместимы %.1f–%.1f из %.1f ммоль/л падения; остаток %.1f причинно не распределён"
-                                        .format(a.explainedLow,a.explainedHigh,a.observedFall,a.unexplainedLowering)
-                                else "Наблюдаемое падение %.1f; интервал ретроспективного CGM-профиля %.1f–%.1f ммоль/л"
-                                    .format(a.observedFall,a.explainedLow,a.explainedHigh),
+                                    stringResource(
+                                        R.string.glucose_chart_audit_underexplained,
+                                        a.explainedLow,a.explainedHigh,a.observedFall,a.unexplainedLowering,
+                                    )
+                                else stringResource(
+                                    R.string.glucose_chart_audit_explained,
+                                    a.observedFall,a.explainedLow,a.explainedHigh,
+                                ),
                                 style=MaterialTheme.typography.labelSmall,
                                 color=if(a.materiallyUnderExplained) MaterialTheme.colorScheme.error else textColor,
                             )
                             if(a.materiallyUnderExplained) Text(
-                                "Наблюдаемая форма совместима с bolus timing, но не доказывает причинность. Возможны другой ISF/тайминг сегодня, скрытая активность, базал/печёночный фон, ошибка еды или сенсора. После завершения см. receipt эпизода в «Анализе».",
+                                stringResource(R.string.glucose_chart_audit_caveat),
                                 style=MaterialTheme.typography.labelSmall,color=textColor,
                             )
                         }
                     }
-                    TextButton(onClick={hiddenBolusTs=null}){Text("Вернуть")}
+                    TextButton(onClick={hiddenBolusTs=null}){Text(stringResource(R.string.glucose_chart_restore))}
                 }
             }
         }
@@ -485,7 +500,7 @@ fun GlucoseChart(
                                 val vTo = liveViewTo()
                                 selPos = off
                                 selection = selectTapped(
-                                    off, padLeftPx, widthPx,
+                                    context, off, padLeftPx, widthPx,
                                     vTo - spanMs, vTo,
                                     readingsLive, bolusesLive, mealsLive,
                                     annotationsLive, basalsLive,
@@ -517,7 +532,7 @@ fun GlucoseChart(
                             val vTo = liveViewTo()
                             selPos = off
                             selection = selectTapped(
-                                off, padLeftPx, widthPx,
+                                context, off, padLeftPx, widthPx,
                                 vTo - spanMs, vTo,
                                 readingsLive, bolusesLive, mealsLive,
                                 annotationsLive, basalsLive,
@@ -1078,7 +1093,7 @@ fun GlucoseChart(
                 val bx = x(b.tsMs)
                 val barH = with(density) { 18.dp.toPx() }
                 drawLine(line, Offset(bx, h), Offset(bx, h - barH), strokeWidth = with(density) { 3.dp.toPx() })
-                val label = "Б%.0f".format(b.units)
+                val label = context.getString(R.string.glucose_chart_basal_short_label, b.units)
                 val layout = measurer.measure(label, basalStyle)
                 drawText(measurer, label, Offset(bx - layout.size.width / 2f, h - barH - layout.size.height - 2f), basalStyle)
             }
@@ -1307,7 +1322,7 @@ fun GlucoseChart(
                         }
                         (item.ref as? SelRef.Note)?.let { note ->
                             androidx.compose.material3.TextButton(onClick={ selection=null;onExplainFood(note.id) }) {
-                                Text("Как рассчитано")
+                                Text(stringResource(R.string.glucose_chart_explain_food))
                             }
                         }
                     }
@@ -1324,17 +1339,17 @@ fun GlucoseChart(
                 }
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { purposeFor = null },
-                    title = { Text("💉 Укол") },
+                    title = { Text(stringResource(R.string.glucose_chart_bolus_dialog_title)) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             androidx.compose.material3.OutlinedTextField(
                                 value = doseText,
                                 onValueChange = { doseText = it },
-                                label = { Text("Доза, ед") },
+                                label = { Text(stringResource(R.string.glucose_chart_dose_units_label)) },
                                 singleLine = true,
                             )
                             Text(
-                                "Назначение:",
+                                stringResource(R.string.glucose_chart_purpose_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1348,7 +1363,7 @@ fun GlucoseChart(
                                             onTagBolus(b.tsMs, if (b.purpose == p) null else p)
                                             purposeFor = null; selection = null
                                         },
-                                        label = { Text(p) },
+                                        label = { Text(com.example.diapilot.i18n.TokenText.bolusPurpose(context, p)!!) },
                                     )
                                 }
                             }
@@ -1360,15 +1375,20 @@ fun GlucoseChart(
                                     hiddenBolusTs=if(hiddenBolusTs==b.tsMs)null else b.tsMs
                                     purposeFor=null;selection=null
                                 },
-                            ) { Text(if(hiddenBolusTs==b.tsMs)"Вернуть фактическую линию" else "Условно убрать только этот укол") }
+                            ) {
+                                Text(
+                                    if(hiddenBolusTs==b.tsMs) stringResource(R.string.glucose_chart_restore_actual_line)
+                                    else stringResource(R.string.glucose_chart_hide_bolus_conditionally),
+                                )
+                            }
                             if(!canDeconvolve)Text(
-                                "Персональная кривая инсулина ещё не определена",
+                                stringResource(R.string.glucose_chart_no_personal_curve),
                                 style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             androidx.compose.material3.TextButton(onClick = {
                                 purposeFor = null; selection = null
                                 onDeleteBolus(b.tsMs)
-                            }) { Text("🗑 Удалить укол", color = MaterialTheme.colorScheme.error) }
+                            }) { Text(stringResource(R.string.glucose_chart_delete_bolus), color = MaterialTheme.colorScheme.error) }
                         }
                     },
                     confirmButton = {
@@ -1377,24 +1397,24 @@ fun GlucoseChart(
                                 onEditBolusUnits(b.tsMs, it)
                             }
                             purposeFor = null; selection = null
-                        }) { Text("Сохранить") }
+                        }) { Text(stringResource(R.string.glucose_chart_save)) }
                     },
                     dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { purposeFor = null }) { Text("Отмена") }
+                        androidx.compose.material3.TextButton(onClick = { purposeFor = null }) { Text(stringResource(R.string.glucose_chart_cancel)) }
                     },
                 )
             }
             confirmNote?.let { id ->
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { confirmNote = null },
-                    title = { Text("Удалить заметку?") },
+                    title = { Text(stringResource(R.string.glucose_chart_delete_note_title)) },
                     confirmButton = {
                         androidx.compose.material3.TextButton(onClick = {
                             confirmNote = null; selection = null; onDeleteNote(id)
-                        }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                        }) { Text(stringResource(R.string.glucose_chart_delete_confirm), color = MaterialTheme.colorScheme.error) }
                     },
                     dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { confirmNote = null }) { Text("Отмена") }
+                        androidx.compose.material3.TextButton(onClick = { confirmNote = null }) { Text(stringResource(R.string.glucose_chart_cancel)) }
                     },
                 )
             }
@@ -1408,30 +1428,29 @@ fun GlucoseChart(
                     )
                 }
                 var bTs by remember(ts) { mutableStateOf(ts) }
-                val bCtx = androidx.compose.ui.platform.LocalContext.current
                 val bFmt = remember { java.text.SimpleDateFormat("HH:mm, d MMM", java.util.Locale.getDefault()) }
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { confirmBasal = null },
-                    title = { Text("🌙 Базал") },
+                    title = { Text(stringResource(R.string.glucose_chart_basal_dialog_title)) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             androidx.compose.material3.OutlinedTextField(
                                 value = bUnits,
                                 onValueChange = { bUnits = it },
-                                label = { Text("Доза, ед") },
+                                label = { Text(stringResource(R.string.glucose_chart_dose_units_label)) },
                                 singleLine = true,
                             )
                             Text(
                                 "🕐 ${bFmt.format(java.util.Date(bTs))} ✎",
                                 modifier = Modifier.pointerInput(Unit) {
                                     detectTapGestures {
-                                        com.example.diapilot.ui.pickDateTime(bCtx, bTs) { bTs = it }
+                                        com.example.diapilot.ui.pickDateTime(context, bTs) { bTs = it }
                                     }
                                 },
                             )
                             androidx.compose.material3.TextButton(onClick = {
                                 confirmBasal = null; selection = null; onDeleteBasal(ts)
-                            }) { Text("🗑 Удалить", color = MaterialTheme.colorScheme.error) }
+                            }) { Text(stringResource(R.string.glucose_chart_delete_basal), color = MaterialTheme.colorScheme.error) }
                         }
                     },
                     confirmButton = {
@@ -1440,10 +1459,10 @@ fun GlucoseChart(
                                 onUpdateBasal(ts, bTs, it)
                             }
                             confirmBasal = null; selection = null
-                        }) { Text("Сохранить") }
+                        }) { Text(stringResource(R.string.glucose_chart_save)) }
                     },
                     dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { confirmBasal = null }) { Text("Отмена") }
+                        androidx.compose.material3.TextButton(onClick = { confirmBasal = null }) { Text(stringResource(R.string.glucose_chart_cancel)) }
                     },
                 )
             }
@@ -1579,6 +1598,7 @@ data class ChartSelection(val tsMs: Long, val items: List<SelLine>)
  * each, so vertically stacked elements all show up together.
  */
 private fun selectTapped(
+    context: android.content.Context,
     off: Offset,
     padL: Float,
     w: Float,
@@ -1598,13 +1618,14 @@ private fun selectTapped(
     val thresholdMs = (span * 24f / w).toLong().coerceAtLeast(5 * 60_000L)
     val range = (tapTs - thresholdMs)..(tapTs + thresholdMs)
     val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val text = context.localized()
 
     val lines = mutableListOf<SelLine>()
     annotations.filter { it.tsMs in range }.forEach {
         lines.add(
             SelLine(
                 it.tsMs,
-                "🏷 ${fmt.format(Date(it.tsMs))} · ${it.content}" +
+                "🏷 ${fmt.format(Date(it.tsMs))} · ${com.example.diapilot.i18n.TokenText.noteTag(context, it.content)}" +
                     (it.analysis?.let { a -> " — ${a.lineSequence().firstOrNull().orEmpty()}" } ?: ""),
                 SelRef.Note(it.id),
             ),
@@ -1633,10 +1654,14 @@ private fun selectTapped(
             else -> "🍽"
         }
         val timesPart = if (note != null && m.onsetMs - note.tsMs > 3 * 60_000) {
-            "$emoji ${fmt.format(Date(note.tsMs))} (ел) · подъём с ${fmt.format(Date(m.onsetMs))}"
+            text.getString(
+                R.string.glucose_chart_sel_meal_ate_rise,
+                emoji, fmt.format(Date(note.tsMs)), fmt.format(Date(m.onsetMs)),
+            )
+        } else if (sys) {
+            "$emoji ${fmt.format(Date(displayTs))} · ${com.example.diapilot.i18n.FoodText.mealLabel(context, label!!)}"
         } else {
-            "$emoji ${fmt.format(Date(displayTs))}" +
-                (if (sys) " · $label" else "")
+            "$emoji ${fmt.format(Date(displayTs))}"
         }
         // The food row is PURE food (what it did to BG); its bolus always
         // gets its own row below — one consistent shape, with actions.
@@ -1644,9 +1669,13 @@ private fun selectTapped(
             SelLine(
                 displayTs,
                 timesPart +
-                    " · ${com.diapilot.core.analysis.fmtBg(m.preBg, mgdl)} → " +
-                    "${com.diapilot.core.analysis.fmtBg(m.peakBg, mgdl)} за %.0f мин".format(m.timeToPeakMin) +
-                    (if (m.bolusUnits == null) " · без болюса" else ""),
+                    " · " + text.getString(
+                        R.string.glucose_chart_sel_meal_bg_change,
+                        com.diapilot.core.analysis.fmtBg(m.preBg, mgdl),
+                        com.diapilot.core.analysis.fmtBg(m.peakBg, mgdl),
+                        m.timeToPeakMin,
+                    ) +
+                    (if (m.bolusUnits == null) " · " + text.getString(R.string.glucose_chart_sel_no_bolus) else ""),
             ),
         )
         includedMealOnsets.add(m.onsetMs)
@@ -1660,8 +1689,8 @@ private fun selectTapped(
         lines.add(
             SelLine(
                 b.tsMs,
-                "💉 ${fmt.format(Date(b.tsMs))} · %.1f ед".format(b.units) +
-                    (b.purpose?.let { p -> " · $p" } ?: ""),
+                text.getString(R.string.glucose_chart_sel_bolus_row, fmt.format(Date(b.tsMs)), b.units) +
+                    (b.purpose?.let { p -> " · ${com.example.diapilot.i18n.TokenText.bolusPurpose(context, p)}" } ?: ""),
                 SelRef.Bolus(b.tsMs, b.purpose),
             ),
         )
@@ -1675,7 +1704,7 @@ private fun selectTapped(
         lines.add(
             SelLine(
                 it.tsMs,
-                "🕐 ${fmt.format(Date(it.tsMs))} · базал %.0f ед".format(it.units),
+                text.getString(R.string.glucose_chart_sel_basal_row, fmt.format(Date(it.tsMs)), it.units),
                 SelRef.Basal(it.tsMs),
             ),
         )
@@ -1694,7 +1723,7 @@ private fun selectTapped(
                     nearest.tsMs,
                     "${fmt.format(Date(nearest.tsMs))} · " +
                         "${com.diapilot.core.analysis.fmtBg(nearest.mmol, mgdl)} " +
-                        com.diapilot.core.analysis.unitLabel(mgdl),
+                        com.example.diapilot.i18n.unitLabel(mgdl),
                 ),
             ),
         )
@@ -1723,11 +1752,11 @@ internal fun HistoryDatePicker(
         onDismissRequest = onDismiss,
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = { onPick(state.selectedDateMillis) }) {
-                Text("Показать")
+                Text(stringResource(R.string.glucose_chart_show))
             }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Отмена") }
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.glucose_chart_cancel)) }
         },
     ) {
         androidx.compose.material3.DatePicker(state = state)

@@ -69,7 +69,6 @@ class PhysioTuningTest {
         val m = model()
         assertSame(m, PhysioTuning.apply(m, PhysioTuning.Values()))
         assertTrue(!PhysioTuning.Values().touched)
-        assertEquals("как отгружено", PhysioTuning.summary(PhysioTuning.Values()))
     }
 
     @Test

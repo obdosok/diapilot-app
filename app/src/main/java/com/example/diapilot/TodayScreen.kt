@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.collector.CollectorStore
@@ -331,10 +333,11 @@ internal fun TodayScreen(
                             state.deltaMmol?.let {
                                 append(com.diapilot.core.analysis.fmtBgDelta(it, state.mgdl))
                             }
-                            append("  ${com.diapilot.core.analysis.unitLabel(state.mgdl)}")
+                            append("  ${com.example.diapilot.i18n.unitLabel(state.mgdl)}")
                             val ageMin = (now - r.tsMs) / 60_000
                             if (ageMin >= com.diapilot.core.PersonalParams.DEFAULT.ageNoiseMin) {
-                                append(" · $ageMin мин назад")
+                                append(" · ")
+                                append(stringResource(R.string.today_screen_reading_age, ageMin))
                             }
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -343,7 +346,9 @@ internal fun TodayScreen(
                     // Acceleration nuance — what the arrow alone can't tell.
                     state.trendNuance?.let {
                         Text(
-                            it,
+                            com.example.diapilot.i18n.TwinText.nuance(
+                                androidx.compose.ui.platform.LocalContext.current, it,
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
@@ -360,7 +365,7 @@ internal fun TodayScreen(
         // that was visible anywhere.
         state.appliedIsf?.let { (isf, src) ->
             Text(
-                "ISF сейчас %.2f ммоль/ед · %s".format(isf, src),
+                stringResource(R.string.today_screen_isf_now, isf, src),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -378,11 +383,11 @@ internal fun TodayScreen(
             androidx.compose.material3.AssistChip(
                 onClick = { onTagBolus(b.tsMs, "коррекция") },
                 label = {
-                    Text("✓ Подтвердить чистую коррекцию %.1f ед".format(b.units))
+                    Text(stringResource(R.string.today_screen_confirm_correction, b.units))
                 },
             )
             Text(
-                "Еды, другого болюса, активности и гипо рядом не найдено.",
+                stringResource(R.string.today_screen_correction_candidate_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -401,12 +406,20 @@ internal fun TodayScreen(
                     ) {
                         if (move.kind == com.example.diapilot.data.DishDialogRuntime.KIND_ASSUMPTION) {
                             Text(
-                                "🍽 «${move.noteContent}»: разбор угадал — ${move.question}",
+                                stringResource(
+                                    R.string.today_screen_dish_assumption_head,
+                                    move.noteContent, move.question,
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
-                                "Один уточняющий вопрос: ответ допишется к записи и в библиотеку" +
-                                    (if (move.dishId.isNotBlank()) " («${move.dishId}»), больше не спросится." else "."),
+                                if (move.dishId.isNotBlank()) {
+                                    stringResource(
+                                        R.string.today_screen_dish_assumption_note_with_id, move.dishId,
+                                    )
+                                } else {
+                                    stringResource(R.string.today_screen_dish_assumption_note)
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -418,7 +431,7 @@ internal fun TodayScreen(
                                 androidx.compose.material3.OutlinedTextField(
                                     value = answer, onValueChange = { answer = it },
                                     modifier = Modifier.weight(1f), singleLine = true,
-                                    placeholder = { Text("например: цельнозерновой") },
+                                    placeholder = { Text(stringResource(R.string.today_screen_dish_assumption_placeholder)) },
                                 )
                                 androidx.compose.material3.FilledTonalButton(
                                     enabled = answer.isNotBlank(),
@@ -428,19 +441,21 @@ internal fun TodayScreen(
                                         )
                                         onRefresh()
                                     },
-                                ) { Text("Сохранить") }
+                                ) { Text(stringResource(R.string.today_screen_dish_assumption_save)) }
                                 androidx.compose.material3.TextButton(onClick = {
                                     com.example.diapilot.data.DishDialogRuntime.dismiss(context, move)
                                 }) { Text("✕") }
                             }
                         } else {
                             Text(
-                                "🍽 «${move.noteContent}» — ${move.question}",
+                                stringResource(
+                                    R.string.today_screen_dish_confirm_head,
+                                    move.noteContent, move.question,
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
-                                "Запись уже сохранена; «Да» добавит структуру блюда и запомнит " +
-                                    "формулировку. Граммы записи не меняются.",
+                                stringResource(R.string.today_screen_dish_confirm_note),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -452,10 +467,10 @@ internal fun TodayScreen(
                                         context, com.example.diapilot.data.Stores.get(context), move,
                                     )
                                     onRefresh()
-                                }) { Text("Да, это оно") }
+                                }) { Text(stringResource(R.string.today_screen_dish_confirm_yes)) }
                                 androidx.compose.material3.TextButton(onClick = {
                                     com.example.diapilot.data.DishDialogRuntime.rejectDish(context, move)
-                                }) { Text("Нет") }
+                                }) { Text(stringResource(R.string.today_screen_dish_confirm_no)) }
                                 androidx.compose.material3.TextButton(onClick = {
                                     com.example.diapilot.data.DishDialogRuntime.dismiss(context, move)
                                 }) { Text("✕") }
@@ -470,7 +485,7 @@ internal fun TodayScreen(
         // actionable lives in the dialog: accept / edit / decline.
         if (state.foodSuggestions.isNotEmpty()) {
             Text(
-                "🍽 Похоже, была еда: ${state.foodSuggestions.size} ▸",
+                stringResource(R.string.today_screen_food_suggestions_badge, state.foodSuggestions.size),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { showFoodSuggest = true },
@@ -506,10 +521,14 @@ internal fun TodayScreen(
         val details = listOfNotNull(state.forecastCheck, state.meterCalLine)
         state.calibrationWindow?.let { cw ->
             val need = when (cw.need) {
-                com.diapilot.core.analysis.CalibrationNeed.ISF -> "фактора чувствительности (ISF)"
-                com.diapilot.core.analysis.CalibrationNeed.CARB_RATIO -> "углеводного коэффициента"
-                com.diapilot.core.analysis.CalibrationNeed.BOTH -> "ISF и углеводного коэффициента"
+                com.diapilot.core.analysis.CalibrationNeed.ISF ->
+                    stringResource(R.string.today_screen_calibration_need_isf)
+                com.diapilot.core.analysis.CalibrationNeed.CARB_RATIO ->
+                    stringResource(R.string.today_screen_calibration_need_carb_ratio)
+                com.diapilot.core.analysis.CalibrationNeed.BOTH ->
+                    stringResource(R.string.today_screen_calibration_need_both)
             }
+            val correctionLabel = com.example.diapilot.i18n.TokenText.bolusPurpose(context, "коррекция")!!
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -523,17 +542,14 @@ internal fun TodayScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
-                        "🧪 Редкий чистый момент для данных",
+                        stringResource(R.string.today_screen_calibration_title),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                     // Never a prompt to dose or eat — only to LOG cleanly IF
                     // the user acts on their own (the app's hard rule).
                     Text(
-                        "Сахар ровный, без активной еды и инсулина. Если по своему " +
-                            "обычному решению поешь или уколешь — запиши точно (граммы " +
-                            "или тег «коррекция»): такие записи дают модели максимум. " +
-                            "Сейчас ей не хватает $need.",
+                        stringResource(R.string.today_screen_calibration_hint, correctionLabel, need),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
@@ -545,8 +561,8 @@ internal fun TodayScreen(
         val bodyLine = buildList {
             state.dayStats?.let { s ->
                 add("TIR ${s.tirPct}%")
-                add("${com.diapilot.core.analysis.fmtBg(s.meanMmol, state.mgdl)} средн")
-                add("%.0f ед · %.0f г".format(s.insulinUnits, s.carbsG))
+                add(stringResource(R.string.today_screen_mean_bg, com.diapilot.core.analysis.fmtBg(s.meanMmol, state.mgdl)))
+                add(stringResource(R.string.today_screen_insulin_carbs_summary, s.insulinUnits, s.carbsG))
             }
         }
         if (bodyLine.isNotEmpty()) {
@@ -559,10 +575,14 @@ internal fun TodayScreen(
         state.dayStats?.takeIf { it.nutritionMeals > 0 }?.let { s ->
             Text(
                 buildList {
-                    s.kcal?.let { add("~%.0f ккал".format(it)) }
-                    s.proteinG?.let { add("Б %.0f г".format(it)) }
-                    s.fatG?.let { add("Ж %.0f г".format(it)) }
-                    add("оценено блюд: ${s.nutritionMeals}")
+                    s.kcal?.let { add(stringResource(R.string.today_screen_kcal, it)) }
+                    s.proteinG?.let { add(stringResource(R.string.today_screen_protein, it)) }
+                    s.fatG?.let { add(stringResource(R.string.today_screen_fat, it)) }
+                    add(
+                        pluralStringResource(
+                            R.plurals.today_screen_nutrition_meals, s.nutritionMeals, s.nutritionMeals,
+                        ),
+                    )
                 }.joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -570,8 +590,7 @@ internal fun TodayScreen(
         }
         if (state.readings == 0L) {
             Text(
-                "Данных пока нет. В xDrip включите Inter-app settings → Broadcast locally " +
-                    "и xDrip Web Service — дальше всё соберётся само.",
+                stringResource(R.string.today_screen_no_data_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -589,13 +608,13 @@ internal fun TodayScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "🕐 Время базала? Обычно ~$usualTime",
+                        stringResource(R.string.today_screen_basal_due, usualTime),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
                     androidx.compose.material3.FilledTonalButton(
                         onClick = { onAddBasal(now, units) },
-                    ) { Text("Записать %.0f ед".format(units)) }
+                    ) { Text(stringResource(R.string.today_screen_log_basal_button, units)) }
                 }
             }
         }
@@ -613,17 +632,19 @@ internal fun TodayScreen(
             ) {
                 Text(
                     if (state.hypoTablets == 0) {
-                        "🍬 +1 таблетка декстрозы (%.0f г)".format(DEXTROSE_TABLET_G)
+                        stringResource(R.string.today_screen_dextrose_first, DEXTROSE_TABLET_G)
                     } else {
-                        "🍬 Ещё таблетку · уже ${state.hypoTablets} (%.0f г)"
-                            .format(state.hypoTablets * DEXTROSE_TABLET_G)
+                        stringResource(
+                            R.string.today_screen_dextrose_more,
+                            state.hypoTablets, state.hypoTablets * DEXTROSE_TABLET_G,
+                        )
                     },
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
         }
         if (state.hcGranted == false) {
-            TextButton(onClick = onConnectHc) { Text("Подключить пульс и сон (Health Connect)") }
+            TextButton(onClick = onConnectHc) { Text(stringResource(R.string.today_screen_connect_health_connect)) }
         } else if (state.stepsGranted == false) {
             // HR/sleep granted long ago, but steps were added later. The in-app
             // permission request is silently throttled by Health Connect after
@@ -639,7 +660,7 @@ internal fun TodayScreen(
                         ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 } catch (_: Exception) {}
-            }) { Text("Разрешить шаги (открыть Health Connect) →") }
+            }) { Text(stringResource(R.string.today_screen_allow_steps)) }
         }
         }
         if (state.prediction.isNotEmpty() && hasWhatIfEngine) {
@@ -666,8 +687,11 @@ internal fun TodayScreen(
                 } ?: "—"
                 fun after(point: com.diapilot.core.twin.PredictedPoint?): String {
                     val minutes = point?.let { ((it.tsMs - anchor) / 60_000L).toInt() } ?: 0
-                    return if (minutes < 60) "через ${minutes}м"
-                    else "через ${minutes / 60}ч${minutes % 60}м"
+                    return if (minutes < 60) {
+                        context.getString(R.string.today_screen_after_minutes, minutes)
+                    } else {
+                        context.getString(R.string.today_screen_after_hours_minutes, minutes / 60, minutes % 60)
+                    }
                 }
                 // THE FLOOR IS A MODEL FAILURE, NOT A PREDICTED MINIMUM.
                 //
@@ -689,18 +713,22 @@ internal fun TodayScreen(
                     minimum.mmol <= com.diapilot.core.hybrid.HYBRID_FLOOR_MMOL + 1e-6
                 val risk = when {
                     floored ->
-                        "⚠ линия упёрлась в границу модели — минимум неизвестен"
+                        stringResource(R.string.today_screen_whatif_risk_floored)
                     minimum != null && minimum.mmol < state.rangeLo ->
-                        "⚠ центральная линия ниже диапазона: ${value(minimum)} ${after(minimum)}"
+                        stringResource(
+                            R.string.today_screen_whatif_risk_center_below, value(minimum), after(minimum),
+                        )
                     lowerMinimum != null && lowerMinimum.loMid < state.rangeLo ->
-                        "⚠ нижняя граница ниже диапазона: " +
-                            "${com.diapilot.core.analysis.fmtBg(lowerMinimum.loMid, state.mgdl)} " +
-                            after(lowerMinimum)
+                        stringResource(
+                            R.string.today_screen_whatif_risk_lower_below,
+                            com.diapilot.core.analysis.fmtBg(lowerMinimum.loMid, state.mgdl),
+                            after(lowerMinimum),
+                        )
                     else -> null
                 }
                 WhatIfTrajectorySummary(
                     atHour = interval(p60),
-                    minimum = if (floored) "ниже границы модели"
+                    minimum = if (floored) stringResource(R.string.today_screen_whatif_below_model_boundary)
                     else "${value(minimum)} ${after(minimum)}",
                     atThreeHours = value(p180),
                     risk = risk,
@@ -805,23 +833,62 @@ internal fun TodayScreen(
             )
         }
         foodCalculation?.let { c ->
+            val unknown = stringResource(R.string.today_screen_calc_unknown)
+            val proteinText = c.proteinG?.let { com.diapilot.core.analysis.fmtOneDecimal(it) } ?: unknown
+            val fatText = c.fatG?.let { com.diapilot.core.analysis.fmtOneDecimal(it) } ?: unknown
             androidx.compose.material3.AlertDialog(
                 onDismissRequest={foodCalculation=null},
-                title={Text("Как рассчитано · ${c.dish}")},
+                title={Text(stringResource(R.string.today_screen_calc_title, c.dish))},
                 text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                    Text("Модель: ${c.model}",style=MaterialTheme.typography.bodySmall)
-                    Text("Углеводы: ${"%.1f".format(c.carbsG)} г · ${c.carbsProvenance}")
-                    Text("Б/Ж: ${c.proteinG?.let{"%.1f".format(it)}?:"неизвестно"} / ${c.fatG?.let{"%.1f".format(it)}?:"неизвестно"} г · длительность ${"%.0f".format(c.durationMin)} мин")
-                    Text("Global CS: ${"%.3f".format(c.globalCsMedian)} [${"%.3f".format(c.globalCsLow)}…${"%.3f".format(c.globalCsHigh)}] ммоль/л/г. Это широкий development prior/posterior, не отдельный CS блюда.")
-                    Text("Causal online evidence: n=${c.globalCsOnlineEpisodes}, дней=${c.globalCsOnlineDays}. ${c.globalCsEvidencePolicy}. Ретроспективные sensitivity-строки Stage 8 не считаются online evidence и сами не могут продвинуть параметр.",style=MaterialTheme.typography.bodySmall)
-                    Text("Полная food-амплитуда: ${"%.2f".format(c.totalAmplitudeMmol)} ммоль/л; вклад той же линии от текущего anchor: +60 ${"%+.2f".format(c.foodContribution60)}, +180 ${"%+.2f".format(c.foodContribution180)}.")
-                    Text("Тайминг: ${c.timingSource} (${c.timingTemplateId}); onset ${"%.0f".format(c.onsetMin)}, половина пришла ${"%.0f".format(c.halfArrivalMin)}, конец роста ${"%.0f".format(c.effectEndMin)} мин; неопределённость ±${"%.0f".format(c.timingUncertaintyMin)} мин.")
-                    Text("Как выбрана кривая: ${c.kineticsSummary}. Название блюда в тайминге не участвует.",style=MaterialTheme.typography.bodySmall)
-                    Text("Инсулин +60: ${"%+.2f".format(c.insulinContribution60)} ммоль/л; ISF ${"%.2f".format(c.isfMedian)} [${"%.2f".format(c.isfLow)}…${"%.2f".format(c.isfHigh)}].")
-                    Text("Фон/базал/тренд +60: ${"%+.2f".format(c.backgroundContribution60)} ммоль/л.")
-                    Text("Неопределённость: ${c.uncertaintySummary}. Наблюдательные связи не интерпретируются как причины.",style=MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.today_screen_calc_model, c.model),style=MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.today_screen_calc_carbs, c.carbsG, c.carbsProvenance))
+                    Text(stringResource(R.string.today_screen_calc_macros, proteinText, fatText, c.durationMin))
+                    Text(stringResource(R.string.today_screen_calc_global_cs, c.globalCsMedian, c.globalCsLow, c.globalCsHigh))
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_causal_evidence,
+                            c.globalCsOnlineEpisodes, c.globalCsOnlineDays, c.globalCsEvidencePolicy,
+                        ),
+                        style=MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_food_amplitude,
+                            c.totalAmplitudeMmol, c.foodContribution60, c.foodContribution180,
+                        ),
+                    )
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_timing,
+                            c.timingSource, c.timingTemplateId, c.onsetMin, c.halfArrivalMin,
+                            c.effectEndMin, c.timingUncertaintyMin,
+                        ),
+                    )
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_curve_choice,
+                            c.kineticsSummary.resolve(androidx.compose.ui.platform.LocalContext.current),
+                        ),
+                        style=MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_insulin_isf,
+                            c.insulinContribution60, c.isfMedian, c.isfLow, c.isfHigh,
+                        ),
+                    )
+                    Text(stringResource(R.string.today_screen_calc_background, c.backgroundContribution60))
+                    Text(
+                        stringResource(
+                            R.string.today_screen_calc_uncertainty,
+                            com.example.diapilot.data.FoodCalculationRegistry.uncertaintyText(
+                                androidx.compose.ui.platform.LocalContext.current, c,
+                            ),
+                        ),
+                        style=MaterialTheme.typography.bodySmall,
+                    )
                 }},
-                confirmButton={TextButton(onClick={foodCalculation=null}){Text("Закрыть")}},
+                confirmButton={TextButton(onClick={foodCalculation=null}){Text(stringResource(R.string.today_screen_close))}},
             )
         }
         }
@@ -866,7 +933,7 @@ private fun InlineWhatIfPanel(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Добавить\n%.1f ед".format(units),
+                stringResource(R.string.today_screen_whatif_add_units, units),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(76.dp),
@@ -879,7 +946,7 @@ private fun InlineWhatIfPanel(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                "2-й ＋",
+                stringResource(R.string.today_screen_whatif_second_dose),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -911,7 +978,7 @@ private fun InlineWhatIfPanel(
         if (second) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Ещё\n%.1f ед".format(units2),
+                    stringResource(R.string.today_screen_whatif_more_units, units2),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(76.dp),
@@ -938,7 +1005,7 @@ private fun InlineWhatIfPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "через",
+                    stringResource(R.string.today_screen_whatif_after_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(48.dp),
@@ -960,7 +1027,7 @@ private fun InlineWhatIfPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "прогулка",
+                    stringResource(R.string.today_screen_whatif_walk_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(62.dp),
@@ -970,7 +1037,7 @@ private fun InlineWhatIfPanel(
                         selected = activityDuration == minutes,
                         onClick = { onActivityDuration(minutes) },
                         modifier = Modifier.weight(1f),
-                        label = { Text("${minutes.toInt()} мин") },
+                        label = { Text(stringResource(R.string.today_screen_whatif_activity_minutes, minutes.toInt())) },
                     )
                 }
             }
@@ -979,7 +1046,8 @@ private fun InlineWhatIfPanel(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                listOf(0f to "сейчас", 30f to "+30", 60f to "+60").forEach { (offset, label) ->
+                val nowLabel = stringResource(R.string.today_screen_whatif_now_label)
+                listOf(0f to nowLabel, 30f to "+30", 60f to "+60").forEach { (offset, label) ->
                     androidx.compose.material3.FilterChip(
                         selected = activityOffset == offset,
                         onClick = { onActivityOffset(offset) },
@@ -993,7 +1061,10 @@ private fun InlineWhatIfPanel(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                listOf(0.7f to "легко", 1f to "обычно", 1.4f to "быстро").forEach { (level, label) ->
+                val lightLabel = stringResource(R.string.today_screen_whatif_intensity_light)
+                val normalLabel = stringResource(R.string.today_screen_whatif_intensity_normal)
+                val fastLabel = stringResource(R.string.today_screen_whatif_intensity_fast)
+                listOf(0.7f to lightLabel, 1f to normalLabel, 1.4f to fastLabel).forEach { (level, label) ->
                     androidx.compose.material3.FilterChip(
                         selected = activityIntensity == level,
                         onClick = { onActivityIntensity(level) },
@@ -1006,11 +1077,13 @@ private fun InlineWhatIfPanel(
         if (active && trajectory != null) {
             Text(
                 (existingIob?.takeIf { it > 0.05 }?.let {
-                    "поверх IOB %.1f ед · ".format(it)
+                    stringResource(R.string.today_screen_whatif_on_top_iob, it) + " · "
                 } ?: "") +
-                    "через 1ч: ${trajectory.atHour} · минимум ${trajectory.minimum} · " +
-                    "к 3ч: ${trajectory.atThreeHours} · сценарий, не доза" +
-                    if (!trusted) " · ⚠ модель ограничена" else "",
+                    stringResource(
+                        R.string.today_screen_whatif_summary,
+                        trajectory.atHour, trajectory.minimum, trajectory.atThreeHours,
+                    ) +
+                    if (!trusted) " · " + stringResource(R.string.today_screen_whatif_model_limited) else "",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (trusted) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.tertiary,
@@ -1047,8 +1120,8 @@ private fun FoodSuggestDialog(
     var editGrams by remember { mutableStateOf("") }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
-        title = { Text("Похоже, была еда") },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.today_screen_close)) } },
+        title = { Text(stringResource(R.string.today_screen_food_suggest_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 suggestions.forEach { s ->
@@ -1056,8 +1129,15 @@ private fun FoodSuggestDialog(
                     val head = buildString {
                         append(fmt.format(java.util.Date(s.triggerTsMs)))
                         append(" · ")
-                        append(if (s.trigger == "укол") "укол" else "подъём сахара")
-                        s.units?.let { append(" %.1f ед".format(it)) }
+                        append(
+                            com.example.diapilot.i18n.FoodText.suggestTrigger(
+                                androidx.compose.ui.platform.LocalContext.current, s.trigger,
+                            ),
+                        )
+                        s.units?.let {
+                            append(" ")
+                            append(stringResource(R.string.today_screen_food_suggest_units, it))
+                        }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -1068,12 +1148,14 @@ private fun FoodSuggestDialog(
                         if (editTs == s.triggerTsMs) {
                             OutlinedTextField(
                                 value = editName, onValueChange = { editName = it },
-                                label = { Text("Что ели") }, singleLine = true,
+                                label = { Text(stringResource(R.string.today_screen_food_suggest_what_label)) },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             OutlinedTextField(
                                 value = editGrams, onValueChange = { editGrams = it },
-                                label = { Text("Углеводы, г") }, singleLine = true,
+                                label = { Text(stringResource(R.string.today_screen_food_suggest_carbs_label)) },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row {
@@ -1086,23 +1168,23 @@ private fun FoodSuggestDialog(
                                         )
                                         editTs = null
                                     },
-                                ) { Text("✓ Сохранить") }
-                                TextButton(onClick = { editTs = null }) { Text("Отмена") }
+                                ) { Text(stringResource(R.string.today_screen_food_suggest_save)) }
+                                TextButton(onClick = { editTs = null }) { Text(stringResource(R.string.today_screen_food_suggest_cancel)) }
                             }
                         } else {
                             Text(
                                 p?.let {
                                     it.dish +
-                                        (it.grams?.let { g -> " · ~%.0f г".format(g) } ?: "") +
+                                        (it.grams?.let { g -> " · " + stringResource(R.string.today_screen_food_suggest_grams, g) } ?: "") +
                                         " · ×${it.nHistory}"
-                                } ?: "что это было?",
+                                } ?: stringResource(R.string.today_screen_food_suggest_unknown_dish),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Row {
                                 if (p != null) {
                                     TextButton(
                                         onClick = { onAccept(s, p.dish, p.grams) },
-                                    ) { Text("✓ Принять") }
+                                    ) { Text(stringResource(R.string.today_screen_food_suggest_accept)) }
                                 }
                                 TextButton(onClick = {
                                     editTs = s.triggerTsMs
@@ -1110,7 +1192,7 @@ private fun FoodSuggestDialog(
                                     editGrams = p?.grams?.let {
                                         if (it == Math.floor(it)) it.toInt().toString() else it.toString()
                                     } ?: ""
-                                }) { Text("Изменить") }
+                                }) { Text(stringResource(R.string.today_screen_food_suggest_edit)) }
                                 TextButton(onClick = { onDecline(s) }) { Text("✗") }
                             }
                         }

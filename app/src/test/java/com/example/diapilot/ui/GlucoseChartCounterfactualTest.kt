@@ -1,5 +1,7 @@
 package com.example.diapilot.ui
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.diapilot.core.analysis.KernelPoint
 import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.collector.GlucosePoint
@@ -7,14 +9,35 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import com.diapilot.core.hybrid.*
 
-class GlucoseChartCounterfactualTest {
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class GlucoseChartCounterfactualEnglishTest {
     @Test fun `counterfactual copy is conditional and never claims what would have happened`() {
-        val s=conditionalBolusScenarioLabel(2.5)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val s = conditionalBolusScenarioLabel(2.5).resolve(context)
+        assertTrue(s.contains("Conditional scenario"));assertTrue(s.contains("hidden processes"))
+        assertFalse(s.contains("what would have happened"));assertFalse(s.contains("without the injection"))
+    }
+}
+
+/** The exact Russian text this scenario label had while it was hardcoded. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], qualifiers = "ru")
+class GlucoseChartCounterfactualRussianTest {
+    @Test fun `counterfactual copy keeps its Russian wording`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val s = conditionalBolusScenarioLabel(2.5).resolve(context)
         assertTrue(s.contains("Условный сценарий"));assertTrue(s.contains("скрытые процессы"))
         assertFalse(s.contains("как было бы"));assertFalse(s.contains("без укола"))
     }
+}
+
+class GlucoseChartCounterfactualTest {
     private val minute=60_000L
     private val kernel=listOf(
         KernelPoint(0.0,0.0,0.0,0.0,10),

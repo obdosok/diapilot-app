@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CollectorService.kt -->
+    <string name="collector_service_starting">Сбор данных активен · ожидаю xDrip</string>
+    <string name="collector_service_channel_name">Текущий сахар</string>
+    <string name="collector_service_channel_description">Постоянная карточка с текущим сахаром на экране блокировки</string>
+
+    <!-- StreamStallNotifier.kt -->
+    <string name="stream_stall_notifier_channel_name">Поток данных остановился</string>
+    <string name="stream_stall_notifier_channel_description">Сенсор перестал отдавать данные — нужен NFC-скан</string>
+    <string name="stream_stall_notifier_title_no_age">📡 Нет данных с сенсора</string>
+    <string name="stream_stall_notifier_title_with_age">📡 Нет данных с сенсора уже %1$d мин</string>
+    <string name="stream_stall_notifier_body">%1$s. Приложи телефон к сенсору (NFC) — скан восстановит связь и добьёт пропуск из памяти сенсора.</string>
+
+    <!-- BackupRestore.kt -->
+    <string name="backup_restore_file_unavailable">файл недоступен</string>
+    <string name="backup_restore_no_readings">в файле нет показаний глюкозы — это не копия DiaPilot?</string>
+    <string name="backup_restore_success">Восстановлено: %1$d показаний, %2$d уколов. Перезапускаю…</string>
+    <string name="backup_restore_cloud_create_failed">не удалось создать файл в облачной папке</string>
+
+    <!-- InsulinProfileRuntime.kt -->
+    <string name="insulin_profile_runtime_measured">измерено по %1$d уколам, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</string>
+    <string name="insulin_profile_runtime_arm_food_free"> · по уколам без действующей еды</string>
+    <string name="insulin_profile_runtime_arm_mixed"> · по всем уколам (чистых пока мало)</string>
+    <string name="insulin_profile_runtime_coerced"> · приведено к границам модели: %1$s</string>
+    <string name="insulin_profile_runtime_no_curve">кривая не построена: %1$s</string>
+    <string name="insulin_profile_runtime_missing_landmarks">ориентиров не хватает: %1$s</string>
+    <string name="insulin_profile_runtime_onset_present">старт %1$d</string>
+    <string name="insulin_profile_runtime_onset_missing">старта нет</string>
+    <string name="insulin_profile_runtime_peak_present">пик %1$d</string>
+    <string name="insulin_profile_runtime_peak_missing">пика нет</string>
+    <string name="insulin_profile_runtime_tail_present">конец %1$d</string>
+    <string name="insulin_profile_runtime_tail_missing">конца нет</string>
+    <string name="insulin_profile_runtime_prior_only">пока приор: ни один укол не дал ориентиров из %1$d</string>
+
+    <!-- Speech.kt -->
+    <string name="speech_prompt">Говорите…</string>
+
+    <!-- PhysioTuningSection.kt -->
+    <string name="physio_tuning_section_title">Параметры модели (Physio)</string>
+    <string name="physio_tuning_section_intro_hint">Пусто = как отгружено. Ничего не меняется, пока не нажмёшь «Применить». Эти числа доходят и до гипо-тревоги.</string>
+    <string name="physio_tuning_section_currently_applied">Сейчас применено: %1$s · %2$s</string>
+    <string name="physio_tuning_section_applied_shape">инсулин %1$.0f·%2$.0f·%3$.0f · ISF %4$.3f</string>
+    <string name="physio_tuning_section_no_model">модель не установлена</string>
+    <string name="physio_tuning_section_curve_hint">Кривая инсулина: поля ниже — то же переопределение, что «Задать вручную». Пустые — считается по сегментам укола. ISF идёт своим путём и закрепляется отдельно.</string>
+    <string name="physio_tuning_section_carb_shape_title">Форма углеводов со стенда</string>
+    <string name="physio_tuning_section_carb_shape_hint">Вставь сюда выгрузку песочницы (кнопка «Выгрузить всё»). Возьмутся только двенадцать чисел треугольников; «различие типов» при этом станет 1.00, потому что оно выражает то же самое.</string>
+    <string name="physio_tuning_section_triangles_custom">сейчас: свой набор</string>
+    <string name="physio_tuning_section_triangles_shipped">сейчас: отгруженные</string>
+    <string name="physio_tuning_section_status_not_all_fields">не все двенадцать полей — число не разобралось</string>
+    <string name="physio_tuning_section_status_applied_reordered">применено, порядок поправлен</string>
+    <string name="physio_tuning_section_status_applied">применено</string>
+    <string name="physio_tuning_section_status_reverted_shipped">вернулись отгруженные</string>
+    <string name="physio_tuning_section_status_parse_failed">не разобралось — нужны все двенадцать чисел</string>
+    <string name="physio_tuning_section_status_applied_from_export">применено из выгрузки</string>
+    <string name="physio_tuning_section_apply_fields_button">Применить поля</string>
+    <string name="physio_tuning_section_reset_button">Сбросить</string>
+    <string name="physio_tuning_section_paste_json_label">или вставь JSON выгрузки</string>
+    <string name="physio_tuning_section_apply_set_button">Применить набор</string>
+    <string name="physio_tuning_section_reach_title">Куда доходят эти ручки</string>
+    <string name="physio_tuning_section_reach_forecast">линия прогноза и What-if</string>
+    <string name="physio_tuning_section_reach_hypo_alert">гипо-тревога</string>
+    <string name="physio_tuning_section_reach_watch_widget">часы и виджет</string>
+    <string name="physio_tuning_section_reach_insulin_timing">тайминги инсулина</string>
+    <string name="physio_tuning_section_reach_isf">ISF</string>
+    <string name="physio_tuning_section_reach_yes">да</string>
+    <string name="physio_tuning_section_reach_timing_verdict">ТОЛЬКО пока нет измеренной кривой</string>
+    <string name="physio_tuning_section_reach_isf_verdict">как БАЗА — учитель её домножает</string>
+    <string name="physio_tuning_section_reach_row">· %1$s — %2$s</string>
+    <string name="physio_tuning_section_reach_log_hint">Что реально применилось — в логе старта под меткой «PhysioTuning: ПРИМЕНЕНО к модели». Если оно не совпадает с введённым — так и задумано, см. список выше.</string>
+    <string name="physio_tuning_section_reach_model_note">Модель одна, поэтому ISF, кривая инсулина и доверие до него доходят. А ккал/ч, сито и различие типов, как и выученные кривые блюд, читает только физио-плечо — там они не работают.</string>
+    <string name="physio_tuning_section_trust_ramp_label">Доверие к горизонту: %1$.2f</string>
+    <string name="physio_tuning_section_ramp_full">1.00 — как в отгруженной модели: на часе до линии доходит половина еды и половина инсулина</string>
+    <string name="physio_tuning_section_ramp_zero">0.00 — ужатия нет, физиология доходит целиком</string>
+    <string name="physio_tuning_section_ramp_partial">на часе доходит %1$.0f%%</string>
+    <string name="physio_tuning_section_label_onset">старт, мин</string>
+    <string name="physio_tuning_section_label_full_speed">полн. скорость</string>
+    <string name="physio_tuning_section_label_phase">фаза, мин</string>
+    <string name="physio_tuning_section_label_tail">хвост, мин</string>
+    <string name="physio_tuning_section_curve_shape_explainer">Кривая разгоняется от «старта» до «полной скорости», держит максимум всю «фазу», потом спадает до «хвоста». Хвост несёт ровно пятую часть дозы. Стенд на его эпизодах даёт 28 · 40 · 30 · 165.</string>
+    <string name="physio_tuning_section_label_isf">ISF, ммоль/ед</string>
+    <string name="physio_tuning_section_label_kcal">ккал/ч</string>
+    <string name="physio_tuning_section_adaptive_pending">Адаптивный: ещё не посчитан (нужно ≥%1$d годных суток за %2$d дн)</string>
+    <string name="physio_tuning_section_adaptive_ready">Адаптивный: %1$.2f ммоль/ед · %2$d суток за %3$d дн</string>
+    <string name="physio_tuning_section_isf_source_adaptive_note">Используется АДАПТИВНЫЙ (баланс суток). Сравните его с вашим числом: если два независимых измерителя сходятся, выбор мало что меняет. Систематическое смещение прогноза ISF не чинит.</string>
+    <string name="physio_tuning_section_isf_source_manual_note">Используется ВАШЕ число из поля выше.</string>
+    <string name="physio_tuning_section_isf_applied">Применён к модели: %1$.3f ммоль/ед</string>
+    <string name="physio_tuning_section_isf_alternative">Альтернатива — измеренный/адаптивный: %1$.3f (эпизодов %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</string>
+    <string name="physio_tuning_section_switch_to_adaptive_button">Перейти на адаптивный</string>
+    <string name="physio_tuning_section_pin_value_button">Закрепить его значение</string>
+    <string name="physio_tuning_section_label_sieve">сито</string>
+    <string name="physio_tuning_section_label_spread">различие типов</string>
+    <string name="physio_tuning_section_apply_button">Применить</string>
+    <string name="physio_tuning_section_revert_shipped_button">Вернуть отгруженные</string>
+    <string name="physio_tuning_section_autofit_title">Автоподбор по последним 10 эпизодам</string>
+    <string name="physio_tuning_section_autofit_explainer" formatted="false">Тайминги инсулина подбираются ТОЛЬКО в коридоре ±20% вокруг измеренного профиля — их читает посегментный анализ твоих уколов, и подменять их числом, которое лучше подошло к графику, нельзя. Очередь и типы углеводов ходят в физиологичных пределах. ISF свободен: он и правда дрейфует, и ловить этот дрейф — часть работы приложения.</string>
+    <string name="physio_tuning_section_autofit_lock_hint">Замок = не трогать при подборе. Запертая ручка остаётся на том, что применено сейчас, а не на заводском.</string>
+    <string name="physio_tuning_section_axis_isf">ISF</string>
+    <string name="physio_tuning_section_axis_onset">старт</string>
+    <string name="physio_tuning_section_axis_full_speed">полн.скор</string>
+    <string name="physio_tuning_section_axis_phase">фаза</string>
+    <string name="physio_tuning_section_axis_tail">хвост</string>
+    <string name="physio_tuning_section_axis_kcal">ккал/ч</string>
+    <string name="physio_tuning_section_axis_sieve">сито</string>
+    <string name="physio_tuning_section_axis_spread">типы</string>
+    <string name="physio_tuning_section_axis_ramp">доверие</string>
+    <string name="physio_tuning_section_axis_fast_shift">сдвиг быстрых</string>
+    <string name="physio_tuning_section_metric_shape">форма</string>
+    <string name="physio_tuning_section_metric_balance">баланс</string>
+    <string name="physio_tuning_section_running_indicator">идёт расчёт</string>
+    <string name="physio_tuning_section_running_collecting">Подбор «%1$s»: собираю эпизоды…</string>
+    <string name="physio_tuning_section_running_progress">Подбор «%1$s»: эпизод %2$d из %3$d</string>
+    <string name="physio_tuning_section_running_hint">Можно уйти с вкладки — расчёт продолжается. Каждый эпизод это около двухсот прогонов модели, так что десять занимают минуту-две.</string>
+    <string name="physio_tuning_section_describe_no_episodes">ни один эпизод не посчитался</string>
+    <string name="physio_tuning_section_describe_episodes_metric">%1$d эпизодов · %2$s</string>
+    <string name="physio_tuning_section_describe_isf">ISF %1$.2f  (%2$s)</string>
+    <string name="physio_tuning_section_describe_insulin">инсулин %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+    <string name="physio_tuning_section_describe_full_speed_spread">полн. скорость по эпизодам %1$s</string>
+    <string name="physio_tuning_section_describe_totals">%1$.0f ккал/ч · сито %2$.2f · типы %3$.2f · доверие %4$.2f</string>
+    <string name="physio_tuning_section_done_against_applied">Против применённого сейчас, на тех же %1$d эпизодах:</string>
+    <string name="physio_tuning_section_done_shape_bias">форма %1$.2f -&gt; %2$.2f (%3$+.2f)   сдвиг %4$.2f -&gt; %5$.2f (%6$+.2f)</string>
+    <string name="physio_tuning_section_outcome_both_better">Лучше по обоим — это редкий случай.</string>
+    <string name="physio_tuning_section_outcome_shape_better">Форма лучше, сдвиг хуже: линия точнее следует за поворотами, но сидит дальше от факта.</string>
+    <string name="physio_tuning_section_outcome_bias_better">Сдвиг лучше, форма хуже: средний уровень выправлен, ходы линии — нет.</string>
+    <string name="physio_tuning_section_outcome_noise">Разница в пределах шума. Применять незачем.</string>
+    <string name="physio_tuning_section_episodes_header">На чём подобрано — нажми, чтобы открыть график на этом месте</string>
+    <string name="physio_tuning_section_load_into_fields_button">Подставить в поля</string>
+    <string name="physio_tuning_section_clear_button">Убрать</string>
+    <string name="physio_tuning_section_offered_hint">Числа подставлены в поля выше, но НЕ применены. Разброс в скобках — это разногласие между эпизодами, а не погрешность: если он широкий, медиана описывает не все дни одинаково.</string>
+    <string name="physio_tuning_section_measured_note">ЧТО ИЗМЕРЕНО: рампа («доверие») удерживает половину еды и инсулина на часе, и из-за неё поздний пик покупает лишний инсулиновый эффект даром — то есть тайминг протекает в количество. Со снятой рампой подбор по его 22 эпизодам даёт пик 40–42 мин в 13 случаях.</string>
+    <string name="physio_tuning_section_not_measured_note">ЧТО НЕ ИЗМЕРЕНО: что станет с гипо-тревогами. Направление — раньше, то есть в сторону безопасности, но насколько раньше, не проверено. Модель-ревью ещё не проходило. И подбор по «балансу» тянет ISF вниз, подъедая недобор еды: смотри на арм «форма», если хочешь именно чувствительность.</string>
+    <string name="physio_tuning_section_episode_food">еда %1$.0f г</string>
+    <string name="physio_tuning_section_episode_units">%1$.1f ед</string>
+    <string name="physio_tuning_section_episode_offset">+%1$d %2$s</string>
+    <string name="physio_tuning_section_episode_summary">%1$s · %2$.0f ч · %3$.0f г · %4$.1f ед</string>
+    <string name="physio_tuning_section_episode_wants">этот эпизод хочет: ISF %1$.2f · пик %2$.0f · форма %3$.2f</string>
+</resources>

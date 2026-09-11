@@ -35,6 +35,7 @@ class Stage9PerformanceContractTest {
         val result=Stage9EpisodeRuntime.buildDetailed(
             notes=notes,readings=emptyList(),boluses=emptyList(),episodes=emptyList(),
             foodEraStartMs=now-60L*24*3_600_000L,nowMs=now,budgetMs=10_000L,
+            context=androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>(),
         )
         assertEquals(5,result.processedClusters)
         assertEquals(5,result.nextOffset)

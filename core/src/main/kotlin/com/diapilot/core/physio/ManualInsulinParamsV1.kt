@@ -162,18 +162,18 @@ object InsulinShapeV1 {
      * refused by the code that installs it. The screen said "curve built, but
      * NOT applied".
      */
-    fun coerceIntoDomain(read:InsulinShapeLandmarksV1):Pair<InsulinShapeLandmarksV1,List<String>> {
+    fun coerceIntoDomain(read:InsulinShapeLandmarksV1):Pair<InsulinShapeLandmarksV1,List<CoercedLandmark>> {
         val bounds=PhysioBoundsV1()
-        val moved=mutableListOf<String>()
-        fun note(name:String,from:Double,to:Double){ if(kotlin.math.abs(to-from)>1e-9)moved+="$name %.0f→%.0f".format(from,to) }
-        val tail=read.tailMin.coerceIn(bounds.insulinTailMinRange).also{note("хвост",read.tailMin,it)}
+        val moved=mutableListOf<CoercedLandmark>()
+        fun note(name:InsulinLandmark,from:Double,to:Double){ if(kotlin.math.abs(to-from)>1e-9)moved+=CoercedLandmark(name,from,to) }
+        val tail=read.tailMin.coerceIn(bounds.insulinTailMinRange).also{note(InsulinLandmark.TAIL_END,read.tailMin,it)}
         // Order is enforced against the ALREADY coerced neighbour, so the
         // result is a valid curve rather than three independently legal numbers
         // that do not form one — the same failure the manual P1 path checks for.
         val onset=read.onsetMin.coerceIn(bounds.insulinOnsetMinRange)
-            .coerceAtMost(tail-3*STEP_MIN).coerceAtLeast(0.0).also{note("старт",read.onsetMin,it)}
+            .coerceAtMost(tail-3*STEP_MIN).coerceAtLeast(0.0).also{note(InsulinLandmark.ONSET,read.onsetMin,it)}
         val peak=read.peakMin.coerceIn(bounds.insulinPeakMinRange)
-            .coerceIn(onset+STEP_MIN,tail-2*STEP_MIN).also{note("пик",read.peakMin,it)}
+            .coerceIn(onset+STEP_MIN,tail-2*STEP_MIN).also{note(InsulinLandmark.PEAK,read.peakMin,it)}
         // The active phase is bounded by what a SINGLE-peak consumer will make
         // of it. `HybridPersonModel.insulin.peakMin` takes one number, and
         // [InsulinShapeLandmarksV1.singlePeakMin] is the midpoint of the phase —
@@ -182,7 +182,7 @@ object InsulinShapeV1 {
         // is installed. Bound the midpoint, not just its ends.
         val plateauCeiling=minOf(tail-STEP_MIN,2*bounds.insulinPeakMinRange.endInclusive-peak)
         val plateau=read.plateauEndMin?.takeIf{plateauCeiling>peak}?.coerceIn(peak,plateauCeiling)
-            ?.takeIf{it>peak}?.also{note("конец активной фазы",read.plateauEndMin,it)}
+            ?.takeIf{it>peak}?.also{note(InsulinLandmark.ACTIVE_END,read.plateauEndMin,it)}
         return InsulinShapeLandmarksV1(onset,peak,plateau,tail) to moved.toList()
     }
 

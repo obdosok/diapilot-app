@@ -11,6 +11,9 @@ package com.diapilot.core.analysis
 import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.collector.LabeledMeal
 
+/** A force other than the dish acting on a measured rise; the app renders the word. */
+enum class BackgroundForce { INSULIN, FOOD }
+
 data class FoodEpisode(
     val onsetMs: Long,
     val primaryDose: Double?,     // bolus paired by the detector
@@ -22,10 +25,11 @@ data class FoodEpisode(
      *  absorption lag. Null when no note anchors the eating moment. */
     val lagMin: Double? = null,
     /** Non-null when the measured rise is contaminated by a background force:
-     *  "insulin" (IOB from a pre-meal bolus was pulling BG down while this
-     *  rise was measured), "food" (another meal overlaps the window), or both.
-     *  Honesty marker for the library — the rise is not the dish's pure own. */
-    val background: String? = null,
+     *  [BackgroundForce.INSULIN] (IOB from a pre-meal bolus was pulling BG down
+     *  while this rise was measured), [BackgroundForce.FOOD] (another meal
+     *  overlaps the window), or both. Honesty marker for the library — the rise
+     *  is not the dish's pure own. Never empty: no force is null. */
+    val background: List<BackgroundForce>? = null,
     /** Portion in grams of carbs (from the eating-moment note), if known. */
     val grams: Double? = null,
     /** The dish's OWN rise (insulin-adjusted) — set when a kernel was given. */
@@ -107,8 +111,8 @@ fun foodMemory(
                 o.event.onsetMs in (onset - 90L * 60_000)..(onset + 180L * 60_000)
         }
         val bg = listOfNotNull(
-            "инсулин".takeIf { bgInsulin }, "еда".takeIf { bgFood },
-        ).joinToString("+").ifEmpty { null }
+            BackgroundForce.INSULIN.takeIf { bgInsulin }, BackgroundForce.FOOD.takeIf { bgFood },
+        ).ifEmpty { null }
         FoodEpisode(
             onsetMs = onset,
             primaryDose = m.event.bolusUnits,

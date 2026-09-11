@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_screen_title">Настройки</string>
+
+    <!-- Personal model card -->
+    <string name="settings_screen_personal_model_title">Персональная модель</string>
+    <string name="settings_screen_model_checking">Проверяю модель…</string>
+    <string name="settings_screen_file_unavailable">файл недоступен</string>
+    <string name="settings_screen_model_installed">Модель установлена атомарно</string>
+    <string name="settings_screen_model_rejected">Модель отклонена: %1$s</string>
+    <string name="settings_screen_model_status_line">%1$s · %2$d дн. · до %3$s\nданные с %4$s (%5$s)\nSHA %6$s… · %7$s</string>
+    <string name="settings_screen_model_not_initialized">Модель ещё не инициализирована</string>
+    <string name="settings_screen_import_json">Импортировать JSON</string>
+    <string name="settings_screen_no_previous_generation">Нет предыдущего поколения</string>
+    <string name="settings_screen_model_rollback_done">Выполнен rollback модели</string>
+    <string name="settings_screen_rollback">Откатить</string>
+    <string name="settings_screen_model_accept_note">Принимается только модель этого человека, обученная на данных не раньше %1$s. Ошибка импорта не влияет на текущий прогноз.</string>
+
+    <!-- Glucose units card -->
+    <string name="settings_screen_units_title">Единицы глюкозы</string>
+    <string name="settings_screen_units_hint">Только отображение: данные и аналитика хранятся в ммоль/л, переключение мгновенное и безопасное.</string>
+
+    <!-- Body card -->
+    <string name="settings_screen_body_title">Тело</string>
+    <string name="settings_screen_weight_label">Вес, кг</string>
+    <string name="settings_screen_weight_supporting">Стартовая оценка углеводов: %1$.3f ммоль/л на грамм. Грамм распределяется в объёме, пропорциональном массе тела, поэтому оценка обратна весу. Измерения по вашим данным её заменят.</string>
+
+    <!-- Target and range card -->
+    <string name="settings_screen_target_range_title">Цель и диапазон</string>
+    <string name="settings_screen_target_label">Идеальный сахар (%1$s)</string>
+    <string name="settings_screen_target_supporting">Подсказки «High +X» считают превышение относительно него</string>
+    <string name="settings_screen_range_lo_label">Диапазон: низ</string>
+    <string name="settings_screen_range_hi_label">Диапазон: верх</string>
+    <string name="settings_screen_range_hint">Диапазон — зелёная зона: TIR, полоса на графике и порог, после которого подсказка вообще подаёт голос.</string>
+
+    <!-- Insulin · measured curve card -->
+    <string name="settings_screen_insulin_curve_title">Инсулин · измеренная кривая</string>
+    <string name="settings_screen_insulin_engine_note">Один движок на всё: линия, What-if, часы и гипо-тревога считают по измеренной кривой — старт 11 · пик ~60 · хвост 120, ISF из ваших коррекций. Разошедшихся рук больше нет.</string>
+    <string name="settings_screen_isf_line">ISF %1$.1f %2$s · начало %3$.0f мин · вершина скорости %4$.0f мин</string>
+    <string name="settings_screen_isf_explain">Это ТА ЖЕ кривая, что измерена ниже, прочитанная другой линейкой: «вершина скорости» — верхушка горба, «пик» в измерении — минута выхода на полную скорость. Расходятся примерно на 15 минут по построению, а не по ошибке.</string>
+    <string name="settings_screen_main_curve_line">Основная кривая %1$.0f мин · дозозависимый хвост до %2$.0f мин</string>
+    <string name="settings_screen_shape_measured">⏱ Форма измерена по вашим уколам</string>
+    <string name="settings_screen_shape_prior">⏱ Форма — популяционный приор, это НЕ ваши данные</string>
+    <string name="settings_screen_refusal_line">не дали ориентиров: %1$s — %2$d</string>
+    <string name="settings_screen_curve_not_applied">кривая построена, но НЕ применена к прогнозу — см. расхождения артефакта</string>
+    <string name="settings_screen_manual_set_title">Задать вручную</string>
+    <string name="settings_screen_manual_set_hint">Минуты от укола: начало действия · активная фаза с и до · полный конец. Пустое поле — считаем сами. Заполненное имеет приоритет над измеренным, и мы сможем только сказать, что у нас вышло иначе.</string>
+    <string name="settings_screen_onset_label">начало</string>
+    <string name="settings_screen_active_from_label">активно с</string>
+    <string name="settings_screen_active_to_label">активно до</string>
+    <string name="settings_screen_end_label">конец</string>
+    <string name="settings_screen_isf_unit_suffix">%1$s/ед</string>
+    <string name="settings_screen_saved_recalculating">Сохранено — пересчитываю прогноз</string>
+    <string name="settings_screen_cleared">Очищено</string>
+    <string name="settings_screen_apply">Применить</string>
+    <string name="settings_screen_cleared_reverted">Очищено — вернулись к измеренному</string>
+    <string name="settings_screen_reset">Сбросить</string>
+    <string name="settings_screen_shape_rejected">⚠ Форма не принята: начало &lt; пик &lt; конец, и каждое в физиологических границах</string>
+    <string name="settings_screen_isf_rejected">⚠ ISF не принят: вне физиологических границ</string>
+    <string name="settings_screen_curve_build_failed">⚠ Не удалось построить кривую по этим числам</string>
+    <string name="settings_screen_unit_min">мин</string>
+    <string name="settings_screen_active_phase_start_name">начало активной фазы</string>
+    <string name="settings_screen_active_phase_end_name">конец активной фазы</string>
+    <string name="settings_screen_divergence_line">≠ По вашим данным %1$s %2$.2f %3$s, у вас задано %4$.2f — используем ваше</string>
+    <string name="settings_screen_isf_measured">💉 ISF измерен по закрытым коррекциям · эпизодов %1$d</string>
+    <string name="settings_screen_isf_prior">💉 ISF — приор артефакта, своих закрытых коррекций пока нет</string>
+    <string name="settings_screen_engine_backup_note">Один движок на всё: линия, What-if, часы и гипо-тревога читают одну модель. Запасной твин включается, только если физио-артефакт не построился.</string>
+    <string name="settings_screen_model_unavailable">Персональная модель недоступна. До её восстановления работает резервный DiaPilot.</string>
+    <string name="settings_screen_manual_values_note">Старые ручные значения сохранены только для аварийного отката и в обычной работе не участвуют.</string>
+
+    <!-- Alerts card -->
+    <string name="settings_screen_alerts_title">Алерты</string>
+    <string name="settings_screen_hypo_forecast_label">Прогноз гипогликемии (за ~45 мин)</string>
+    <string name="settings_screen_hypo_forecast_hint">Модель смотрит на 45 минут вперёд каждую минуту данных. Качество правила — в Анализе, карточка «Гипо-алерт»: точность, ловля, ложные в день.</string>
+    <string name="settings_screen_alert_sound_label">Звук алерта (слышно на «без звука»)</string>
+    <string name="settings_screen_night_gentle_label">Ночью мягко, потом громче</string>
+    <string name="settings_screen_alert_sound_hint">Звук играет на АЛАРМ-канале — слышно, даже когда телефон на «без звука» (но громкость будильника должна быть поднята, и DiaPilot добавлен в исключения «Не беспокоить», если он включён ночью). Ночью (0-7ч) сначала тихая вибрация, через 5 мин без реакции — полный будильник.</string>
+    <string name="settings_screen_check_signal">🔔 Проверить сигнал</string>
+    <string name="settings_screen_signal_sent">Сигнал отправлен (вибро есть)</string>
+    <string name="settings_screen_vibrator_unavailable">⚠ Вибромотор недоступен</string>
+    <string name="settings_screen_dextrose_snooze_label">Пауза алертов после декстрозы</string>
+    <string name="settings_screen_dextrose_window_label">Окно всасывания декстрозы</string>
+    <string name="settings_screen_low_refire_label">Повтор при низком каждые</string>
+    <string name="settings_screen_persist_label">Затяжная гипа → громче через</string>
+    <string name="settings_screen_hypo_alert_hint">Съел декстрозу — алерты молчат на окно всасывания; если через него сахар всё ещё низкий, алерт вернётся (лечение не помогло). Если гипа длится дольше «затяжной» — полный будильник и повтор каждые 10 мин, даже в мягком ночном режиме. Замер глюкометром в норме — гасит алерты. Неправдоподобно низкие значения (артефакт сенсора) → «проверьте сахар», не полный алярм.</string>
+    <string name="settings_screen_hyper_forecast_label">Прогноз выхода вверх (за ~40 мин)</string>
+    <string name="settings_screen_hyper_forecast_hint">Экспериментально: предупреждение до пересечения верхней границы — меньше взлётов к 300 начинается с 40 минут форы. Ночью гипо-алерт чувствительнее (нижний край коридора).</string>
+    <string name="settings_screen_hypo_plan_label">Мой план при гипо (согласуйте с врачом)</string>
+    <string name="settings_screen_hypo_plan_placeholder">например: 10 г сока, проверка через 15 мин</string>
+    <string name="settings_screen_hypo_plan_hint">Алерт напоминает ВАШ план дословно — приложение не вычисляет лечение. Пусто — алерт просто попросит проверить сахар.</string>
+
+    <!-- Libre 2 own receiver card -->
+    <string name="settings_screen_libre_title">Libre 2 — свой приём (эксперимент)</string>
+    <string name="settings_screen_own_ble_label">DiaPilot сам держит BLE-связь с сенсором</string>
+    <string name="settings_screen_libre_state_info">Сенсор %1$s · MAC %2$s · соединение №%3$d · ключей: %4$d</string>
+    <string name="settings_screen_libre_no_keys">Ключей нет. Включите тумблер и отсканируйте сенсор (NFC) — скан включит стриминг на DiaPilot.</string>
+    <string name="settings_screen_libre_warning">⚠ Сенсор держит одно BLE-соединение: включение забирает поток у xDrip. Вернуть xDrip — пересканировать сенсор в нём. Расшифровка — через OOP2.</string>
+
+    <!-- Diagnostics card -->
+    <string name="settings_screen_diagnostics_title">Диагностика</string>
+    <string name="settings_screen_age_minutes_ago">%1$d мин назад</string>
+    <string name="settings_screen_ble_line">BLE: %1$s · пакет %2$s</string>
+    <string name="settings_screen_main_reading_line">Основные показания: %1$s (%2$s)</string>
+    <string name="settings_screen_minute_stream_line">Минутный поток: %1$s</string>
+    <string name="settings_screen_calibration_line">Калибровка мин→осн: ×%1$.2f %2$+.1f (n=%3$d)</string>
+    <string name="settings_screen_calibration_none">Калибровка мин→осн: нет</string>
+    <string name="settings_screen_sensor_line">Сенсор: %1$s</string>
+    <string name="settings_screen_sensor_line_with_day">Сенсор: %1$s · день %2$.1f</string>
+    <string name="settings_screen_service_started_line">Сервис запущен: %1$s</string>
+    <string name="settings_screen_watch_server_running">работает</string>
+    <string name="settings_screen_watch_server_off">выключен</string>
+    <string name="settings_screen_watch_server_status_line">Сервер часов: %1$s</string>
+    <string name="settings_screen_xdrip_broadcast_line">xDrip-бродкаст: %1$s</string>
+    <string name="settings_screen_pairs_stage4_line">Пары для этапа 4: %1$s</string>
+
+    <!-- Data card -->
+    <string name="settings_screen_data_title">Данные</string>
+    <string name="settings_screen_exporting">Экспортирую…</string>
+    <string name="settings_screen_export_create_failed">не удалось создать файл</string>
+    <string name="settings_screen_export_saved_downloads">Сохранено в Загрузки: %1$s</string>
+    <string name="settings_screen_export_saved_path">Сохранено: %1$s</string>
+    <string name="settings_screen_export_error">Ошибка экспорта: %1$s</string>
+    <string name="settings_screen_export_database">💾 Экспорт базы (.sqlite)</string>
+    <string name="settings_screen_era_start_hint">Начало периода обучения: %1$s. Данные до этой даты хранятся и видны в истории, но модель на них не учится.</string>
+    <string name="settings_screen_era_date_future_error">Дата не может быть в будущем</string>
+    <string name="settings_screen_change_era_start">📅 Изменить начало периода</string>
+    <string name="settings_screen_purge_before_era">🧹 Удалить данные до %1$s</string>
+    <plurals name="settings_screen_purge_rows_title">
+        <item quantity="one">Удалить %d строку?</item>
+        <item quantity="few">Удалить %d строки?</item>
+        <item quantity="many">Удалить %d строк?</item>
+        <item quantity="other">Удалить %d строки?</item>
+    </plurals>
+    <string name="settings_screen_purge_confirm_text">Всё, записанное до %1$s, будет удалено безвозвратно. Эти записи сделаны до выбранного начала периода обучения, и модель на них уже не учится.</string>
+    <string name="settings_screen_purge_export_first">Сначала сделайте «Экспорт базы» — восстановить будет неоткуда.</string>
+    <string name="settings_screen_purging">Удаляю и сжимаю базу…</string>
+    <string name="settings_screen_purge_era_not_selected">начало периода не выбрано</string>
+    <plurals name="settings_screen_purge_result">
+        <item quantity="one">Удалено %1$d строка, освобождено %2$d МБ</item>
+        <item quantity="few">Удалено %1$d строки, освобождено %2$d МБ</item>
+        <item quantity="many">Удалено %1$d строк, освобождено %2$d МБ</item>
+        <item quantity="other">Удалено %1$d строки, освобождено %2$d МБ</item>
+    </plurals>
+    <string name="settings_screen_purge_error">Ошибка очистки: %1$s</string>
+    <string name="settings_screen_delete">Удалить</string>
+    <string name="settings_screen_cancel">Отмена</string>
+    <string name="settings_screen_restore_backup">♻️ Восстановить из копии (.sqlite)</string>
+    <string name="settings_screen_replace_all_data_title">Заменить все данные?</string>
+    <string name="settings_screen_replace_all_data_text">Текущая база будет полностью заменена выбранной копией. Приложение перезапустится. Действие необратимо — если сомневаешься, сначала сделай экспорт текущей базы.</string>
+    <string name="settings_screen_restoring">Восстанавливаю…</string>
+    <string name="settings_screen_restore_error">Ошибка восстановления: %1$s</string>
+    <string name="settings_screen_replace">Заменить</string>
+    <string name="settings_screen_companion_url_label">Компаньон-сервер (URL)</string>
+    <string name="settings_screen_companion_token_label">Токен компаньона</string>
+    <string name="settings_screen_companion_hint">Личный дашборд в браузере: сахар, тренд, прогноз, события — обновляется каждую минуту; туда же уезжает суточная копия базы. Сервер — server/ в репозитории. Пусто = выключено.</string>
+    <string name="settings_screen_cloud_folder_choose">☁️ Папка облачной копии — выбрать</string>
+    <string name="settings_screen_cloud_folder_configured">☁️ Облачная копия: %1$s · сменить</string>
+    <string name="settings_screen_cloud_configured_fallback">настроена</string>
+    <string name="settings_screen_disable_cloud_copy">Отключить облачную копию</string>
+    <string name="settings_screen_backup_hint">Полная копия всех данных (глюкоза, инсулин, еда, разметка) — в папку Загрузки. Плюс автокопия раз в сутки (7 файлов по дням недели, diapilot-auto-backup-N) — и в облачную папку, если выбрана (укажи папку Google Диска — синхронизирует сам Диск, данные не уходят никуда, кроме твоего облака). Восстановление — путь переезда на новый телефон.</string>
+
+    <!-- Watch card -->
+    <string name="settings_screen_watch_title">Часы</string>
+    <string name="settings_screen_watch_server_label">Сервер для циферблата (порт 29863)</string>
+    <string name="settings_screen_watch_hint">WatchDrip-совместимый локальный сервер для Zepp OS. Изменение применяется после перезапуска приложения.</string>
+    <string name="settings_screen_watch_test_toast">Тест на часы (флаг «низко» на 3 мин) — вибрация в течение ~1-2 мин</string>
+    <string name="settings_screen_watch_test_vibro">⌚ Тест вибро на часах</string>
+    <string name="settings_screen_watch_test_hint">Проверяет ОБА пути: флаг «низко» серверу циферблата (45с) и зеркалируемое уведомление (как реальный алерт). Часы завибрируют, если включён либо low-alarm циферблата, либо зеркалирование уведомлений Zepp с вибрацией.</string>
+    <string name="settings_screen_watch_dim_title">Ночной тусклый AOD на часах</string>
+    <string name="settings_screen_dim_mode_off">Выкл</string>
+    <string name="settings_screen_dim_mode_scheduled">По времени</string>
+    <string name="settings_screen_dim_mode_on_now">Вкл сейчас</string>
+    <string name="settings_screen_dim_start_label">С</string>
+    <string name="settings_screen_dim_end_label">До</string>
+    <string name="settings_screen_unit_hour">ч</string>
+    <string name="settings_screen_watch_dim_hint">Ночью циферблат почти гаснет (тусклые часы + сахар, красное при низком), график и остальное скрыты — можно держать AOD ночью, не слепя. Флаг едет на часы с данными (~минута задержки).</string>
+
+    <!-- Lock screen card -->
+    <string name="settings_screen_lock_screen_title">Экран блокировки</string>
+    <string name="settings_screen_overlay_label">Показывать сахар поверх экрана блокировки</string>
+    <string name="settings_screen_overlay_permission_needed">⚠ Нужно разрешение «Поверх других приложений».</string>
+    <string name="settings_screen_grant_permission">Выдать разрешение</string>
+    <string name="settings_screen_overlay_hint">Плавающая плашка с сахаром/стрелкой — как у xDrip, видна не разблокируя. На MIUI дополнительно включите «Отображение всплывающих окон» и показ на экране блокировки в разрешениях DiaPilot.</string>
+
+    <!-- Experimental card -->
+    <string name="settings_screen_experimental_title">Экспериментальное</string>
+    <string name="settings_screen_plausibility_label">Не доверять неправдоподобному якорю</string>
+    <string name="settings_screen_plausibility_hint">Показание ниже пола 2.0, всплывшее из разрыва или входящее в артефактный выброс, перестаёт считаться надёжной опорой: прогноз теряет статус TRUSTED и называет причину. Правдоподобные якоря не трогает. Читает путь гипо-тревоги — включайте, наблюдая.</string>
+    <string name="settings_screen_night_low_label">Ночью судить по нижней границе коридора</string>
+    <string name="settings_screen_night_low_hint">Ночная гипо-тревога срабатывает по НИЖНЕЙ границе прогноза, а не по центральной линии — раньше и чаще. На проверенной истории это давало много поводов без настоящих ночных низких, поэтому по умолчанию выключено. Включать, когда появится настоящий низкий, на котором видно полноту.</string>
+    <string name="settings_screen_marks_teach_label">Отметки еды учат модель</string>
+    <string name="settings_screen_experimental_hint">Выключение любой из трёх меняет то, что модель учит, и вступает в силу после пересчёта корпуса.</string>
+</resources>

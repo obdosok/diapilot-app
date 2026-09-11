@@ -30,6 +30,23 @@ data class HybridFoodObservation(
     val curveMmol: List<Double> = emptyList(),
 )
 
+/** What a History card's amplitude/timing is based on (stored in the projection cache). */
+object FoodBasis {
+    const val DISH_PROFILE = "dish_profile"
+    const val GLOBAL_CS = "global_cs"
+    const val MACROS_DURATION = "macros_duration"
+}
+
+/** The carb kinetics of a dish as the History card prints them (rendered in the UI language). */
+data class FoodKineticsLine(
+    val fastPct: Int,
+    val mediumPct: Int,
+    val slowPct: Int,
+    val form: String,
+    /** Where the model's trace tail ends, when it runs well past the plateau. */
+    val tailEndMin: Int?,
+)
+
 data class HybridFoodReadout(
     val amplitudeMmol: Double,
     val onsetMin: Int,
@@ -50,11 +67,11 @@ data class HybridFoodReadout(
     val observed: HybridFoodObservation? = null,
     val carbsG: Double? = null,
     val modelLabel: String = "Legacy v11",
-    val amplitudeBasis: String = "профиль блюда",
-    val timingBasis: String = "профиль блюда",
+    val amplitudeBasis: String = FoodBasis.DISH_PROFILE,
+    val timingBasis: String = FoodBasis.DISH_PROFILE,
     val timingTemplateId: String? = null,
     val timingSource: String? = null,
-    val kineticsSummary:String? = null,
+    val kinetics: FoodKineticsLine? = null,
     /** Protein/fat of the note, so the card can show macros and calories — the
      *  user judges the LLM's parse by them. Null when the note carries no macro line. */
     val proteinG: Double? = null,
@@ -283,7 +300,7 @@ object HybridRuntimeMetrics {
         val person=PhysioRuntime.artifact(store,toMs)?.personModelAt(12.0,emptySet())?:return emptyList()
         val tArt1 = android.os.SystemClock.elapsedRealtime()
         if (tArt1 - tArt >= 200) android.util.Log.i(
-            "ForecastPerf", "iob: артефакт ${tArt1 - tArt} ms",
+            "ForecastPerf", "iob: artifact ${tArt1 - tArt} ms",
         )
         val engine=HybridForecastEngine(person)
         val lookbackMs=(person.insulin.tailDurationMin*60_000.0).toLong()
@@ -639,8 +656,8 @@ object HybridRuntimeMetrics {
         }else baseEvent
         return foodReadout(engine,event,tsMs).copy(
             modelLabel="Physio v1",
-            amplitudeBasis="глобальный CS",
-            timingBasis="Б/Ж и длительность приёма",
+            amplitudeBasis=FoodBasis.GLOBAL_CS,
+            timingBasis=FoodBasis.MACROS_DURATION,
         )
     }
 
@@ -671,8 +688,8 @@ object HybridRuntimeMetrics {
                 val event = decorated
                 Triple(note, event, foodReadout(engine, event, note.tsMs).copy(
                     modelLabel = "Physio v1",
-                    amplitudeBasis = "глобальный CS",
-                    timingBasis = "Б/Ж и длительность приёма",
+                    amplitudeBasis = FoodBasis.GLOBAL_CS,
+                    timingBasis = FoodBasis.MACROS_DURATION,
                 ))
             }
             .toList()
@@ -787,13 +804,17 @@ object HybridRuntimeMetrics {
             timingSource=if(event.kineticFeatures!=null)"structured-feature-mixture-v2"
                 else "physiological_prior",
 
-            kineticsSummary=event.kineticFeatures?.normalized()?.let{
-                val trace=if(timing.tailEndMin>timing.plateauMin+30)
-                    "; следовой хвост до ~${"%.0f".format(timing.tailEndMin)} мин" else ""
+            kinetics=event.kineticFeatures?.normalized()?.let{
                 // Kept compact: the user reads the three percentages as an
                 // input control, but not the provenance tag — that moved off
                 // the card. Form stays: liquid-vs-solid is a decision input too.
-                "быстр/средн/медл ${"%.0f".format(it.fastFraction*100)}/${"%.0f".format(it.mediumFraction*100)}/${"%.0f".format(it.slowFraction*100)}%; ${it.physicalForm.name}$trace"
+                FoodKineticsLine(
+                    fastPct=Math.round(it.fastFraction*100).toInt(),
+                    mediumPct=Math.round(it.mediumFraction*100).toInt(),
+                    slowPct=Math.round(it.slowFraction*100).toInt(),
+                    form=it.physicalForm.name,
+                    tailEndMin=if(timing.tailEndMin>timing.plateauMin+30)Math.round(timing.tailEndMin).toInt() else null,
+                )
             },
         )
     }

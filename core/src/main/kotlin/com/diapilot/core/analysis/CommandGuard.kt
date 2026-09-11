@@ -16,12 +16,46 @@ package com.diapilot.core.analysis
 /** Actions the command parser is allowed to emit. */
 val COMMAND_ACTIONS = setOf("food", "meter", "bolus", "basal", "activity", "dextrose")
 
-/** Bolus purposes the UI knows how to render and train on. */
+/** Bolus purposes the UI knows how to render and train on. Stored tokens: they
+ *  are written to the database as they are and never translated. */
 val BOLUS_PURPOSES = setOf("коррекция", "на еду", "докол", "воздух")
 
+/** The physiological glucose range a meter command may carry, mmol/L. */
+val COMMAND_GLUCOSE_RANGE_MMOL = 1.0..35.0
+
+/** Carbs above this in one food command look like a recognition error, g. */
+const val COMMAND_MAX_CARBS_G = 300.0
+
+/** Longest food description a command may carry, characters. */
+const val COMMAND_MAX_FOOD_CHARS = 120
+
+/** Longest activity description a command may carry, characters. */
+const val COMMAND_MAX_ACTIVITY_CHARS = 40
+
+/** Why a parsed command is blocked; the app renders the reason under the composer. */
+sealed interface CommandBlock {
+    /** A value is NaN, infinite, zero or negative. */
+    data object NotANumber : CommandBlock
+    data object GlucoseMissing : CommandBlock
+    /** Outside [COMMAND_GLUCOSE_RANGE_MMOL]. */
+    data object GlucoseOutOfRange : CommandBlock
+    data object DoseMissing : CommandBlock
+    data class BolusAboveFuse(val units: Double, val fuseUnits: Double) : CommandBlock
+    /** Not one of [BOLUS_PURPOSES]. */
+    data class UnknownPurpose(val purpose: String) : CommandBlock
+    data class BasalAboveFuse(val units: Double, val fuseUnits: Double) : CommandBlock
+    data object FoodEmpty : CommandBlock
+    data object FoodTooLong : CommandBlock
+    /** Above [COMMAND_MAX_CARBS_G]. */
+    data object CarbsImplausible : CommandBlock
+    data object ActivityEmpty : CommandBlock
+    data object ActivityTooLong : CommandBlock
+    data class UnknownAction(val action: String) : CommandBlock
+}
+
 /**
- * Null when the command's values are safe to write; otherwise a short
- * human-readable reason (Russian, shown verbatim under the composer).
+ * Null when the command's values are safe to write; otherwise why it is
+ * blocked, shown under the composer.
  */
 fun validateCommandValues(
     action: String,
@@ -32,45 +66,40 @@ fun validateCommandValues(
     purpose: String? = null,
     activity: String? = null,
     p: com.diapilot.core.PersonalParams = com.diapilot.core.PersonalParams.DEFAULT,
-): String? {
+): CommandBlock? {
     fun bad(v: Double?): Boolean = v != null && (!v.isFinite() || v <= 0.0)
     // Non-finite or non-positive anywhere = hard stop, whatever the action.
-    if (bad(mmol) || bad(units) || bad(grams)) return "число не распознано (NaN/≤0)"
+    if (bad(mmol) || bad(units) || bad(grams)) return CommandBlock.NotANumber
 
     return when (action) {
         "meter" -> when {
-            mmol == null -> "не распознано значение глюкозы"
-            mmol !in 1.0..35.0 -> "глюкоза вне физиологического диапазона (1–35 ммоль/л)"
+            mmol == null -> CommandBlock.GlucoseMissing
+            mmol !in COMMAND_GLUCOSE_RANGE_MMOL -> CommandBlock.GlucoseOutOfRange
             else -> null
         }
         "bolus" -> when {
-            units == null -> "не распознана доза"
-            units > p.commandMaxBolusUnits ->
-                "болюс %.1f ед выше персонального предохранителя (%.0f ед)"
-                    .format(units, p.commandMaxBolusUnits)
-            purpose != null && purpose !in BOLUS_PURPOSES ->
-                "неизвестное назначение «$purpose»"
+            units == null -> CommandBlock.DoseMissing
+            units > p.commandMaxBolusUnits -> CommandBlock.BolusAboveFuse(units, p.commandMaxBolusUnits)
+            purpose != null && purpose !in BOLUS_PURPOSES -> CommandBlock.UnknownPurpose(purpose)
             else -> null
         }
         "basal" -> when {
-            units == null -> "не распознана доза"
-            units > p.commandMaxBasalUnits ->
-                "базал %.1f ед выше персонального предохранителя (%.0f ед)"
-                    .format(units, p.commandMaxBasalUnits)
+            units == null -> CommandBlock.DoseMissing
+            units > p.commandMaxBasalUnits -> CommandBlock.BasalAboveFuse(units, p.commandMaxBasalUnits)
             else -> null
         }
         "food" -> when {
-            food.isNullOrBlank() -> "пустое описание еды"
-            food.length > 120 -> "описание еды слишком длинное"
-            grams != null && grams > 300.0 -> "углеводы > 300 г — похоже на ошибку распознавания"
+            food.isNullOrBlank() -> CommandBlock.FoodEmpty
+            food.length > COMMAND_MAX_FOOD_CHARS -> CommandBlock.FoodTooLong
+            grams != null && grams > COMMAND_MAX_CARBS_G -> CommandBlock.CarbsImplausible
             else -> null
         }
         "activity" -> when {
-            activity.isNullOrBlank() -> "пустое описание активности"
-            activity.length > 40 -> "описание активности слишком длинное"
+            activity.isNullOrBlank() -> CommandBlock.ActivityEmpty
+            activity.length > COMMAND_MAX_ACTIVITY_CHARS -> CommandBlock.ActivityTooLong
             else -> null
         }
         "dextrose" -> null
-        else -> "неизвестное действие «$action»"
+        else -> CommandBlock.UnknownAction(action)
     }
 }

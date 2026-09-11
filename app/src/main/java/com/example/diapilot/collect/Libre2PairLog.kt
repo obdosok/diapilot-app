@@ -3,6 +3,7 @@ package com.example.diapilot.collect
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import com.example.diapilot.i18n.localized
 import org.json.JSONObject
 import java.io.File
 
@@ -54,6 +55,11 @@ object Libre2PairLog {
 
     fun stats(context: Context): String {
         val f = file(context)
-        return if (f.exists()) "%.0f КБ".format(f.length() / 1024.0) else "пусто"
+        val text = context.localized()
+        return if (f.exists()) {
+            text.getString(com.example.diapilot.R.string.libre2_pair_log_stats_kb, f.length() / 1024.0)
+        } else {
+            text.getString(com.example.diapilot.R.string.libre2_pair_log_stats_empty)
+        }
     }
 }

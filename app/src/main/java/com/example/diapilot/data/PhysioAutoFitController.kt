@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.atomic.AtomicInteger
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 
 /**
  * THE AUTO-FIT SURVIVES LEAVING THE SCREEN.
@@ -179,12 +181,16 @@ object PhysioAutoFitController {
             val base = HybridModelStore.untunedModel(app)
             val start = startOverride ?: PhysioAutoFitRuntime.startingKnobs(app)
             if (base == null || start == null) {
-                _state.value = State.Failed("модель не установлена")
+                _state.value = State.Failed(app.localized().getString(R.string.physio_auto_fit_controller_no_model))
                 return@coroutineScope
             }
             val episodes = PhysioAutoFitRuntime.buildEpisodes(Stores.get(app), limit)
             if (episodes.size < 3) {
-                _state.value = State.Failed("эпизодов ${episodes.size} — мало для медианы")
+                _state.value = State.Failed(
+                    app.localized().resources.getQuantityString(
+                        R.plurals.physio_auto_fit_controller_too_few_episodes, episodes.size, episodes.size,
+                    ),
+                )
                 return@coroutineScope
             }
             // The horizon must cover the grid or every candidate scores null and
@@ -199,7 +205,8 @@ object PhysioAutoFitController {
             // safety claim with nothing behind it.
             val safety = PhysioAutoFitRuntime.safetyBounds(app)
             val bounds = safety?.first ?: PhysioAutoFitV1.PLAUSIBLE_PHYSIOLOGY
-            val corridor = safety?.second ?: "тайминги ещё не измерены — коридор широкий"
+            val corridor = safety?.second
+                ?: app.localized().getString(R.string.physio_auto_fit_controller_corridor_unmeasured)
             _state.value = State.Running(metric, 0, episodes.size)
             val finished = AtomicInteger(0)
             val gate = Semaphore(maxOf(1, Runtime.getRuntime().availableProcessors() - 1))
@@ -234,7 +241,7 @@ object PhysioAutoFitController {
                 )
             }
             _state.value = if (fits.isEmpty()) {
-                State.Failed("ни один эпизод не посчитался")
+                State.Failed(app.localized().getString(R.string.physio_auto_fit_controller_no_episode_scored))
             } else {
                 State.Done(
                     metric,

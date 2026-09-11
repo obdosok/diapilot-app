@@ -56,13 +56,13 @@ android {
     lint {
         // ONE CHECK, DISABLED WITH ITS PREMISE CHECKED RATHER THAN ASSUMED.
         //
-        // `InvalidFragmentVersionForActivityResult` fires because
-        // `androidx.fragment:fragment:1.0.0` is on the classpath transitively.
-        // Its premise is that a Fragment older than 1.3.0 is handling an
-        // activity result — and this app has no Fragments at all: `MainActivity`
-        // extends `ComponentActivity`, `registerForActivityResult` is called on
-        // that, and `grep` over `app/src/main` finds no Fragment reference of
-        // any kind. Verified before switching it off.
+        // `InvalidFragmentVersionForActivityResult` fires when an old
+        // `androidx.fragment` is on the classpath transitively. Its premise is
+        // that a Fragment older than 1.3.0 is handling an activity result — and
+        // this app has no Fragments at all: `MainActivity` extends
+        // `AppCompatActivity` (only for per-app language), `registerForActivityResult`
+        // is called on that activity, and `grep` over `app/src/main` finds no
+        // Fragment reference of any kind. Verified before switching it off.
         //
         // The alternative fixes are both worse: adding an unused
         // `androidx.fragment` dependency to satisfy a version check, or
@@ -83,6 +83,20 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+    androidResources {
+        // The app ships English (default) and Russian. Library strings in other
+        // languages are dropped so a system dialog never shows a third language
+        // next to the app's fallback English.
+        localeFilters += listOf("en", "ru")
+    }
+    bundle {
+        // The language is picked inside the app (Settings -> Language), so a
+        // bundle must not split resources by the device language: a phone set
+        // to English would otherwise never receive the Russian strings.
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {
@@ -92,6 +106,9 @@ dependencies {
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    // Per-app language (Settings -> Language) back to API 26:
+    // AppCompatDelegate.setApplicationLocales + AppLocalesMetadataHolderService.
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

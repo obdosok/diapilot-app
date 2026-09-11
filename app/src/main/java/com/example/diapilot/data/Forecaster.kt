@@ -352,7 +352,7 @@ object Forecaster {
                     val tLed2 = android.os.SystemClock.elapsedRealtime()
                     if (tLed2 - tLed0 >= 200) android.util.Log.i(
                         "ForecastPerf",
-                        "леджер ($recordAs): whatIf ${tLed1 - tLed0} ms · " +
+                        "ledger ($recordAs): whatIf ${tLed1 - tLed0} ms · " +
                             "forecast ${tLed2 - tLed1} ms",
                     )
                 } 

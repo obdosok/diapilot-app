@@ -22,15 +22,27 @@ data class WatchHintInput(
     val hypoProtocol: String? = null,
 )
 
+/** What the watch face's hint slot says; the app renders it in the UI language. */
+sealed interface WatchHint {
+    /** A predicted low, with the user's own pre-agreed first step, verbatim. */
+    data class HypoPlan(val protocol: String) : WatchHint
+
+    /** A predicted low and no protocol set: a check, never a computed amount. */
+    data object HypoCheck : WatchHint
+
+    /** Expected to settle above range, at [settleMmol]. Glucose, never a dose. */
+    data class AboveTarget(val settleMmol: Double, val mgdl: Boolean) : WatchHint
+}
+
 /**
- * Short string for the watch face's hint slot, or null when the model sees
- * nothing actionable. Low wins over high (a predicted low is always the
- * more urgent story).
+ * The hint for the watch face's slot, or null when the model sees nothing
+ * actionable. Low wins over high (a predicted low is always the more urgent
+ * story).
  */
 fun watchHint(
     s: WatchHintInput,
     p: com.diapilot.core.PersonalParams = com.diapilot.core.PersonalParams.DEFAULT,
-): String? {
+): WatchHint? {
     val lo = s.predLoIn60
     val mid = s.predMmolIn60
 
@@ -42,8 +54,8 @@ fun watchHint(
     // doctor) is REMINDED; without one, the hint is a check, not a therapy.
     if (lo != null && lo < s.loMmol) {
         return s.hypoProtocol?.takeIf { it.isNotBlank() }
-            ?.let { "гипо? план: $it" }
-            ?: "риск гипо — проверьте"
+            ?.let { WatchHint.HypoPlan(it) }
+            ?: WatchHint.HypoCheck
     }
 
     // Model expects to SETTLE out of range despite the insulin on board.
@@ -51,7 +63,7 @@ fun watchHint(
     // the wrist wants, more concrete than an excess-over-target delta. Still
     // glucose, never a dose.
     if (mid != null && mid > s.hiMmol + 0.5) {
-        return "выше цели, к ~${fmtBg(mid, s.mgdl)}"
+        return WatchHint.AboveTarget(mid, s.mgdl)
     }
     return null
 }

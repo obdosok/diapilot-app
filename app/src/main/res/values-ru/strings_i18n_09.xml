@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- InsulinShapeSpark.kt -->
+    <string name="insulin_shape_spark_caption">скорость действия · вертикали: начало и пик · сетка — часы, всего %1$.0f мин</string>
+
+    <!-- WatchServer.kt: placeholder food-note content when the watch sends carbs with no dish name -->
+    <string name="watch_server_food_from_watch">Еда с часов</string>
+
+    <!-- MainState.kt -->
+    <string name="main_state_meter_cal_prefix">🩸 Калибровка по глюкометру: %1$s</string>
+    <plurals name="main_state_meter_cal_checks">
+        <item quantity="one">%1$s (по %2$d замеру)</item>
+        <item quantity="few">%1$s (по %2$d замерам)</item>
+        <item quantity="many">%1$s (по %2$d замерам)</item>
+        <item quantity="other">%1$s (по %2$d замерам)</item>
+    </plurals>
+    <plurals name="main_state_meter_cal_checks_slope">
+        <item quantity="one">×%1$.2f %2$s (по %3$d замеру)</item>
+        <item quantity="few">×%1$.2f %2$s (по %3$d замерам)</item>
+        <item quantity="many">×%1$.2f %2$s (по %3$d замерам)</item>
+        <item quantity="other">×%1$.2f %2$s (по %3$d замерам)</item>
+    </plurals>
+    <string name="main_state_meter_cal_fading">%1$s (тает)</string>
+    <string name="main_state_generic_food_label">еда</string>
+    <string name="main_state_isf_source_hour">physio, час %1$d</string>
+    <string name="main_state_isf_source_manual">%1$s · твоя настройка</string>
+    <string name="main_state_sensitivity_stronger">⚡ Инсулин в последние часы действует сильнее обычного (×%1$.1f) — чувствительность могла измениться</string>
+    <string name="main_state_sensitivity_weaker">⚡ Инсулин в последние часы действует слабее обычного (×%1$.1f)</string>
+    <string name="main_state_isf_unit_mgdl">%1$.0f мг/дл/ед</string>
+    <string name="main_state_isf_unit_mmol">%1$.1f ммоль/ед</string>
+    <string name="main_state_isf_factor_tod">время суток ×%1$.2f</string>
+    <string name="main_state_isf_factor_autosens">автосенс ×%1$.2f</string>
+    <string name="main_state_applied_isf_plain">Прогноз считал по %1$s (база, без поправок)</string>
+    <string name="main_state_applied_isf_factors">Прогноз считал по %1$s = база %2$s × %3$s</string>
+
+    <!-- GlucoseChart.kt -->
+    <string name="glucose_chart_conditional_bolus_scenario">Условный сценарий: убран только укол %1$.1f ед; остальные наблюдаемые и скрытые процессы считаются неизменными</string>
+    <string name="glucose_chart_span_3h">3ч</string>
+    <string name="glucose_chart_span_6h">6ч</string>
+    <string name="glucose_chart_span_24h">24ч</string>
+    <string name="glucose_chart_span_3d">3д</string>
+    <string name="glucose_chart_cd_return_to_now">Вернуться к текущему времени</string>
+    <string name="glucose_chart_cd_pick_date">Выбрать дату графика</string>
+    <string name="glucose_chart_dashed_line">Пунктир: %1$s</string>
+    <string name="glucose_chart_dashed_line_with_landmarks">Пунктир: %1$s · старт %2$.0f · пик скорости %3$.0f · хвост %4$.0f мин</string>
+    <string name="glucose_chart_audit_underexplained">С ретроспективным CGM-профилем совместимы %1$.1f–%2$.1f из %3$.1f ммоль/л падения; остаток %4$.1f причинно не распределён</string>
+    <string name="glucose_chart_audit_explained">Наблюдаемое падение %1$.1f; интервал ретроспективного CGM-профиля %2$.1f–%3$.1f ммоль/л</string>
+    <string name="glucose_chart_audit_caveat">Наблюдаемая форма совместима с bolus timing, но не доказывает причинность. Возможны другой ISF/тайминг сегодня, скрытая активность, базал/печёночный фон, ошибка еды или сенсора. После завершения см. receipt эпизода в «Анализе».</string>
+    <string name="glucose_chart_restore">Вернуть</string>
+    <string name="glucose_chart_basal_short_label">Б%1$.0f</string>
+    <string name="glucose_chart_explain_food">Как рассчитано</string>
+    <string name="glucose_chart_bolus_dialog_title">💉 Укол</string>
+    <string name="glucose_chart_dose_units_label">Доза, ед</string>
+    <string name="glucose_chart_purpose_label">Назначение:</string>
+    <string name="glucose_chart_restore_actual_line">Вернуть фактическую линию</string>
+    <string name="glucose_chart_hide_bolus_conditionally">Условно убрать только этот укол</string>
+    <string name="glucose_chart_no_personal_curve">Персональная кривая инсулина ещё не определена</string>
+    <string name="glucose_chart_delete_bolus">🗑 Удалить укол</string>
+    <string name="glucose_chart_save">Сохранить</string>
+    <string name="glucose_chart_cancel">Отмена</string>
+    <string name="glucose_chart_delete_note_title">Удалить заметку?</string>
+    <string name="glucose_chart_delete_confirm">Удалить</string>
+    <string name="glucose_chart_basal_dialog_title">🌙 Базал</string>
+    <string name="glucose_chart_delete_basal">🗑 Удалить</string>
+    <string name="glucose_chart_show">Показать</string>
+    <string name="glucose_chart_sel_meal_ate_rise">%1$s %2$s (ел) · подъём с %3$s</string>
+    <string name="glucose_chart_sel_meal_bg_change">%1$s → %2$s за %3$.0f мин</string>
+    <string name="glucose_chart_sel_no_bolus">без болюса</string>
+    <string name="glucose_chart_sel_bolus_row">💉 %1$s · %2$.1f ед</string>
+    <string name="glucose_chart_sel_basal_row">🕐 %1$s · базал %2$.0f ед</string>
+</resources>

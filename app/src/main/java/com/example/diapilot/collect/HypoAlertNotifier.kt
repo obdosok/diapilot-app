@@ -10,6 +10,8 @@ import android.media.RingtoneManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.diapilot.MainActivity
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 
 /**
  * The predictive hypo alert — fires when the twin's median forecast crosses
@@ -52,11 +54,13 @@ object HypoAlertNotifier {
         // flag must outlive at least one full cast to reliably reach the
         // watch app-service (and its sleep-mode vibration).
         watchTestUntilMs = now + 180_000
+        val text = context.localized()
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_WATCH_TEST, "Тест часов", NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = "Проверка зеркалирования уведомлений на часы" },
+                CHANNEL_WATCH_TEST, text.getString(R.string.hypo_alert_notifier_watch_test_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { description = text.getString(R.string.hypo_alert_notifier_watch_test_channel_desc) },
         )
         val hhmmss = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
             .format(java.util.Date(now))
@@ -67,8 +71,8 @@ object HypoAlertNotifier {
         nm.cancel(NOTIF_ID_WATCH_TEST)
         val n = NotificationCompat.Builder(context, CHANNEL_WATCH_TEST)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
-            .setContentTitle("⌚ Тест сигнала на часы · $hhmmss")
-            .setContentText("Если Zepp зеркалит уведомления — часы завибрируют сейчас.")
+            .setContentTitle(text.getString(R.string.hypo_alert_notifier_watch_test_title, hhmmss))
+            .setContentText(text.getString(R.string.hypo_alert_notifier_watch_test_text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOnlyAlertOnce(false)
             .setWhen(now)
@@ -121,6 +125,7 @@ object HypoAlertNotifier {
 
     fun maybeNotify(context: Context, store: com.diapilot.core.collector.CollectorStore) {
         try {
+            val text = context.localized()
             val hypoOn = com.example.diapilot.data.Settings.hypoAlertEnabled(context)
             val hyperOn = com.example.diapilot.data.Settings.hyperAlertEnabled(context)
             // Disabled alerts must also stop the watch signal.
@@ -265,22 +270,28 @@ object HypoAlertNotifier {
                     .apply()
 
                 val protocol = com.example.diapilot.data.Settings.hypoProtocol(context)
-                val protocolLine = protocol?.takeIf { it.isNotBlank() }?.let { "Ваш план: $it" }
-                    ?: "Проверьте сахар и действуйте по своему плану лечения гипо."
+                val protocolLine = protocol?.takeIf { it.isNotBlank() }
+                    ?.let { text.getString(R.string.hypo_alert_notifier_protocol_line, it) }
+                    ?: text.getString(R.string.hypo_alert_notifier_protocol_default)
                 val predictText = hit?.let {
-                    "Прогноз: ниже ${com.diapilot.core.analysis.fmtBg(threshold, mgdl)} " +
-                        "к ${fmtT.format(java.util.Date(it.crossTsMs))}, " +
-                        "минимум ~${com.diapilot.core.analysis.fmtBg(it.minMmol, mgdl)}. $protocolLine"
+                    text.getString(
+                        R.string.hypo_alert_notifier_predict_text,
+                        com.diapilot.core.analysis.fmtBg(threshold, mgdl),
+                        fmtT.format(java.util.Date(it.crossTsMs)),
+                        com.diapilot.core.analysis.fmtBg(it.minMmol, mgdl),
+                        protocolLine,
+                    )
                 } ?: protocolLine
                 when (decision.action) {
                     com.diapilot.core.twin.HypoAction.NONE -> {}
                     com.diapilot.core.twin.HypoAction.ARTIFACT_ALARM -> {
                         postHypo(
                             context,
-                            "⚠ Критически низко или сбой сенсора",
-                            "Значение ${com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl)}. Возможен " +
-                                "артефакт сенсора — СРОЧНО перепроверьте глюкометром и действуйте " +
-                                "по своему плану. Ввод замера уточнит калибровку.",
+                            text.getString(R.string.hypo_alert_notifier_artifact_title),
+                            text.getString(
+                                R.string.hypo_alert_notifier_artifact_text,
+                                com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl),
+                            ),
                         )
                         AlarmPlayer.alarm(context, withSound = sound)
                     }
@@ -311,42 +322,72 @@ object HypoAlertNotifier {
                         val blind = blindMins >= 5
                         postHypo(
                             context,
-                            if (blind) "⚠ Затяжная гипа — видели $mins из $wallMins мин"
-                            else "⚠ Затяжная гипа — $mins мин",
-                            "Сахар долго ниже ${com.diapilot.core.analysis.fmtBg(threshold, mgdl)} " +
-                                "(${com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl)})." +
-                                (if (blind) " $blindMins мин без надёжных данных — их не считаем." else "") +
-                                " Если лечение не помогает — действуйте по своему плану. $protocolLine",
+                            if (blind) {
+                                text.getString(R.string.hypo_alert_notifier_persistent_title_blind, mins, wallMins)
+                            } else {
+                                text.getString(R.string.hypo_alert_notifier_persistent_title, mins)
+                            },
+                            if (blind) {
+                                text.getString(
+                                    R.string.hypo_alert_notifier_persistent_text_blind,
+                                    com.diapilot.core.analysis.fmtBg(threshold, mgdl),
+                                    com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl),
+                                    blindMins,
+                                    protocolLine,
+                                )
+                            } else {
+                                text.getString(
+                                    R.string.hypo_alert_notifier_persistent_text,
+                                    com.diapilot.core.analysis.fmtBg(threshold, mgdl),
+                                    com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl),
+                                    protocolLine,
+                                )
+                            },
                         )
                         AlarmPlayer.alarm(context, withSound = sound)
                     }
                     com.diapilot.core.twin.HypoAction.LOW_ALARM -> {
                         postHypo(
                             context,
-                            "⚠ Сейчас низко — ${com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl)}",
-                            "Сахар ниже ${com.diapilot.core.analysis.fmtBg(threshold, mgdl)}. $protocolLine",
+                            text.getString(
+                                R.string.hypo_alert_notifier_low_title,
+                                com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl),
+                            ),
+                            text.getString(
+                                R.string.hypo_alert_notifier_low_text,
+                                com.diapilot.core.analysis.fmtBg(threshold, mgdl),
+                                protocolLine,
+                            ),
                         )
                         AlarmPlayer.alarm(context, withSound = sound)
                     }
                     com.diapilot.core.twin.HypoAction.PREDICT_GENTLE -> {
-                        postHypo(context, "⚠ Возможна гипа через ~%.0f мин".format(hit?.leadMin ?: 0.0), predictText)
+                        postHypo(
+                            context,
+                            text.getString(R.string.hypo_alert_notifier_predict_title, hit?.leadMin ?: 0.0),
+                            predictText,
+                        )
                         AlarmPlayer.gentle(context)
                     }
                     com.diapilot.core.twin.HypoAction.SENSOR_CHECK -> {
                         postHypo(
                             context,
-                            "🔎 Датчик читает неправдоподобно низко",
-                            "Значение ${com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl)} похоже на сбой " +
-                                "сенсора (компрессия/EOL за ночь). Перепроверьте глюкометром и доверяйте " +
-                                "своему самочувствию — реальный лёгкий лоу может быть под этим. Ввод замера " +
-                                "уточнит калибровку.",
+                            text.getString(R.string.hypo_alert_notifier_sensor_check_title),
+                            text.getString(
+                                R.string.hypo_alert_notifier_sensor_check_text,
+                                com.diapilot.core.analysis.fmtBg(anchorMmol, mgdl),
+                            ),
                         )
                         AlarmPlayer.gentle(context)
                     }
                     com.diapilot.core.twin.HypoAction.PREDICT_ALARM,
                     com.diapilot.core.twin.HypoAction.ESCALATE_ALARM,
                     -> {
-                        postHypo(context, "⚠ Возможна гипа через ~%.0f мин".format(hit?.leadMin ?: 0.0), predictText)
+                        postHypo(
+                            context,
+                            text.getString(R.string.hypo_alert_notifier_predict_title, hit?.leadMin ?: 0.0),
+                            predictText,
+                        )
                         AlarmPlayer.alarm(context, withSound = sound)
                     }
                 }
@@ -389,11 +430,14 @@ object HypoAlertNotifier {
                     prefs.edit().putLong(PREF_LAST_SUSTAINED, now).apply()
                     notify(
                         context,
-                        title = "↑ Высоко уже %d мин".format(v.minutesAbove),
-                        text = "Выше ${com.diapilot.core.analysis.fmtBg(
-                            com.diapilot.core.twin.SustainedHigh.THRESHOLD_MMOL, mgdl,
-                        )} непрерывно, максимум ${com.diapilot.core.analysis.fmtBg(v.peakMmol, mgdl)}. " +
-                            "Действуйте по своему плану.",
+                        title = text.getString(R.string.hypo_alert_notifier_sustained_high_title, v.minutesAbove),
+                        text = text.getString(
+                            R.string.hypo_alert_notifier_sustained_high_text,
+                            com.diapilot.core.analysis.fmtBg(
+                                com.diapilot.core.twin.SustainedHigh.THRESHOLD_MMOL, mgdl,
+                            ),
+                            com.diapilot.core.analysis.fmtBg(v.peakMmol, mgdl),
+                        ),
                     )
                     Log.i(TAG, "sustained high: %d min, peak %.1f".format(v.minutesAbove, v.peakMmol))
                 }
@@ -411,11 +455,13 @@ object HypoAlertNotifier {
                     prefs.edit().putLong(PREF_LAST_HIGH, now).apply()
                     notify(
                         context,
-                        title = "↗ Возможен выход вверх через ~%.0f мин".format(hit.leadMin),
-                        text = "Прогноз: выше ${com.diapilot.core.analysis.fmtBg(ceiling, mgdl)} " +
-                            "к ${fmtT.format(java.util.Date(hit.crossTsMs))}, " +
-                            "пик ~${com.diapilot.core.analysis.fmtBg(hit.maxMmol, mgdl)}. " +
-                            "Проверьте и действуйте по своему плану.",
+                        title = text.getString(R.string.hypo_alert_notifier_hyper_predict_title, hit.leadMin),
+                        text = text.getString(
+                            R.string.hypo_alert_notifier_hyper_predict_text,
+                            com.diapilot.core.analysis.fmtBg(ceiling, mgdl),
+                            fmtT.format(java.util.Date(hit.crossTsMs)),
+                            com.diapilot.core.analysis.fmtBg(hit.maxMmol, mgdl),
+                        ),
                     )
                     Log.i(TAG, "hyper fired: lead=%.0f min, crest=%.1f".format(hit.leadMin, hit.maxMmol))
                 }
@@ -429,12 +475,14 @@ object HypoAlertNotifier {
      *  [AlarmPlayer] on the alarm stream (heard on silent); the channel itself
      *  is silent so we don't double-buzz or get swallowed by the ringer. */
     private fun postHypo(context: Context, title: String, text: String) {
+        val localizedText = context.localized()
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL, "Прогноз гипогликемии", NotificationManager.IMPORTANCE_HIGH,
+                CHANNEL, localizedText.getString(R.string.hypo_alert_notifier_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Упреждающее предупреждение: модель видит гипо впереди"
+                description = localizedText.getString(R.string.hypo_alert_notifier_channel_desc)
                 setSound(null, null)
                 enableVibration(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
@@ -462,11 +510,13 @@ object HypoAlertNotifier {
     /** Hyper notification — a high is not a wake-you-now emergency, so it uses
      *  a plain high-importance channel (its own sound, respects the ringer). */
     private fun notify(context: Context, title: String, text: String) {
+        val localizedText = context.localized()
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_HYPER, "Прогноз высокого сахара", NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply { description = "Упреждающее предупреждение о выходе вверх" },
+                CHANNEL_HYPER, localizedText.getString(R.string.hypo_alert_notifier_hyper_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = localizedText.getString(R.string.hypo_alert_notifier_hyper_channel_desc) },
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_HYPER)
             .setSmallIcon(android.R.drawable.stat_notify_error)

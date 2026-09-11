@@ -19,12 +19,13 @@ import com.diapilot.core.collector.BolusPoint
  * are looking at the same afternoon, so a second implementation would be a
  * second answer to a question that has one.
  */
-enum class Regime(val labelRu: String) {
-    NIGHT("ночь"),
-    ACTIVITY("активность"),
-    POST_MEAL("после еды"),
-    POST_BOLUS("после укола"),
-    QUIET("спокойно"),
+// The names are stored (ledger, snapshot JSON); the app renders the label.
+enum class Regime {
+    NIGHT,
+    ACTIVITY,
+    POST_MEAL,
+    POST_BOLUS,
+    QUIET,
 }
 
 /**

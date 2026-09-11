@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// The wording is rendered and tested in :app (com.example.diapilot.i18n.WatchHintTextTest).
 class WatchHintTest {
     @Test
     fun predictedLowRemindsTheUsersOwnProtocol() {
@@ -16,7 +17,7 @@ class WatchHintTest {
                 hypoProtocol = "10 г сока",
             ),
         )
-        assertEquals("гипо? план: 10 г сока", hint)
+        assertEquals(WatchHint.HypoPlan("10 г сока"), hint)
     }
 
     @Test
@@ -26,16 +27,21 @@ class WatchHintTest {
                 predMmolIn60 = 3.0, predLoIn60 = 1.0,
                 iobUnits = 5.0, carbSensMmolPerGram = 0.05,
             ),
-        )!!
-        assertEquals("риск гипо — проверьте", hint)
-        assertTrue("no digits allowed in an uncomputed hint", hint.none { it.isDigit() })
+        )
+        // A check carries no number at all: nothing was computed.
+        assertEquals(WatchHint.HypoCheck, hint)
     }
 
     @Test
     fun lowWithoutCalibrationStillWarns() {
+        assertEquals(WatchHint.HypoCheck, watchHint(WatchHintInput(4.0, 3.2, null, null)))
+    }
+
+    @Test
+    fun blankProtocolFallsBackToTheCheck() {
         assertEquals(
-            "риск гипо — проверьте",
-            watchHint(WatchHintInput(4.0, 3.2, null, null)),
+            WatchHint.HypoCheck,
+            watchHint(WatchHintInput(4.0, 3.2, null, null, hypoProtocol = "  ")),
         )
     }
 
@@ -45,9 +51,8 @@ class WatchHintTest {
         // itself, in glucose, never insulin units.
         val hint = watchHint(
             WatchHintInput(12.5, 10.5, 0.2, 0.1, targetMmol = 5.5),
-        )!!
-        assertEquals("выше цели, к ~12,5", hint)
-        assertTrue(!hint.contains("ед") && !hint.lowercase().contains("u"))
+        )
+        assertEquals(WatchHint.AboveTarget(settleMmol = 12.5, mgdl = false), hint)
     }
 
     @Test
@@ -59,7 +64,7 @@ class WatchHintTest {
     @Test
     fun lowBeatsHighAndQuietModelSaysNothing() {
         // Corridor floor low even though midline is high → low wins.
-        assertTrue(watchHint(WatchHintInput(11.0, 3.5, 1.0, 0.1))!!.startsWith("риск гипо"))
+        assertTrue(watchHint(WatchHintInput(11.0, 3.5, 1.0, 0.1)) is WatchHint.HypoCheck)
         assertNull(watchHint(WatchHintInput(7.0, 5.5, 1.0, 0.1)))
         assertNull(watchHint(WatchHintInput(null, null, null, null)))
     }

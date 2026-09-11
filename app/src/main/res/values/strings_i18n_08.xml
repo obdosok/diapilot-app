@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HypoAlertNotifier.kt -->
+    <string name="hypo_alert_notifier_watch_test_channel_name">Watch test</string>
+    <string name="hypo_alert_notifier_watch_test_channel_desc">Checks notification mirroring to the watch</string>
+    <!-- %1$s: HH:mm:ss timestamp. -->
+    <string name="hypo_alert_notifier_watch_test_title">⌚ Watch signal test · %1$s</string>
+    <string name="hypo_alert_notifier_watch_test_text">If Zepp mirrors notifications, the watch will vibrate now.</string>
+    <!-- %1$s: the user's hypo treatment plan text. -->
+    <string name="hypo_alert_notifier_protocol_line">Your plan: %1$s</string>
+    <string name="hypo_alert_notifier_protocol_default">Check your glucose and follow your hypo treatment plan.</string>
+    <!-- %1$s: threshold glucose; %2$s: crossing time; %3$s: minimum glucose; %4$s: protocol line. -->
+    <string name="hypo_alert_notifier_predict_text">Forecast: below %1$s by %2$s, minimum ~%3$s. %4$s</string>
+    <string name="hypo_alert_notifier_artifact_title">⚠ Critically low or sensor fault</string>
+    <!-- %1$s: glucose value. -->
+    <string name="hypo_alert_notifier_artifact_text">Value %1$s. This may be a sensor artifact — check with a meter URGENTLY and follow your plan. Entering a meter reading will refine the calibration.</string>
+    <!-- %1$d: minutes observed; %2$d: minutes since the episode started. -->
+    <string name="hypo_alert_notifier_persistent_title_blind">⚠ Prolonged low — seen %1$d of %2$d min</string>
+    <!-- %1$d: minutes low. -->
+    <string name="hypo_alert_notifier_persistent_title">⚠ Prolonged low — %1$d min</string>
+    <!-- %1$s: threshold glucose; %2$s: current glucose; %3$d: minutes without reliable data; %4$s: protocol line. -->
+    <string name="hypo_alert_notifier_persistent_text_blind">Glucose has stayed below %1$s for a while (%2$s). %3$d min without reliable data isn\'t counted. If treatment isn\'t helping, follow your plan. %4$s</string>
+    <!-- %1$s: threshold glucose; %2$s: current glucose; %3$s: protocol line. -->
+    <string name="hypo_alert_notifier_persistent_text">Glucose has stayed below %1$s for a while (%2$s). If treatment isn\'t helping, follow your plan. %3$s</string>
+    <!-- %1$s: current glucose. -->
+    <string name="hypo_alert_notifier_low_title">⚠ Low right now — %1$s</string>
+    <!-- %1$s: threshold glucose; %2$s: protocol line. -->
+    <string name="hypo_alert_notifier_low_text">Glucose is below %1$s. %2$s</string>
+    <!-- %1$.0f: minutes until the predicted low. -->
+    <string name="hypo_alert_notifier_predict_title">⚠ Possible low in ~%1$.0f min</string>
+    <string name="hypo_alert_notifier_sensor_check_title">🔎 Sensor reading looks implausibly low</string>
+    <!-- %1$s: glucose value. -->
+    <string name="hypo_alert_notifier_sensor_check_text">Value %1$s looks like a sensor fault (compression/EOL overnight). Check with a meter and trust how you feel — a real mild low can hide underneath this. Entering a meter reading will refine the calibration.</string>
+    <string name="hypo_alert_notifier_channel_name">Hypo forecast</string>
+    <string name="hypo_alert_notifier_channel_desc">Early warning: the model sees a low ahead</string>
+    <!-- %1$d: minutes above the sustained-high threshold. -->
+    <string name="hypo_alert_notifier_sustained_high_title">↑ High for %1$d min</string>
+    <!-- %1$s: threshold glucose; %2$s: peak glucose. -->
+    <string name="hypo_alert_notifier_sustained_high_text">Above %1$s continuously, peak %2$s. Follow your plan.</string>
+    <!-- %1$.0f: minutes until the predicted rise above range. -->
+    <string name="hypo_alert_notifier_hyper_predict_title">↗ Possible rise above range in ~%1$.0f min</string>
+    <!-- %1$s: ceiling glucose; %2$s: crossing time; %3$s: peak glucose. -->
+    <string name="hypo_alert_notifier_hyper_predict_text">Forecast: above %1$s by %2$s, peak ~%3$s. Check and follow your plan.</string>
+    <string name="hypo_alert_notifier_hyper_channel_name">High glucose forecast</string>
+    <string name="hypo_alert_notifier_hyper_channel_desc">Early warning about a rise above range</string>
+
+    <!-- Libre2PairLog.kt -->
+    <string name="libre2_pair_log_stats_kb">%1$.0f KB</string>
+    <string name="libre2_pair_log_stats_empty">empty</string>
+
+    <!-- RapidFallNotifier.kt -->
+    <string name="rapid_fall_notifier_title_urgent">⬇ Fast drop — possible low</string>
+    <string name="rapid_fall_notifier_title">⬇ Glucose is dropping fast</string>
+    <!-- %1$s: current glucose; %2$s: slope (with unit); %3$s: projected glucose in ~20 min. -->
+    <string name="rapid_fall_notifier_text">Now %1$s · %2$s per minute · in ~20 min could be %3$s</string>
+    <string name="rapid_fall_notifier_channel_name">Fast glucose drop</string>
+    <string name="rapid_fall_notifier_channel_desc">Early warning from the per-minute stream — 3–4 minutes ahead of the usual alarms</string>
+
+    <!-- PhysioAutoFitRuntime.kt -->
+    <!-- %1$.0f..%4$.0f: measured onset/peak/phase/tail minutes. -->
+    <string name="physio_auto_fit_runtime_safety_label">corridor ±20%% around the measured %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+
+    <!-- AnalysisOverviewScreen.kt -->
+    <string name="analysis_overview_screen_title">Analysis</string>
+    <string name="analysis_overview_screen_subtitle">What helps judge health and forecast honesty.</string>
+    <string name="analysis_overview_screen_metrics_failed">Couldn\'t read the metrics</string>
+    <string name="analysis_overview_screen_loading">Computing a quick summary…</string>
+    <string name="analysis_overview_screen_glucose_card_title">Glucose</string>
+    <string name="analysis_overview_screen_days_7">7 days</string>
+    <string name="analysis_overview_screen_days_30">30 days</string>
+    <string name="analysis_overview_screen_backtests_note">Research backtests and retraining no longer run when this tab is opened.</string>
+
+    <string name="analysis_overview_screen_daily_balance_title">Daily balance</string>
+    <string name="analysis_overview_screen_daily_balance_intro">carbs × CS − units × ISF = glucose change over the day. Day boundary 04:00, not midnight: that\'s when you\'re asleep and haven\'t eaten, so both reference points are taken at rest.</string>
+    <!-- %1$d: minimum days needed; %2$d: minimum carbs (g); %3$d: minimum insulin (U). -->
+    <string name="analysis_overview_screen_daily_balance_empty">Nothing to show yet: at least %1$d valid days are needed (≥%2$d g carbs, ≥%3$d U insulin, and glucose at both boundaries).</string>
+    <string name="analysis_overview_screen_daily_balance_col_day">day</string>
+    <string name="analysis_overview_screen_daily_balance_col_carbs">carbs</string>
+    <string name="analysis_overview_screen_daily_balance_col_units">U</string>
+    <string name="analysis_overview_screen_daily_balance_col_delta">dGlucose</string>
+    <string name="analysis_overview_screen_daily_balance_col_g_per_u">g/U</string>
+    <string name="analysis_overview_screen_daily_balance_col_isf" translatable="false">ISF</string>
+    <!-- %1$d: days; %2$s: ISF; %3$s: spread low; %4$s: spread high; %5$s: carb sensitivity. Numbers are pre-formatted (Locale.ROOT) to keep the table's decimal points consistent regardless of language. -->
+    <string name="analysis_overview_screen_daily_balance_median">Median over %1$d days: ISF %2$s · range %3$s…%4$s · CS %5$s mmol/g</string>
+    <string name="analysis_overview_screen_daily_balance_footnote">This is an estimate of AMPLITUDE and only that: over a full day, all timings — the kcal queue, the sieve, the insulin shape — drop out of the equation. It does not say WHEN something happened, and it does not replace a forecast.</string>
+
+    <string name="analysis_overview_screen_rescue_safety_title">Prevented hypos / rescue</string>
+    <string name="analysis_overview_screen_rescue_safety_intro">Dextrose changes the outcome. So the absence of a measured hypo after it is not counted as a successful forecast: that episode is censored and counted in the safety metric “rescue needed”.</string>
+    <!-- %1$d: rescue events in 30 days; %2$d: events compatible with a prevented hypo. -->
+    <string name="analysis_overview_screen_rescue_safety_summary">Over 30 days: %1$d rescue event(s); %2$d compatible with a prevented hypo.</string>
+    <!-- %1$s: date/time; %2$s: grams; %3$s: glucose at rescue or "?"; %4$s: slope or "?"; %5$s: active bolus units. -->
+    <string name="analysis_overview_screen_rescue_safety_row">%1$s · %2$s g · glucose %3$s · rate %4$s mmol/L/min · bolus over 4h %5$s U. The final outcome isn\'t causally assessed without the rescue.</string>
+    <string name="analysis_overview_screen_rescue_safety_footnote">This improves the safety estimate and catches stacking/forecast error. One such mixed episode does not retrain the ISF or a single injection\'s profile.</string>
+
+    <string name="analysis_overview_screen_episode_status_identified_isf">isolated correction: ISF identifiable</string>
+    <string name="analysis_overview_screen_episode_status_effective_response_only">meal + insulin: joint response only</string>
+    <string name="analysis_overview_screen_episode_status_carb_error_candidate">possible carb error</string>
+    <string name="analysis_overview_screen_episode_status_timing_mismatch">total matches, trajectory doesn\'t</string>
+    <string name="analysis_overview_screen_episode_status_sensor_or_process">possible sensor/process issue</string>
+    <string name="analysis_overview_screen_episode_status_retrospective_correction">isolated correction found retrospectively; useful for diagnostics, not for auto-learning</string>
+    <string name="analysis_overview_screen_episode_status_censored">window not complete</string>
+    <string name="analysis_overview_screen_episode_status_unexplained">unexplained / mixed</string>
+
+    <string name="analysis_overview_screen_today_card_title">Today / current state</string>
+    <string name="analysis_overview_screen_today_no_checkpoints">No completed 60/120-minute causal checkpoints yet.</string>
+    <string name="analysis_overview_screen_today_what_changed">What changed</string>
+    <string name="analysis_overview_screen_today_what_explains">What might explain it</string>
+    <string name="analysis_overview_screen_today_what_unexplained">What\'s not explained yet</string>
+    <string name="analysis_overview_screen_today_unallocated">The unallocated part remains unresolved/confounded.</string>
+    <string name="analysis_overview_screen_today_mixed_data">What data is mixed in</string>
+    <string name="analysis_overview_screen_today_timeline">Timeline</string>
+
+    <string name="analysis_overview_screen_evidence_source_missing">There are no structured records for this factor yet.</string>
+    <string name="analysis_overview_screen_evidence_no_exposures">The source is connected, but no matching events have happened yet.</string>
+    <string name="analysis_overview_screen_evidence_not_identifiable">There\'s data, but this effect can\'t yet be separated from food, insulin or other factors.</string>
+    <string name="analysis_overview_screen_evidence_insufficient">Not enough matching independent episodes yet.</string>
+    <string name="analysis_overview_screen_evidence_null_compatible">No practically significant stable link has been found yet.</string>
+    <string name="analysis_overview_screen_evidence_hypothesis">There\'s a possible signal in the history, but its direction or size isn\'t stable yet.</string>
+    <string name="analysis_overview_screen_evidence_preliminary">A preliminary link repeats in the available data, but still needs future confirmation.</string>
+    <string name="analysis_overview_screen_evidence_supported">The link has passed a prospective check on future data.</string>
+    <string name="analysis_overview_screen_evidence_conflicting">Different parts of the history show different directions for the effect.</string>
+
+    <string name="analysis_overview_screen_hint_absorption">Log protein/fat, or confirm the photo breakdown, before evaluating the result.</string>
+    <string name="analysis_overview_screen_hint_duration_absorption">Enter the meal duration in the food clarification.</string>
+    <string name="analysis_overview_screen_hint_alcohol_background">Note alcohol in the meal entry.</string>
+    <string name="analysis_overview_screen_hint_cartridge_kinetics">Note “new cartridge” on every change.</string>
+    <string name="analysis_overview_screen_hint_injection_site">Note the injection site whenever it changes.</string>
+    <string name="analysis_overview_screen_hint_cartridge_heat">Note heat exposure alongside the current cartridge.</string>
+    <string name="analysis_overview_screen_hint_stress_illness_background">Note stress or illness at the time of the event.</string>
+    <string name="analysis_overview_screen_hint_default">Keep collecting data as usual.</string>
+
+    <string name="analysis_overview_screen_measurement_activity_same_isf">What counts: pure corrections only; the strength of the drop after insulin is compared, with activity before the correction, against days without it. Food and activity inside the window rule out a pure ISF estimate.</string>
+    <string name="analysis_overview_screen_measurement_activity_same_effective">What counts: completed meal + IOB/bolus chains. The residual drop relative to the model is divided by the expected insulin contribution; activity is searched from 6 hours before the start to the end of the episode. This is a combined effective response (including muscle glucose uptake), not a proven pure ISF.</string>
+
+    <!-- %1$s: label ("7 days" / "30 days"). -->
+    <string name="analysis_overview_screen_stats_no_data">%1$s · no data</string>
+    <!-- %1$.1f: mean glucose in mmol/L. -->
+    <string name="analysis_overview_screen_stats_mean">average %1$.1f mmol/L</string>
+    <!-- %1$.0f: percent in range. -->
+    <string name="analysis_overview_screen_stats_in_range">%1$.0f%% in range</string>
+    <!-- %1$.1f: percent below range; %2$.1f: percent above range. -->
+    <string name="analysis_overview_screen_stats_below_above">%1$.1f%% below · %2$.1f%% above</string>
+
+    <string name="analysis_overview_screen_model_card_title">Personal model</string>
+    <string name="analysis_overview_screen_model_not_installed">No model installed</string>
+    <string name="analysis_overview_screen_model_in_use">A measured model is used for the forecast</string>
+    <!-- %1$d: training days (also selects the plural form); %2$s: the trained-through date, or "—" when unknown. -->
+    <plurals name="analysis_overview_screen_model_trained">
+        <item quantity="one">Trained over %1$d day · data through %2$s</item>
+        <item quantity="other">Trained over %1$d days · data through %2$s</item>
+    </plurals>
+</resources>

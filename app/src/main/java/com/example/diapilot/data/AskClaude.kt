@@ -5,7 +5,10 @@ import com.diapilot.core.analysis.Confidence
 import com.diapilot.core.analysis.glycemicStats
 import com.diapilot.core.analysis.labelStats
 import com.diapilot.core.collector.CollectorStore
+import com.example.diapilot.R
 import com.example.diapilot.collect.TreatmentsPollWorker
+import com.example.diapilot.i18n.LlmLanguage
+import com.example.diapilot.i18n.localized
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,15 +49,16 @@ object AskClaude {
         val kcal: Double?,
     )
 
-    private const val SYSTEM = """Ты — ассистент приложения DiaPilot для человека с диабетом 1 типа.
-Тебе дают сводку его данных (глюкоза, инсулин, еда, контекст) и вопрос.
+    private fun systemPrompt(context: Context): String = """You are the assistant for the DiaPilot app, for a person with type 1 diabetes.
+You are given a summary of their data (glucose, insulin, food, context) and a question.
 
-ЖЁСТКИЕ ПРАВИЛА:
-- НИКОГДА не называй конкретные дозы инсулина и не давай указаний по дозированию ("уколите X единиц" — запрещено в любой форме).
-- Не назначай лечение. Формулируй наблюдения и гипотезы по данным.
-- Если вопрос про изменение настроек терапии (ISF, базал) — опиши, что видно в данных, и добавь: обсудить с врачом.
-- Опирайся на конкретные числа из сводки, ссылайся на них.
-- Отвечай по-русски, кратко и по делу. Если данных для ответа мало — скажи прямо."""
+STRICT RULES:
+- NEVER name specific insulin doses or give dosing instructions ("inject X units" is forbidden in any form).
+- Do not prescribe treatment. State observations and hypotheses from the data.
+- If the question is about changing therapy settings (ISF, basal) — describe what the data shows, and add: discuss it with a doctor.
+- Base your answer on specific numbers from the summary, and reference them.
+- Be brief and to the point. If there isn't enough data to answer, say so directly.
+${LlmLanguage.replyInstruction(context)}"""
 
     /**
      * Chat history shared across recompositions and persisted to prefs —
@@ -120,14 +124,14 @@ object AskClaude {
         // converting every line here.
         if (Units.isMgdl(context)) {
             sb.appendLine(
-                "ЕДИНИЦЫ: пользователь читает сахар в мг/дл. Все значения глюкозы ниже — " +
-                    "в ммоль/л; в ответах ВСЕГДА переводи в мг/дл (×18) и указывай единицы.",
+                "UNITS: the user reads glucose in mg/dL. All glucose values below are " +
+                    "in mmol/L; in your answers ALWAYS convert to mg/dL (×18) and state the units.",
             )
         }
 
-        sb.appendLine("СЕЙЧАС (${fmt.format(Date(now))}):")
+        sb.appendLine("NOW (${fmt.format(Date(now))}):")
         store.lastSensorReading()?.let {
-            sb.appendLine("- глюкоза %.1f ммоль/л (%s, %d мин назад)".format(it.mmol, it.trend ?: "?", (now - it.tsMs) / 60_000))
+            sb.appendLine("- glucose %.1f mmol/L (%s, %d min ago)".format(it.mmol, it.trend ?: "?", (now - it.tsMs) / 60_000))
         }
         run {
             // The same curve the forecast used. Briefing the assistant on a
@@ -138,13 +142,13 @@ object AskClaude {
             val v11Tail = HybridRuntimeMetrics.insulinDurationMin()
             val dia = measured?.effectEndMin ?: v11Tail ?: Settings.insulinDiaMin(context)
             val curveName = when {
-                measured != null -> "измеренная кривая"
-                v11Tail != null -> "персональная v11"
-                else -> "резервная модель"
+                measured != null -> "measured curve"
+                v11Tail != null -> "personal v11"
+                else -> "fallback model"
             }
             iob.takeIf { it > 0.05 }?.let {
                 sb.appendLine(
-                    "- активный инсулин (IOB): %.2f ед (%s, хвост до %.0f мин)"
+                    "- insulin on board (IOB): %.2f U (%s, tail to %.0f min)"
                         .format(
                             it,
                             curveName,
@@ -154,28 +158,28 @@ object AskClaude {
             }
         }
         store.lastHeartRate()?.takeIf { now - it.tsMs < 3 * 3_600_000 }?.let {
-            sb.appendLine("- пульс: %.0f (по данным часов)".format(it.bpm))
+            sb.appendLine("- heart rate: %.0f (from watch data)".format(it.bpm))
         }
         val dayHr = store.heartRate(now - 24L * 3_600_000, now)
         if (dayHr.size >= 10) {
-            sb.appendLine("- пульс за 24ч: средний %.0f, макс %.0f".format(
+            sb.appendLine("- heart rate over 24h: avg %.0f, max %.0f".format(
                 dayHr.map { it.bpm }.average(), dayHr.maxOf { it.bpm }))
         }
 
         model?.let { m ->
             sb.appendLine()
-            sb.appendLine("ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (рассчитан по его истории):")
+            sb.appendLine("USER PROFILE (computed from their history):")
             val kernelEnd = m.kernel.lastOrNull()?.median
-            if (kernelEnd != null) sb.appendLine("- полный эффект 1 ед инсулина: %.2f ммоль/л (плато кривой действия)".format(-kernelEnd))
+            if (kernelEnd != null) sb.appendLine("- full effect of 1 U of insulin: %.2f mmol/L (action-curve plateau)".format(-kernelEnd))
             listOf(60.0, 120.0, 180.0).forEach { tau ->
                 com.diapilot.core.analysis.kernelAt(m.kernel, tau)?.let {
-                    sb.appendLine("- к %d мин после укола реализовано %.2f ммоль/л на 1 ед".format(tau.toInt(), -it))
+                    sb.appendLine("- by %d min after the injection, %.2f mmol/L per 1 U is realized".format(tau.toInt(), -it))
                 }
             }
             val tod = m.byTod.filterValues { it.confidence != Confidence.INSUFFICIENT && it.median != null }
             if (tod.isNotEmpty()) {
-                sb.appendLine("- ISF по времени суток: " + tod.entries.joinToString("; ") {
-                    "${it.key.labelRu}: %.2f (n=${it.value.nValid})".format(it.value.median)
+                sb.appendLine("- ISF by time of day: " + tod.entries.joinToString("; ") {
+                    "${com.example.diapilot.i18n.IsfText.todPromptLabel(it.key)}: %.2f (n=${it.value.nValid})".format(it.value.median)
                 })
             }
         }
@@ -194,24 +198,24 @@ object AskClaude {
         // review.
         glycemicStats(trustedHistory(store, context, now - 7L * 24 * 3_600_000, now))?.let { w ->
             sb.appendLine()
-            sb.appendLine("НЕДЕЛЯ: средний %.1f; в цели(3.9–10) %.0f%%; ниже %.0f%%; выше %.0f%%; эпизодов гипо %d".format(
+            sb.appendLine("WEEK: avg %.1f; in range (3.9-10) %.0f%%; below %.0f%%; above %.0f%%; hypo episodes %d".format(
                 w.mean, w.inRangePct, w.belowPct, w.abovePct, w.hypoEpisodes))
         }
 
         sb.appendLine()
-        sb.appendLine("ПОСЛЕДНИЕ 24 ЧАСА:")
+        sb.appendLine("LAST 24 HOURS:")
         // Same series: raw points used to go INTO the model's prompt, so it
         // was reasoning about the wrong scale.
         val dayReadings = trustedHistory(store, context, now - 24L * 3_600_000, now)
         if (dayReadings.isNotEmpty()) {
             // Downsample to ~30-min points.
             val pts = dayReadings.filterIndexed { i, _ -> i % 6 == 0 } + dayReadings.last()
-            sb.appendLine("- глюкоза: " + pts.joinToString("; ") { "%s %.1f".format(fmtT.format(Date(it.tsMs)), it.mmol) })
+            sb.appendLine("- glucose: " + pts.joinToString("; ") { "%s %.1f".format(fmtT.format(Date(it.tsMs)), it.mmol) })
         }
         val dayBoluses = store.boluses(now - 24L * 3_600_000, now)
         if (dayBoluses.isNotEmpty()) {
-            sb.appendLine("- болюсы: " + dayBoluses.joinToString("; ") {
-                "%s %.1f ед".format(fmtT.format(Date(it.tsMs)), it.units) +
+            sb.appendLine("- boluses: " + dayBoluses.joinToString("; ") {
+                "%s %.1f U".format(fmtT.format(Date(it.tsMs)), it.units) +
                     (it.purpose?.let { p -> " ($p)" } ?: "")
             })
         }
@@ -223,8 +227,8 @@ object AskClaude {
         // dish twice.
         val mergedNoteIds = mutableSetOf<Long>()
         if (dayMeals.isNotEmpty()) {
-            sb.appendLine("- еда (детект): " + dayMeals.joinToString("; ") { m ->
-                val label = labelByOnset[m.onsetMs] ?: "не размечено"
+            sb.appendLine("- food (detected): " + dayMeals.joinToString("; ") { m ->
+                val label = labelByOnset[m.onsetMs] ?: "unlabeled"
                 // System-labeled rises are "not food" — keep food notes apart.
                 val sys = label in com.diapilot.core.analysis.SysLabels.ALL
                 val note = if (sys) null else notes
@@ -237,43 +241,43 @@ object AskClaude {
                     }
                     .minByOrNull { kotlin.math.abs(it.tsMs - m.onsetMs) }
                 note?.let { mergedNoteIds.add(it.id) }
-                "%s «%s» +%.1f за %.0f мин%s".format(
+                "%s \"%s\" +%.1f over %.0f min%s".format(
                     fmtT.format(Date(m.onsetMs)), label, m.rise, m.timeToPeakMin,
-                    m.bolusUnits?.let { " (болюс %.1f)".format(it) } ?: " (без болюса)",
+                    m.bolusUnits?.let { " (bolus %.1f)".format(it) } ?: " (no bolus)",
                 ) + (note?.let { n ->
-                    " [запись: «${n.content}»" +
-                        (n.estCarbs?.let { g -> ", ~%.0f г углев".format(g) } ?: "") + "]"
+                    " [note: \"${n.content}\"" +
+                        (n.estCarbs?.let { g -> ", ~%.0f g carbs".format(g) } ?: "") + "]"
                 } ?: "")
             })
         }
         val looseNotes = notes.filter { it.id !in mergedNoteIds }
         if (looseNotes.isNotEmpty()) {
-            sb.appendLine("- заметки (48ч): " + looseNotes.joinToString("; ") {
-                "${fmt.format(Date(it.tsMs))} «${it.content}»" +
-                    (it.estCarbs?.let { g -> " ~%.0f г углев".format(g) } ?: "")
+            sb.appendLine("- notes (48h): " + looseNotes.joinToString("; ") {
+                "${fmt.format(Date(it.tsMs))} \"${it.content}\"" +
+                    (it.estCarbs?.let { g -> " ~%.0f g carbs".format(g) } ?: "")
             })
         }
         store.sleepSessions(now - 48L * 3_600_000, now).lastOrNull()?.let {
-            sb.appendLine("- сон: %.1f ч (%s–%s)".format(it.durationH, fmtT.format(Date(it.startMs)), fmtT.format(Date(it.endMs))))
+            sb.appendLine("- sleep: %.1f h (%s-%s)".format(it.durationH, fmtT.format(Date(it.startMs)), fmtT.format(Date(it.endMs))))
         }
         val basals = store.basalEvents(now - 48L * 3_600_000, now)
         if (basals.isNotEmpty()) {
-            sb.appendLine("- длинный инсулин (48ч): " + basals.joinToString("; ") {
-                "%s %.0f ед".format(fmt.format(Date(it.tsMs)), it.units)
+            sb.appendLine("- basal (48h): " + basals.joinToString("; ") {
+                "%s %.0f U".format(fmt.format(Date(it.tsMs)), it.units)
             })
         }
 
         val foods = labelStats(store.labeledMeals(limit = 500).filter { it.event.onsetMs >= FoodEraSettings.current().startMs }).take(8)
         if (foods.isNotEmpty()) {
             sb.appendLine()
-            sb.appendLine("ПРОФИЛИ ЕДЫ (по повторам): " + foods.joinToString("; ") {
-                "«${it.name}»×${it.count}: +%.1f за %.0f мин".format(it.avgRise, it.avgTimeToPeakMin)
+            sb.appendLine("FOOD PROFILES (by repeats): " + foods.joinToString("; ") {
+                "\"${it.name}\"×${it.count}: +%.1f over %.0f min".format(it.avgRise, it.avgTimeToPeakMin)
             })
         }
         model?.contexts?.take(6)?.let { ctx ->
             if (ctx.isNotEmpty()) {
-                sb.appendLine("КОНТЕКСТ (12ч после тега vs обычно): " + ctx.joinToString("; ") {
-                    "«${it.tag}»×${it.count}: %.1f vs %.1f".format(it.meanAfter, it.meanBaseline)
+                sb.appendLine("CONTEXT (12h after tag vs usual): " + ctx.joinToString("; ") {
+                    "\"${it.tag}\"×${it.count}: %.1f vs %.1f".format(it.meanAfter, it.meanBaseline)
                 })
             }
         }
@@ -281,9 +285,9 @@ object AskClaude {
     }
 
     private const val DIGEST_QUESTION =
-        "Составь короткий дайджест моей недели по данным: 1) общая картина и сравнение с прошлой неделей; " +
-            "2) заметные закономерности (еда, время суток, контекст); 3) на что обратить внимание. " +
-            "Опирайся на числа. Без советов по дозам."
+        "Write a short digest of my week from the data: 1) the overall picture and a comparison with last week; " +
+            "2) notable patterns (food, time of day, context); 3) what to pay attention to. " +
+            "Base it on the numbers. No dose advice."
 
     /**
      * Per-day rows for the last 14 days — lets the model compare weeks.
@@ -292,7 +296,7 @@ object AskClaude {
      *        over the same series the user sees on the chart.
      */
     fun buildWeeklyContext(context: Context, store: CollectorStore): String {
-        val sb = StringBuilder("ПО ДНЯМ (последние 14 суток):\n")
+        val sb = StringBuilder("BY DAY (last 14 days):\n")
         val cal = java.util.Calendar.getInstance()
         cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
         cal.set(java.util.Calendar.MINUTE, 0)
@@ -308,7 +312,7 @@ object AskClaude {
             val meals = store.meals(dayStart, dayEnd)
             val labels = meals.mapNotNull { labelByOnset[it.onsetMs] }
             sb.appendLine(
-                "%s: средний %.1f; в цели %.0f%%; гипо %d; болюсов %d (Σ%.1f ед); еда: %d детектов%s".format(
+                "%s: avg %.1f; in range %.0f%%; hypo %d; boluses %d (Σ%.1f U); food: %d detected%s".format(
                     fmt.format(Date(dayStart)), stats.mean, stats.inRangePct, stats.hypoEpisodes,
                     boluses.size, boluses.sumOf { it.units }, meals.size,
                     if (labels.isNotEmpty()) " (${labels.joinToString(", ")})" else "",
@@ -320,13 +324,24 @@ object AskClaude {
 
     /** Fire the weekly digest as a chat turn. */
     fun sendDigest(context: Context, store: CollectorStore) =
-        sendAsync(context, store, DIGEST_QUESTION, displayAs = "📋 Дайджест недели")
+        sendAsync(
+            context, store, DIGEST_QUESTION,
+            displayAs = context.localized().getString(R.string.ask_claude_digest_display),
+        )
 
     // Requests must survive tab switches and screen rotation — the scope
     // lives with the process, not with the composable.
     private val requestScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
     )
+
+    /**
+     * A failed call as the user sees it ("Error: …"), in the app language.
+     * Display only: callers track the failure themselves (the call threw) and
+     * never store this text as an analysis.
+     */
+    fun errorText(context: Context, e: Throwable): String =
+        context.localized().getString(R.string.ask_claude_error, e.message ?: e.javaClass.simpleName)
 
     /** Fire a question; history and busy-state update via [History]. */
     fun sendAsync(
@@ -344,9 +359,9 @@ object AskClaude {
             val answer = try {
                 val ctx = buildContext(context, store) +
                     if (displayAs != null) "\n\n" + buildWeeklyContext(context, store) else ""
-                ask(key, ctx, priorHistory, question)
+                ask(key, ctx, priorHistory, question, context)
             } catch (e: Exception) {
-                "Ошибка: ${e.message}"
+                errorText(context, e)
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 History.append(context, ChatMsg("assistant", answer))
@@ -355,31 +370,33 @@ object AskClaude {
         }
     }
 
-    private const val FOOD_PROMPT = """На фото — еда человека с диабетом 1 типа.
-Первая строка ответа: короткое название блюда (2–4 слова, без точки в конце).
-Со второй строки: состав и ориентировочная оценка углеводов по компонентам — честно обозначай неопределённость (порцию по фото видно плохо).
-Для КАЖДОГО компонента добавь строку строго в формате: СОСТАВ: название ×N = X г — где название 1–3 слова в именительном падеже ЕДИНСТВЕННОГО числа, N — число штук/порций, X — углеводы ОДНОЙ штуки/порции («2 кантуччи по 11 г» → «СОСТАВ: кантуччи ×2 = 11 г»; если компонент один или непересчитываемый — «СОСТАВ: хумус = 10 г»). Сумма N·X по компонентам должна совпадать с итоговой строкой УГЛЕВОДЫ.
-Оценивай консервативно: свежие овощи и листовые салаты почти без углеводов (2–5 г); яйца, мясо, рыба, сыр — около нуля.
-Предпоследняя строка — строго в формате: ГИ: N (гликемический индекс блюда целиком с учётом жиров/белков, число; если неизвестно — ГИ: неизвестно).
-Последняя строка ответа — строго в формате: УГЛЕВОДЫ: X–Y г (суммарный диапазон по всей порции; если оценить невозможно — УГЛЕВОДЫ: неизвестно).
-Никаких рекомендаций по дозам инсулина."""
+    private fun foodPrompt(replyLanguage: String) = """A photo shows the food of a person with type 1 diabetes.
+First line of the answer: a short dish name (2-4 words, no trailing period).
+From the second line: the composition and an estimated carb breakdown by component — state uncertainty honestly (the portion is hard to judge from a photo).
+For EACH component add a line in exactly this format: СОСТАВ: name ×N = X г — where name is 1-3 words in the nominative singular, N is the number of items/portions, and X is the carbs of ONE item/portion (example: "2 cookies at 11 g each" → "СОСТАВ: cookie ×2 = 11 г"; if there is one component or it can't be counted — "СОСТАВ: hummus = 10 г"). The sum of N·X across components must match the final УГЛЕВОДЫ line.
+Estimate conservatively: fresh vegetables and leafy salads have almost no carbs (2-5 g); eggs, meat, fish, cheese — close to zero.
+The second-to-last line — in exactly this format: ГИ: N (the glycemic index of the whole dish, accounting for fat/protein, a number; if unknown — ГИ: неизвестно).
+The last line of the answer — in exactly this format: УГЛЕВОДЫ: X–Y г (the total range for the whole portion; if it can't be estimated — УГЛЕВОДЫ: неизвестно).
+Write these line prefixes exactly as given, in Russian, whatever the reply language. Write the dish name in $replyLanguage.
+Never any dose recommendations."""
 
-    private const val CARBS_TEXT_PROMPT = """Человек с диабетом 1 типа описал еду словами: «%s».
-Оцени углеводы. Ответ: 1–3 короткие строки состава/порции (если порция не указана — возьми типичную и явно это скажи).
-Первая строка ответа — строго в формате: НАЗВАНИЕ: короткое чистое название блюда (2–4 слова, именительный падеж, без количеств и весов; «2 сухарика кантуччи и чай» → «НАЗВАНИЕ: кантуччи с чаем»).
-Оценивай консервативно и реалистично: свежие овощи и листовые салаты почти без углеводов (2–5 г); яйца, мясо, рыба, сыр — около нуля. Если название неоднозначно («салат» может быть овощным или оливье) — бери САМЫЙ ПРОСТОЙ типовой вариант и явно напиши допущение.
-Если еда составная (несколько блюд/компонентов) — добавь для КАЖДОГО компонента строку строго в формате: СОСТАВ: название ×N = X г — где название 1–3 слова в именительном падеже ЕДИНСТВЕННОГО числа, N — число штук/порций, X — углеводы ОДНОЙ штуки/порции («2 кантуччи по 11 г» → «СОСТАВ: кантуччи ×2 = 11 г»; если компонент один или непересчитываемый — «СОСТАВ: хумус = 10 г»). Сумма N·X по компонентам должна совпадать с итоговой строкой УГЛЕВОДЫ.
-Предпоследняя строка — строго в формате: ГИ: N (гликемический индекс блюда целиком с учётом жиров/белков, число; если неизвестно — ГИ: неизвестно).
-Последняя строка ответа — строго в формате: УГЛЕВОДЫ: X–Y г (если оценить невозможно — УГЛЕВОДЫ: неизвестно).
-Никаких рекомендаций по дозам инсулина."""
+    private fun carbsTextPrompt(replyLanguage: String) = """A person with type 1 diabetes described their food in words: "%s".
+Estimate the carbs. Answer: 1-3 short lines of composition/portion (if the portion isn't stated, assume a typical one and say so explicitly).
+The first line of the answer — in exactly this format: НАЗВАНИЕ: a short clean dish name (2-4 words, nominative case, no quantities or weights; example: "2 crackers and tea" → "НАЗВАНИЕ: crackers with tea").
+Estimate conservatively and realistically: fresh vegetables and leafy salads have almost no carbs (2-5 g); eggs, meat, fish, cheese — close to zero. If the name is ambiguous ("salad" could be a vegetable salad or a mayo-based one) — pick the SIMPLEST typical variant and state the assumption explicitly.
+If the food has several components — add a line for EACH component in exactly this format: СОСТАВ: name ×N = X г — where name is 1-3 words in the nominative singular, N is the number of items/portions, and X is the carbs of ONE item/portion (example: "2 cookies at 11 g each" → "СОСТАВ: cookie ×2 = 11 г"; if there is one component or it can't be counted — "СОСТАВ: hummus = 10 г"). The sum of N·X across components must match the final УГЛЕВОДЫ line.
+The second-to-last line — in exactly this format: ГИ: N (the glycemic index of the whole dish, accounting for fat/protein, a number; if unknown — ГИ: неизвестно).
+The last line of the answer — in exactly this format: УГЛЕВОДЫ: X–Y г (if it can't be estimated — УГЛЕВОДЫ: неизвестно).
+Write these line prefixes exactly as given, in Russian, whatever the reply language. Write the dish name in $replyLanguage.
+Never any dose recommendations."""
 
     /** The user's own history for matching dishes, so the estimate anchors on
      *  their measured reality — not a generic population guess. Observation
      *  fed to the model, never a dose. */
     private fun personalBlock(personalContext: String?): String =
         personalContext?.takeIf { it.isNotBlank() }?.let {
-            "\nЛичная история этого пользователя по похожим блюдам (ОРИЕНТИР — " +
-                "он уже это ел и измерил, доверяй этим цифрам больше, чем типовым):\n$it"
+            "\nThis user's personal history for similar dishes (A GUIDE — " +
+                "they have already eaten and measured this; trust these numbers more than typical ones):\n$it"
         } ?: ""
 
     // ---- Structured food output (tool-use) --------------------------------
@@ -437,13 +454,13 @@ object AskClaude {
         return buildString {
             appendLine()
             appendLine(
-                "ИЗВЕСТНЫЕ КОМПОНЕНТЫ пользователя. Если компонент блюда совпадает с одним из " +
-                    "них — бери ЕГО углеводы на порцию и записанные факты вместо справочных " +
-                    "значений, и не помечай этот компонент как угаданный:",
+                "The user's KNOWN COMPONENTS. If a dish component matches one of " +
+                    "these — use ITS carbs per portion and the recorded facts instead of reference " +
+                    "values, and do not mark this component as guessed:",
             )
             rows.take(40).forEach { c ->
                 val parts = buildList {
-                    c.carbsPerPortionG?.let { add("%.0f г/порция".format(it)) }
+                    c.carbsPerPortionG?.let { add("%.0f g/portion".format(it)) }
                     c.facts?.takeIf { it.isNotBlank() }?.let { add(it.replace('\n', ' ').take(120)) }
                 }
                 appendLine("- ${c.name}: ${parts.joinToString(" · ")}")
@@ -458,28 +475,29 @@ object AskClaude {
         return buildString {
             appendLine()
             appendLine(
-                "ИЗВЕСТНЫЕ БЛЮДА пользователя. Реши: какое из этих блюд на фото, или ни одно " +
-                    "(поле known_dish_id; \"none\", если ни одно). Совпадение — ТО ЖЕ блюдо, " +
-                    "а не похожий класс еды: карбонара похожа на любую пасту, сомнение = none. " +
-                    "У известного блюда состав НЕ переоценивай — он записан; фото нужно, чтобы " +
-                    "опознать блюдо и оценить ПОРЦИЮ (known_dish_portion, доля обычной).",
+                "The user's KNOWN DISHES. Decide: which of these dishes is in the photo, or none " +
+                    "(the known_dish_id field; \"none\" if none match). A match means the SAME dish, " +
+                    "not a similar food class: carbonara looks like any pasta — when unsure, use none. " +
+                    "For a known dish, do NOT re-estimate the composition — it is already recorded; the " +
+                    "photo is only there to recognize the dish and estimate the PORTION " +
+                    "(known_dish_portion, a fraction of the usual).",
             )
             dishes.forEach { d ->
-                appendLine("- id=${d.id}: ${d.title}" + (d.typicalCarbsG?.let { " · обычно %.0f г".format(it) } ?: ""))
+                appendLine("- id=${d.id}: ${d.title}" + (d.typicalCarbsG?.let { " · usually %.0f g".format(it) } ?: ""))
             }
         }
     }
 
-    private fun foodTool(knownDishes: List<KnownDishForVision> = emptyList()): JSONObject {
+    private fun foodTool(knownDishes: List<KnownDishForVision> = emptyList(), replyLanguage: String = "English"): JSONObject {
         val component = JSONObject()
             .put("type", "object")
             .put(
                 "properties",
                 JSONObject()
-                    .put("name", prop("string", "Название компонента, 1–3 слова, им.п. ед.ч."))
-                    .put("count", prop("integer", "Число одинаковых штук/порций (по умолчанию 1)"))
-                    .put("carbs_g", prop("number", "Углеводы ОДНОЙ штуки/порции, г. НЕ распределяй сюда общий итог — у каждого компонента своё число. Овощи/салат 2–5 г; мясо, яйца, рыба, сыр ≈0."))
-                    .put("portion_g", prop("number", "Натуральная масса одной порции, г, если ясно"))
+                    .put("name", prop("string", "Component name, 1-3 words, nominative singular, in $replyLanguage."))
+                    .put("count", prop("integer", "Number of identical items/portions (default 1)"))
+                    .put("carbs_g", prop("number", "Carbs of ONE item/portion, in grams. Do NOT split the total across this field — each component has its own number. Vegetables/salad 2-5 g; meat, eggs, fish, cheese ≈0."))
+                    .put("portion_g", prop("number", "Natural weight of one portion, in grams, if it's clear"))
                     .put(
                         "speed",
                         JSONObject().put("type", "string")
@@ -495,24 +513,24 @@ object AskClaude {
                             // slope, caloric queue). Lowering speed for it was a FOURTH.
                             .put(
                                 "description",
-                                "Скорость усвоения САМОГО углевода компонента — как если бы он был " +
-                                    "съеден без жира и белка. Жир, белок и клетчатку модель учитывает " +
-                                    "отдельно (total_fat_g, total_protein_g, total_fiber_g) и уже " +
-                                    "замедляет ими всё блюдо: понижать за них speed — двойной счёт. " +
-                                    "Решай по типу углевода: FAST — сахар в любом виде (варенье, мёд, " +
-                                    "сироп, глазурь, сладкая паста, крем, сок, конфета), белая мука, " +
-                                    "шлифованный рис, картофель. MED — цельное зерно, паста, овсянка, " +
-                                    "целый фрукт, молоко. SLOW — бобовые, сырые овощи, углевод, " +
-                                    "связанный клетчаткой. Жирность компонента на выбор speed не влияет.",
+                                "Absorption speed of the component's OWN carbohydrate — as if it were " +
+                                    "eaten without fat and protein. The model accounts for fat, protein and " +
+                                    "fiber separately (total_fat_g, total_protein_g, total_fiber_g), and " +
+                                    "already slows the whole dish with them: lowering speed for them too is a " +
+                                    "double count. Decide by the TYPE of carbohydrate: FAST — sugar in any " +
+                                    "form (jam, honey, syrup, icing, sweet paste, cream, juice, candy), white " +
+                                    "flour, polished rice, potato. MED — whole grain, pasta, oats, whole " +
+                                    "fruit, milk. SLOW — legumes, raw vegetables, carbohydrate bound by " +
+                                    "fiber. The component's fat content does not affect the speed choice.",
                             ),
                     )
-                    .put("confidence", prop("number", "Уверенность в оценке УГЛЕВОДОВ этого компонента, 0..1"))
-                    .put("is_rescue", prop("boolean", "true для декстрозы/сока/таблеток от гипогликемии")),
+                    .put("confidence", prop("number", "Confidence in this component's CARB estimate, 0..1"))
+                    .put("is_rescue", prop("boolean", "true for dextrose/juice/tablets for a hypo")),
             )
             .put("required", JSONArray().put("name").put("carbs_g"))
         return JSONObject()
             .put("name", FOOD_TOOL_NAME)
-            .put("description", "Структурированный разбор еды с углеводами ПО КОМПОНЕНТАМ. У каждого компонента своё число углеводов; ничего не распределять из общего итога.")
+            .put("description", "Structured food breakdown with carbs PER COMPONENT. Each component has its own carb number; nothing is split out of a total.")
             .put(
                 "input_schema",
                 JSONObject()
@@ -520,14 +538,14 @@ object AskClaude {
                     .put(
                         "properties",
                         JSONObject()
-                            .put("dish_name", prop("string", "Короткое чистое название блюда, 2–4 слова, им.п., без количеств и весов"))
-                            .put("gi", prop("integer", "ГИ блюда 5..120 с учётом жиров/белков; опусти, если неизвестно"))
-                            .put("total_carbs_min", prop("number", "Нижняя граница суммарных углеводов всей порции, г"))
-                            .put("total_carbs_max", prop("number", "Верхняя граница суммарных углеводов всей порции, г"))
-                            .put("total_protein_g", prop("number", "Белки всей порции, г"))
-                            .put("total_fat_g", prop("number", "Жиры всей порции, г"))
-                            .put("total_fiber_g", prop("number", "Клетчатка всей порции, г; оцени диапазон консервативно и верни среднюю оценку"))
-                            .put("total_kcal", prop("number", "Энергетическая ценность всей порции, ккал"))
+                            .put("dish_name", prop("string", "Short clean dish name, 2-4 words, nominative case, no quantities or weights, in $replyLanguage."))
+                            .put("gi", prop("integer", "Dish GI 5..120 accounting for fat/protein; omit if unknown"))
+                            .put("total_carbs_min", prop("number", "Lower bound of total carbs for the whole portion, g"))
+                            .put("total_carbs_max", prop("number", "Upper bound of total carbs for the whole portion, g"))
+                            .put("total_protein_g", prop("number", "Protein for the whole portion, g"))
+                            .put("total_fat_g", prop("number", "Fat for the whole portion, g"))
+                            .put("total_fiber_g", prop("number", "Fiber for the whole portion, g; estimate the range conservatively and return the average"))
+                            .put("total_kcal", prop("number", "Energy value of the whole portion, kcal"))
                             .put(
                                 "physical_form",
                                 JSONObject().put("type","string")
@@ -539,10 +557,10 @@ object AskClaude {
                                     // so 10 of 11 notes could not be recognised as repeats
                                     // of themselves. The ladder below is exhaustive and
                                     // ordered, so two draws cannot legitimately differ.
-                                    .put("description","Физическая форма ВСЕГО приёма, не отдельного ингредиента. Определяй по шагам: 1) возьми компонент с наибольшими carbs_g (при равенстве — первый в списке); 2) назови его форму по тесту на жевание: пьётся, жевать не надо — LIQUID (сок, смузи, пиво, кисель, суп-пюре); ест ложкой, но не жуётся — PUREE (йогурт, каша, мороженое, пюре); жуётся, но разминается вилкой — SOFT_SOLID (хлеб, блин, выпечка, варёные овощи, творог, сыр мягкий); требует настоящего жевания — SOLID (мясо, орехи, сырые овощи, яблоко, чипсы). Соусы, начинки, гарнир и добавки форму не меняют. MIXED — только если компоненты разной формы дают почти поровну углеводов (разница меньше 10% от суммы). UNKNOWN — только если состав неизвестен. Обязательное поле: от него зависит скорость появления углеводов."),
+                                    .put("description","Physical form of the WHOLE meal, not a single ingredient. Decide step by step: 1) take the component with the largest carbs_g (tie — the first one listed); 2) name its form by the chewing test: drinkable, no chewing needed — LIQUID (juice, smoothie, beer, fruit kissel, cream soup); eaten with a spoon but not chewed — PUREE (yogurt, porridge, ice cream, mash); chewed but mashes with a fork — SOFT_SOLID (bread, pancake, pastry, boiled vegetables, cottage cheese, soft cheese); needs real chewing — SOLID (meat, nuts, raw vegetables, apple, chips). Sauces, fillings, side dishes and toppings do not change the form. MIXED — only if components of different forms carry nearly equal carbs (the difference is less than 10% of the total). UNKNOWN — only if the composition is unknown. A required field: the speed carbs appear at depends on it."),
                             )
-                            .put("alcohol_present",prop("boolean","Есть ли алкоголь в приёме"))
-                            .put("summary", prop("string", "1–2 короткие фразы для человека — что это и на что смотреть"))
+                            .put("alcohol_present",prop("boolean","Whether the meal contains alcohol"))
+                            .put("summary", prop("string", "1-2 short sentences for a person — what this is and what to watch, in $replyLanguage."))
                             .put("components", JSONObject().put("type", "array").put("items", component))
                             .put(
                                 "assumptions",
@@ -551,9 +569,9 @@ object AskClaude {
                                     JSONObject().put("type", "object").put(
                                         "properties",
                                         JSONObject()
-                                            .put("component", prop("string", "Имя компонента из components, которого касается догадка; опусти, если догадка о блюде целиком"))
-                                            .put("what", prop("string", "Что в описании НЕОДНОЗНАЧНО и что ты предположил. Пример: «сорт хлеба не указан, предположил белую муку»"))
-                                            .put("impact", prop("string", "Как сильно выбор меняет оценку или скорость. Пример: «белый против цельнозернового меняет скорость углевода вдвое»")),
+                                            .put("component", prop("string", "Name of the component from components this guess concerns; omit if the guess is about the whole dish"))
+                                            .put("what", prop("string", "What in the description was AMBIGUOUS and what you assumed. Example: \"the type of bread wasn't stated, assumed white flour\""))
+                                            .put("impact", prop("string", "How much the choice changes the estimate or the speed. Example: \"white versus whole-grain doubles the carb speed\"")),
                                     ).put("required", JSONArray().put("what")),
                                     // The wholegrain-bread rule: the model
                                     // KNOWS white flour is fast and wholegrain medium;
@@ -563,12 +581,12 @@ object AskClaude {
                                     // question instead.
                                 ).put(
                                     "description",
-                                    "ОБЯЗАТЕЛЬНО: каждое существенное предположение, которое пришлось " +
-                                        "сделать из-за неоднозначного описания — способ приготовления, сорт/помол, " +
-                                        "обработка (целый фрукт против сока), остывший крахмал, тип клетчатки. " +
-                                        "Пустой список, если описание однозначно или факт есть среди известных " +
-                                        "компонентов пользователя. Только факты о ЕДЕ — никогда о дозах или " +
-                                        "физиологии конкретного человека.",
+                                    "REQUIRED: every material assumption you had to make because the " +
+                                        "description was ambiguous — cooking method, variety/milling, processing " +
+                                        "(whole fruit versus juice), cooled starch, fiber type. An empty list if " +
+                                        "the description is unambiguous or the fact is among the user's known " +
+                                        "components. Only facts about FOOD — never about doses or a specific " +
+                                        "person's physiology.",
                                 ),
                             )
                             .apply {
@@ -588,17 +606,17 @@ object AskClaude {
                                             )
                                             .put(
                                                 "description",
-                                                "Какое из ИЗВЕСТНЫХ блюд пользователя (список в сообщении) " +
-                                                    "на фото; \"none\", если ни одно или есть сомнение. " +
-                                                    "Это подсказка для подтверждения человеком, не решение.",
+                                                "Which of the user's KNOWN dishes (list in the message) is in " +
+                                                    "the photo; \"none\" if none match or there is doubt. This is a " +
+                                                    "hint for the person to confirm, not a decision.",
                                             ),
                                     )
                                     put(
                                         "known_dish_portion",
                                         prop(
                                             "number",
-                                            "Только при known_dish_id != none: доля ОБЫЧНОЙ порции этого " +
-                                                "блюда на фото, 0.25–3.0 (1.0 = как обычно).",
+                                            "Only when known_dish_id != none: the fraction of this dish's USUAL " +
+                                                "portion shown in the photo, 0.25-3.0 (1.0 = as usual).",
                                         ),
                                     )
                                 }
@@ -624,10 +642,11 @@ object AskClaude {
         userContent: Any,
         maxTokens: Int,
         knownDishes: List<KnownDishForVision> = emptyList(),
+        replyLanguage: String = "English",
     ): JSONObject = JSONObject()
         .put("model", MODEL)
         .put("max_tokens", maxTokens)
-        .put("tools", JSONArray().put(foodTool(knownDishes)))
+        .put("tools", JSONArray().put(foodTool(knownDishes, replyLanguage)))
         .put("tool_choice", JSONObject().put("type", "tool").put("name", FOOD_TOOL_NAME))
         .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userContent)))
 
@@ -684,15 +703,16 @@ object AskClaude {
         )
     }
 
-    private const val FOOD_TEXT_INSTR = """Человек с диабетом 1 типа описал еду словами: «%s». Разбери и вызови инструмент food_analysis.
-Если порция не указана — возьми типичную и понизь confidence. Оценивай КОНСЕРВАТИВНО: свежие овощи и листовые салаты 2–5 г; яйца, мясо, рыба, сыр ≈0. Если название неоднозначно («салат» может быть овощным или оливье) — бери самый простой типовой вариант и понизь confidence.
-Перечисляй ВСЕ компоненты блюда, включая безуглеводные (мясо, яйцо, сыр, овощи) с carbs_g = 0 — они несут жир и белок, это нужно модели.
-У каждого компонента своё число углеводов — не распределяй общий итог. Сумма carbs_g × count по всем компонентам должна совпадать с серединой диапазона total_carbs_min…total_carbs_max.
-Оцени также белки, жиры и ккал ВСЕЙ порции в total_protein_g, total_fat_g и total_kcal. Ккал должны быть примерно согласованы с 4×белки + 4×углеводы + 9×жиры.
-Разбор должен быть воспроизводимым: на один и тот же текст — один и тот же ответ. speed и physical_form выводи по правилам из описаний полей, а не «на глаз». Жир учитывается ровно один раз — числом в total_fat_g. Белки и жиры оценивай справочным значением для блюда целиком, кратным 5 г, а не суммированием по ингредиентам.
-Если дан список ИЗВЕСТНЫХ КОМПОНЕНТОВ пользователя — совпавший компонент бери из него (его углеводы, его факты), а не из справочных значений.
-Каждое существенное предположение, которое пришлось сделать из-за неоднозначного описания, НАЗЫВАЙ в assumptions — не предполагай молча. Спрашивают только про еду: состав, тип углевода, обработку. Никогда не оценивай, «как быстро это поднимет сахар у него», — это физиология, она измеряется.
-Никаких рекомендаций по дозам инсулина."""
+    private fun foodTextInstr(replyLanguage: String) = """A person with type 1 diabetes described their food in words: "%s". Parse it and call the food_analysis tool.
+If the portion isn't stated, assume a typical one and lower confidence. Estimate CONSERVATIVELY: fresh vegetables and leafy salads 2-5 g; eggs, meat, fish, cheese ≈0. If the name is ambiguous ("salad" could be a vegetable salad or a mayo-based one) — pick the simplest typical variant and lower confidence.
+List ALL components of the dish, including carb-free ones (meat, egg, cheese, vegetables) with carbs_g = 0 — they carry fat and protein, which the model needs.
+Each component has its own carb number — do not split the total across them. The sum of carbs_g × count across all components must match the middle of the total_carbs_min…total_carbs_max range.
+Also estimate protein, fat and kcal for the WHOLE portion in total_protein_g, total_fat_g and total_kcal. Kcal should be roughly consistent with 4×protein + 4×carbs + 9×fat.
+The breakdown must be reproducible: the same text should give the same answer. Derive speed and physical_form from the field-description rules, not "by eye". Fat is counted exactly once — as the total_fat_g number. Estimate protein and fat with a reference value for the whole dish, rounded to 5 g, not by summing ingredients.
+If the message below lists the user's previously recorded ingredients, use a matching one from it (its carbs, its facts) instead of reference values.
+Name every material assumption you had to make because the description was ambiguous in assumptions — never assume silently. Only ask about the food: composition, type of carbohydrate, preparation. Never estimate "how fast this will raise the user's glucose" — that is physiology, and it is measured.
+Write the dish name, component names and summary in $replyLanguage.
+Never any dose recommendations."""
 
     /** The complete text request, assembled without HTTP — testable like the
      *  vision one. */
@@ -700,8 +720,9 @@ object AskClaude {
         description: String,
         personalContext: String?,
         knownComponents: List<KnownComponent>,
+        replyLanguage: String = "English",
     ): JSONObject = foodToolBody(
-        FOOD_TEXT_INSTR.format(description.trim()) +
+        foodTextInstr(replyLanguage).format(description.trim()) +
             knownComponentsBlock(knownComponents, description) + personalBlock(personalContext),
         // 1400, raised from 700 — a live finding: the v4 output (assumptions
         // included) needs roughly 760-911 tokens, so at 700 EVERY call stopped
@@ -711,20 +732,25 @@ object AskClaude {
         // same body. The budget must clear the measured need with headroom; a
         // test pins the floor.
         maxTokens = 1400,
+        replyLanguage = replyLanguage,
     )
 
-    /** Carbs estimate from a text description (no photo). Blocking — Dispatchers.IO. */
+    /** Carbs estimate from a text description (no photo). Blocking — Dispatchers.IO.
+     *  [context], when given, requests the dish/component names in the app's
+     *  language; without it the model answers in English. */
     fun estimateCarbs(
         apiKey: String,
         description: String,
         personalContext: String? = null,
         knownComponents: List<KnownComponent> = emptyList(),
+        context: Context? = null,
     ): String {
+        val replyLanguage = context?.let { LlmLanguage.replyLanguage(it) } ?: "English"
         val input = postToolInput(
-            apiKey, textRequestBody(description, personalContext, knownComponents), FOOD_TOOL_NAME,
+            apiKey, textRequestBody(description, personalContext, knownComponents, replyLanguage), FOOD_TOOL_NAME,
         )
         // An analysis with NO composition must never reach the store — callers only
-        // check for a specific error-marker string, so it would be saved as-is. A name-only render is
+        // check whether the call threw, so it would be saved as-is. A name-only render is
         // non-blank, so blankness alone is not enough: require components.
         input?.let { toFoodAnalysis(it) }
             ?.takeIf { it.components.isNotEmpty() }
@@ -740,10 +766,10 @@ object AskClaude {
                 "messages",
                 JSONArray().put(
                     JSONObject().put("role", "user")
-                        .put("content", CARBS_TEXT_PROMPT.format(description.trim()) + personalBlock(personalContext)),
+                        .put("content", carbsTextPrompt(replyLanguage).format(description.trim()) + personalBlock(personalContext)),
                 ),
             )
-        return post(apiKey, body)
+        return post(apiKey, body, replyLanguage)
     }
 
     /**
@@ -761,10 +787,10 @@ object AskClaude {
             .put(
                 "properties",
                 JSONObject()
-                    .put("id", prop("string", "Неприкосновенный id входной строки"))
-                    .put("protein_g", prop("number", "Белки всей указанной порции, г"))
-                    .put("fat_g", prop("number", "Жиры всей указанной порции, г"))
-                    .put("kcal", prop("number", "Ккал всей указанной порции")),
+                    .put("id", prop("string", "Untouchable id of the input row"))
+                    .put("protein_g", prop("number", "Protein of the whole stated portion, g"))
+                    .put("fat_g", prop("number", "Fat of the whole stated portion, g"))
+                    .put("kcal", prop("number", "Kcal of the whole stated portion")),
             )
             .put("required", JSONArray().put("id"))
         val toolName = "nutrition_batch"
@@ -772,7 +798,7 @@ object AskClaude {
             .put("name", toolName)
             .put(
                 "description",
-                "Пакетная оценка БЖУ и ккал исторических порций без изменения углеводов и названий.",
+                "Batch estimate of protein/fat/kcal for historical portions without changing carbs or names.",
             )
             .put(
                 "input_schema",
@@ -805,13 +831,13 @@ object AskClaude {
             IMPORTANT: estimate and return only the keys listed in each item's
             missing_fields. Other nutrition fields are already stored; do not
             re-estimate or return them.
-            Оцени БЕЛКИ, ЖИРЫ и ККАЛ каждой исторической порции из JSON ниже.
-            Углеводы authoritative_carbs_g уже записаны человеком/моделью и являются
-            фиксированным входом: не исправляй и не возвращай их. known_composition
-            используй для размера и состава порции. Если сведений мало, дай умеренную
-            типичную оценку, а не экстремум. Проверь энергетический баланс:
-            ккал примерно 4×белки + 4×углеводы + 9×жиры (алкоголь может дать
-            дополнительную энергию). Верни ровно по одному item на каждый id.
+            Estimate the PROTEIN, FAT and KCAL of each historical portion from the JSON below.
+            The authoritative_carbs_g carbs are already recorded by the person/model and are a
+            fixed input: do not correct or return them. Use known_composition
+            for the portion's size and composition. If there is little information, give a
+            moderate typical estimate, not an extreme. Check the energy balance:
+            kcal roughly 4×protein + 4×carbs + 9×fat (alcohol can add
+            extra energy). Return exactly one item per id.
 
             INPUT:
             $inputRows
@@ -848,16 +874,17 @@ object AskClaude {
         }.orEmpty()
     }
 
-    private const val COMMAND_PROMPT = """Пользователь диктует команду приложению для диабетика 1 типа. Разбери её в СТРОГО ОДНУ строку JSON без пояснений и без markdown.
-Поля: "action" (одно из: food, meter, bolus, basal, activity, dextrose, none) и параметры.
-- food (поел/съел): {"action":"food","food":"название 1-4 слова","grams":число или null}. «поел смузи» → grams:null. «съел 60г риса» → grams:60.
-- meter (замер глюкометром/калибровка/сахар): {"action":"meter","mmol":число}. Значение в ммоль/л. Если пользователь назвал мг/дл (число > 30) — раздели на 18.
-- bolus (укол/болюс/уколол): {"action":"bolus","units":число,"purpose":"коррекция" или "на еду" или "докол" или null}.
-- basal (базал/длинный/тресиба/тужео): {"action":"basal","units":число}.
-- activity (гулял/тренировка/спорт/бег/велосипед): {"action":"activity","activity":"тренировка" или "прогулка" или "спорт" или "бег" или "велосипед"}.
-- dextrose (декстроза/сок/таблетки от гипо): {"action":"dextrose"}.
-- Если это НЕ команда на ввод данных (вопрос, болтовня): {"action":"none"}.
-Только JSON, одна строка. Никаких рекомендаций по дозам."""
+    private const val COMMAND_PROMPT = """The user dictates a command to an app for a person with type 1 diabetes. Parse it into EXACTLY ONE line of JSON, with no explanation and no markdown.
+The command may be in Russian or English.
+Fields: "action" (one of: food, meter, bolus, basal, activity, dextrose, none) and parameters.
+- food (ate/had): {"action":"food","food":"name, 1-4 words","grams":number or null}. "поел смузи" → grams:null. "съел 60г риса" → grams:60.
+- meter (meter reading/calibration/glucose): {"action":"meter","mmol":number}. The value is in mmol/L. If the user said mg/dL (number > 30) — divide by 18.
+- bolus (injection/bolus): {"action":"bolus","units":number,"purpose":"коррекция" or "на еду" or "докол" or null}. Write these purpose values exactly as given, in Russian.
+- basal (basal/long-acting/tresiba/toujeo): {"action":"basal","units":number}.
+- activity (walked/workout/sport/run/bike): {"action":"activity","activity":"тренировка" or "прогулка" or "спорт" or "бег" or "велосипед"}. Write these activity values exactly as given, in Russian.
+- dextrose (dextrose/juice/hypo tablets): {"action":"dextrose"}.
+- If this is NOT a data-entry command (a question, chit-chat): {"action":"none"}.
+JSON only, one line. Never any dose recommendations."""
 
     /** Parse a natural-language data-entry command into a structured JSON
      *  action. Blocking — Dispatchers.IO. Returns the raw JSON string. */
@@ -869,22 +896,23 @@ object AskClaude {
                 "messages",
                 JSONArray().put(
                     JSONObject().put("role", "user")
-                        .put("content", COMMAND_PROMPT + "\n\nКоманда: «" + text.trim() + "»"),
+                        .put("content", COMMAND_PROMPT + "\n\nCommand: “" + text.trim() + "”"),
                 ),
             )
         return post(apiKey, body)
     }
 
-    private const val FOOD_VISION_INSTR = """На фото — еда человека с диабетом 1 типа. Разбери её и вызови инструмент food_analysis.
-Оценивай КОНСЕРВАТИВНО: свежие овощи и листовые салаты почти без углеводов (2–5 г); яйца, мясо, рыба, сыр — около нуля.
-Перечисляй ВСЕ компоненты блюда, включая безуглеводные (мясо, яйцо, сыр, овощи) с carbs_g = 0 — они несут жир и белок, это нужно модели.
-У каждого компонента своё число углеводов — НЕ распределяй общий итог по компонентам. Сумма carbs_g × count по всем компонентам должна совпадать с серединой диапазона total_carbs_min…total_carbs_max.
-Оцени также белки, жиры и ккал ВСЕЙ видимой порции в total_protein_g, total_fat_g и total_kcal. Ккал должны быть примерно согласованы с 4×белки + 4×углеводы + 9×жиры.
-Порцию по фото видно плохо — отражай неопределённость в поле confidence.
-Разбор должен быть воспроизводимым: на одно и то же фото — один и тот же ответ. speed и physical_form выводи по правилам из описаний полей, а не «на глаз». Жир учитывается ровно один раз — числом в total_fat_g. Белки и жиры оценивай справочным значением для блюда целиком, кратным 5 г, а не суммированием по ингредиентам.
-Если дан список ИЗВЕСТНЫХ КОМПОНЕНТОВ пользователя — совпавший компонент бери из него (его углеводы, его факты), а не из справочных значений.
-Каждое существенное предположение, которое пришлось сделать (сорт, обработка, способ приготовления — по фото их не видно), НАЗЫВАЙ в assumptions — не предполагай молча. Никогда не оценивай, «как быстро это поднимет сахар у него».
-Никаких рекомендаций по дозам инсулина."""
+    private fun foodVisionInstr(replyLanguage: String) = """A photo shows the food of a person with type 1 diabetes. Parse it and call the food_analysis tool.
+Estimate CONSERVATIVELY: fresh vegetables and leafy salads have almost no carbs (2-5 g); eggs, meat, fish, cheese — close to zero.
+List ALL components of the dish, including carb-free ones (meat, egg, cheese, vegetables) with carbs_g = 0 — they carry fat and protein, which the model needs.
+Each component has its own carb number — do NOT split the total across the components. The sum of carbs_g × count across all components must match the middle of the total_carbs_min…total_carbs_max range.
+Also estimate protein, fat and kcal for the WHOLE visible portion in total_protein_g, total_fat_g and total_kcal. Kcal should be roughly consistent with 4×protein + 4×carbs + 9×fat.
+The portion is hard to judge from a photo — reflect the uncertainty in the confidence field.
+The breakdown must be reproducible: the same photo should give the same answer. Derive speed and physical_form from the field-description rules, not "by eye". Fat is counted exactly once — as the total_fat_g number. Estimate protein and fat with a reference value for the whole dish, rounded to 5 g, not by summing ingredients.
+If the message below lists the user's previously recorded ingredients, use a matching one from it (its carbs, its facts) instead of reference values.
+Name every material assumption you had to make (variety, processing, cooking method — not visible in a photo) in assumptions — never assume silently. Never estimate "how fast this will raise the user's glucose".
+Write the dish name, component names and summary in $replyLanguage.
+Never any dose recommendations."""
 
     /**
      * A vision answer: the serialized analysis PLUS the recognition hint.
@@ -923,24 +951,28 @@ object AskClaude {
         personalContext: String?,
         knownDishes: List<KnownDishForVision>,
         knownComponents: List<KnownComponent> = emptyList(),
+        replyLanguage: String = "English",
     ): JSONObject {
         val captionLine = caption?.takeIf { it.isNotBlank() && it != "фото" }
-            ?.let { "\nПодпись пользователя к фото: «$it» — учти её при определении." } ?: ""
+            ?.let { "\nThe user's caption for the photo: \"$it\" — take it into account when identifying the dish." } ?: ""
         return foodToolBody(
             imageContent(
                 b64,
-                FOOD_VISION_INSTR + captionLine + knownDishesBlock(knownDishes) +
+                foodVisionInstr(replyLanguage) + captionLine + knownDishesBlock(knownDishes) +
                     knownComponentsBlock(knownComponents, caption) + personalBlock(personalContext),
             ),
             // 1600: the vision output is the same v4 shape plus the
             // recognition fields — same truncation math as the text path.
             maxTokens = 1600,
             knownDishes = knownDishes,
+            replyLanguage = replyLanguage,
         )
     }
 
     /** Vision: describe a food photo, recognising the user's known dishes.
-     *  Blocking — invoke on Dispatchers.IO. */
+     *  Blocking — invoke on Dispatchers.IO. [context], when given, requests
+     *  the dish/component names in the app's language; without it the model
+     *  answers in English. */
     fun describeFood(
         apiKey: String,
         jpegBytes: ByteArray,
@@ -948,15 +980,17 @@ object AskClaude {
         personalContext: String? = null,
         knownDishes: List<KnownDishForVision> = emptyList(),
         knownComponents: List<KnownComponent> = emptyList(),
+        context: Context? = null,
     ): VisionResult {
+        val replyLanguage = context?.let { LlmLanguage.replyLanguage(it) } ?: "English"
         val b64 = android.util.Base64.encodeToString(jpegBytes, android.util.Base64.NO_WRAP)
         val input = postToolInput(
             apiKey,
-            visionRequestBody(b64, caption, personalContext, knownDishes, knownComponents),
+            visionRequestBody(b64, caption, personalContext, knownDishes, knownComponents, replyLanguage),
             FOOD_TOOL_NAME,
         )
         // An analysis with NO composition must never reach the store — callers only
-        // check for a specific error-marker string, so it would be saved as-is. A name-only render is
+        // check whether the call threw, so it would be saved as-is. A name-only render is
         // non-blank, so blankness alone is not enough: require components.
         input?.let { toFoodAnalysis(it) }
             ?.takeIf { it.components.isNotEmpty() }
@@ -975,7 +1009,7 @@ object AskClaude {
             }
         // Fallback: the original prose vision path (rare with a forced tool_choice).
         val captionLine = caption?.takeIf { it.isNotBlank() && it != "фото" }
-            ?.let { "\nПодпись пользователя к фото: «$it» — учти её при определении." } ?: ""
+            ?.let { "\nThe user's caption for the photo: \"$it\" — take it into account when identifying the dish." } ?: ""
         val body = JSONObject()
             .put("model", MODEL)
             .put("max_tokens", 512)
@@ -983,14 +1017,16 @@ object AskClaude {
                 "messages",
                 JSONArray().put(
                     JSONObject().put("role", "user")
-                        .put("content", imageContent(b64, FOOD_PROMPT + captionLine + personalBlock(personalContext))),
+                        .put("content", imageContent(b64, foodPrompt(replyLanguage) + captionLine + personalBlock(personalContext))),
                 ),
             )
-        return VisionResult(post(apiKey, body))
+        return VisionResult(post(apiKey, body, replyLanguage))
     }
 
-    /** Blocking HTTP call — invoke on Dispatchers.IO. */
-    fun ask(apiKey: String, dataContext: String, history: List<ChatMsg>, question: String): String {
+    /** Blocking HTTP call — invoke on Dispatchers.IO. [context] picks the
+     *  reply language (see [LlmLanguage.replyInstruction]); only called
+     *  internally, always with the caller's Context. */
+    fun ask(apiKey: String, dataContext: String, history: List<ChatMsg>, question: String, context: Context): String {
         val messages = JSONArray()
         history.takeLast(6).forEach { m ->
             messages.put(JSONObject().put("role", m.role).put("content", m.text))
@@ -998,15 +1034,15 @@ object AskClaude {
         messages.put(
             JSONObject().put("role", "user").put(
                 "content",
-                "СВОДКА ДАННЫХ:\n$dataContext\n\nВОПРОС: $question",
+                "DATA SUMMARY:\n$dataContext\n\nQUESTION: $question",
             ),
         )
         val body = JSONObject()
             .put("model", MODEL)
             .put("max_tokens", 1024)
-            .put("system", SYSTEM)
+            .put("system", systemPrompt(context))
             .put("messages", messages)
-        return post(apiKey, body)
+        return post(apiKey, body, LlmLanguage.replyLanguage(context))
     }
 
     /** Blocking HTTP call — the full parsed response JSON. Invoke on Dispatchers.IO. */
@@ -1034,8 +1070,9 @@ object AskClaude {
         }
     }
 
-    /** Text answer — concatenated text blocks. */
-    private fun post(apiKey: String, body: JSONObject): String {
+    /** Text answer — concatenated text blocks. [replyLanguage] only decides
+     *  the rare empty-response fallback message below. */
+    private fun post(apiKey: String, body: JSONObject, replyLanguage: String = "English"): String {
         val json = postRaw(apiKey, body)
         val content = json.getJSONArray("content")
         return buildString {
@@ -1043,7 +1080,10 @@ object AskClaude {
                 val block = content.getJSONObject(i)
                 if (block.getString("type") == "text") append(block.getString("text"))
             }
-        }.ifBlank { "Пустой ответ (stop_reason: ${json.optString("stop_reason")})" }
+        }.ifBlank {
+            if (replyLanguage == "Russian") "Пустой ответ (stop_reason: ${json.optString("stop_reason")})"
+            else "Empty response (stop_reason: ${json.optString("stop_reason")})"
+        }
     }
 
     /** The forced tool call's validated input object, or null when the model

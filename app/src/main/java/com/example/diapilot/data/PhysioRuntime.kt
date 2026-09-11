@@ -169,7 +169,7 @@ object PhysioRuntime {
             artifactCache=key to it
             val ms = android.os.SystemClock.elapsedRealtime() - tBuild
             if (ms >= 200) android.util.Log.i(
-                "PhysioRuntime", "артефакт пересобран за $ms ms — сменилось: $changed",
+                "PhysioRuntime", "artifact rebuilt in $ms ms — changed: $changed",
             )
         }
     }
@@ -277,11 +277,11 @@ object PhysioRuntime {
         // ordinary case — the one that is actually in force — said nothing.
         android.util.Log.i(
             "PhysioTuning",
-            "ручные параметры: форма=${resolution.shapeTier} ISF=${resolution.isfTier}" +
-                " · ISF резолвера ${resolution.isfMmolPerU?.let { "%.3f".format(java.util.Locale.ROOT, it) } ?: "нет"}" +
-                " · до ручного ${"%.3f".format(java.util.Locale.ROOT, widened.insulin.isf)}" +
-                (if(resolution.rejected.isEmpty()) "" else " · ОТКЛОНЕНО: ${resolution.rejected.joinToString(", ")}") +
-                (if(resolution.divergences.isEmpty()) "" else " · расхождения: ${resolution.divergences.size}"),
+            "manual params: shape=${resolution.shapeTier} ISF=${resolution.isfTier}" +
+                " · resolver ISF ${resolution.isfMmolPerU?.let { "%.3f".format(java.util.Locale.ROOT, it) } ?: "none"}" +
+                " · before manual ${"%.3f".format(java.util.Locale.ROOT, widened.insulin.isf)}" +
+                (if(resolution.rejected.isEmpty()) "" else " · REJECTED: ${resolution.rejected.joinToString(", ")}") +
+                (if(resolution.divergences.isEmpty()) "" else " · divergences: ${resolution.divergences.size}"),
         )
         val mechanics=ManualInsulinRuntime.apply(widened,resolution).let{m->
             // The learned value lands the same way a hand-set one does: as a
@@ -357,12 +357,13 @@ object PhysioRuntime {
             // A measured curve that exists but did not reach the model is the
             // one state nobody could see. It has to be a conflict, not a
             // silently unchanged person model.
-            measured.refusal?.let{add("измеренная кривая инсулина НЕ применена: $it")}
+            measured.refusal?.let{add("measured insulin curve NOT applied: $it")}
             if(InsulinPriorV1.isPrior(mechanics))add(
-                "профиль инсулина — популяционный приор, не данные этого человека; " +
-                    "полоса ISF расширена до ${InsulinPriorV1.ISF_LOW_MMOL_PER_U}..${InsulinPriorV1.ISF_HIGH_MMOL_PER_U} ммоль/ед",
+                "insulin profile is a population prior, not this person's data; " +
+                    "ISF band widened to ${InsulinPriorV1.ISF_LOW_MMOL_PER_U}..${InsulinPriorV1.ISF_HIGH_MMOL_PER_U} mmol/L per U",
             )
-            personalCurve?.coerced?.takeIf{it.isNotEmpty()}?.let{add("измеренная кривая приведена к границам: ${it.joinToString(", ")}")}
+            // The moved landmarks in their data form (no Context here): "TAIL_END 110→120".
+            personalCurve?.coerced?.takeIf{it.isNotEmpty()}?.let{add("measured curve coerced to bounds: ${it.joinToString(", "){c->"%s %.0f→%.0f".format(java.util.Locale.ROOT,c.landmark.name,c.fromMin,c.toMin)}}")}
         }
         fun scaled(pct: Double): Double = (mechanics.insulin.isf * (1.0 + pct / 100.0)).coerceIn(bounds.isfMmolPerLUmin,bounds.isfMmolPerLUmax)
         // A HAND-SET ISF IS FINAL — see PhysioArtifactV1.isfPinnedByHand.

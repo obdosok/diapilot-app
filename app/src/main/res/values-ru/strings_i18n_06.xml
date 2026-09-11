@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CompanionSync.kt -->
+    <string name="companion_sync_minutes_compact">%1$dм</string>
+    <string name="companion_sync_hours_minutes_compact">%1$dч%2$dм</string>
+    <string name="companion_sync_insulin_line">укол %1$.1f ед · %2$s</string>
+    <string name="companion_sync_event_note">📝 %1$s %2$s</string>
+    <string name="companion_sync_event_note_with_carbs">📝 %1$s %2$s · ~%3$.0f г</string>
+    <string name="companion_sync_event_bolus">💉 %1$s %2$.1f ед</string>
+    <string name="companion_sync_event_bolus_with_purpose">💉 %1$s %2$.1f ед · %3$s</string>
+
+    <!-- LibreBleClient.kt (status text, no Context wrapper — read via context.localized()) -->
+    <string name="libre_ble_client_status_off">выключен</string>
+    <string name="libre_ble_client_status_stream_stalled">поток завис — переподключаюсь</string>
+    <string name="libre_ble_client_status_no_mac">нет MAC — отсканируйте сенсор</string>
+    <string name="libre_ble_client_status_bluetooth_off">Bluetooth выключен</string>
+    <string name="libre_ble_client_status_listening">сенсор молчит — дежурю в эфире</string>
+    <string name="libre_ble_client_status_connecting">подключаюсь к %1$s</string>
+    <string name="libre_ble_client_status_discovering">подключён, ищу сервисы</string>
+    <string name="libre_ble_client_status_reconnecting">отключён, переподключение…</string>
+    <string name="libre_ble_client_status_subscribing">подписка на данные…</string>
+    <string name="libre_ble_client_status_unlock_exhausted">unlock-буферы кончились — пересканируйте сенсор</string>
+    <string name="libre_ble_client_status_login_sent">логин отправлен (nonce %1$d)</string>
+    <string name="libre_ble_client_status_subscribe_failed">не удалось подписаться (status=%1$d)</string>
+    <string name="libre_ble_client_status_waiting_stream">жду поток…</string>
+    <string name="libre_ble_client_status_streaming">поток идёт (пакет %1$s)</string>
+
+    <!-- FoodLibrary.kt -->
+    <string name="food_library_deconv_stats">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</string>
+    <string name="food_library_deconv_stats_with_onset">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</string>
+    <string name="food_library_title">📚 Библиотека еды</string>
+    <string name="food_library_add_product">＋ Продукт</string>
+    <string name="food_library_search">Поиск</string>
+    <plurals name="food_library_substrate_title">
+        <item quantity="one">🧩 Субстрат для компонентной модели: %1$d из %2$d приёма с составом (%3$d%%)</item>
+        <item quantity="few">🧩 Субстрат для компонентной модели: %1$d из %2$d приёмов с составом (%3$d%%)</item>
+        <item quantity="many">🧩 Субстрат для компонентной модели: %1$d из %2$d приёмов с составом (%3$d%%)</item>
+        <item quantity="other">🧩 Субстрат для компонентной модели: %1$d из %2$d приёмов с составом (%3$d%%)</item>
+    </plurals>
+    <string name="food_library_substrate_hint">Приёмы с разбором на компоненты — обучающая база под будущую модель по компонентам. Растёт по мере логирования составных блюд. Тап — словарь компонентов.</string>
+    <plurals name="food_library_substrate_vocab_line">
+        <item quantity="one">%1$s · %2$d приём · %3$.0f г всего</item>
+        <item quantity="few">%1$s · %2$d приёма · %3$.0f г всего</item>
+        <item quantity="many">%1$s · %2$d приёмов · %3$.0f г всего</item>
+        <item quantity="other">%1$s · %2$d приёма · %3$.0f г всего</item>
+    </plurals>
+    <string name="food_library_and_more">…и ещё %1$d</string>
+    <plurals name="food_library_concepts_title">
+        <item quantity="one">🍱 Концепты: %1$d на %2$d запись</item>
+        <item quantity="few">🍱 Концепты: %1$d на %2$d записи</item>
+        <item quantity="many">🍱 Концепты: %1$d на %2$d записей</item>
+        <item quantity="other">🍱 Концепты: %1$d на %2$d записи</item>
+    </plurals>
+    <plurals name="food_library_concepts_title_with_gap">
+        <item quantity="one">🍱 Концепты: %1$d на %2$d запись · ? не распознано: %3$d</item>
+        <item quantity="few">🍱 Концепты: %1$d на %2$d записи · ? не распознано: %3$d</item>
+        <item quantity="many">🍱 Концепты: %1$d на %2$d записей · ? не распознано: %3$d</item>
+        <item quantity="other">🍱 Концепты: %1$d на %2$d записи · ? не распознано: %3$d</item>
+    </plurals>
+    <plurals name="food_library_concepts_hint">
+        <item quantity="one">История сведена по concept-id, а не по названию. %1$d концепт собрали разные имена в один пул — переименовывать вручную не нужно. Тап — раскрыть.</item>
+        <item quantity="few">История сведена по concept-id, а не по названию. %1$d концепта собрали разные имена в один пул — переименовывать вручную не нужно. Тап — раскрыть.</item>
+        <item quantity="many">История сведена по concept-id, а не по названию. %1$d концептов собрали разные имена в один пул — переименовывать вручную не нужно. Тап — раскрыть.</item>
+        <item quantity="other">История сведена по concept-id, а не по названию. %1$d концепта собрали разные имена в один пул — переименовывать вручную не нужно. Тап — раскрыть.</item>
+    </plurals>
+    <string name="food_library_concepts_tap_hint">Тап по имени → переназначить концепт вручную.</string>
+    <string name="food_library_concept_summary_line">%1$s · ×%2$d · %3$.0f г · %4$s</string>
+    <string name="food_library_no_concept_prompt">? нет концепта (%1$d) — тап, чтобы назначить:</string>
+    <string name="food_library_grams">%1$d г</string>
+    <string name="food_library_grams_edited">%1$d г ✎</string>
+    <string name="food_library_rise">подъём ~%1$.1f</string>
+    <string name="food_library_underdosed_count">⚠ докол ×%1$d</string>
+    <string name="food_library_not_eaten_yet">ещё не ели</string>
+    <string name="food_library_empty_no_query">Пока пусто — добавьте продукт или поешьте 🙂</string>
+    <string name="food_library_empty_query">Ничего не найдено. «%1$s» добавит «%2$s».</string>
+    <string name="food_library_speed_fast">быстро</string>
+    <string name="food_library_speed_medium">средне</string>
+    <string name="food_library_speed_slow">медленно</string>
+    <string name="food_library_speed_none_label">без углев</string>
+    <string name="food_library_concept_for">Концепт для «%1$s»</string>
+    <string name="food_library_concept_current">Сейчас: %1$s. Выбери архетип — модель учит по concept-id, не по имени.</string>
+    <string name="food_library_concept_current_unrecognized">Сейчас: не распознано. Выбери архетип — модель учит по concept-id, не по имени.</string>
+    <string name="food_library_concept_filter">Фильтр концептов</string>
+    <string name="food_library_reset_default">Сбросить (по умолчанию)</string>
+    <string name="food_library_cancel">Отмена</string>
+    <string name="food_library_editor_title_new">Новый продукт</string>
+    <string name="food_library_editor_title_existing">«%1$s»</string>
+    <string name="food_library_dish_name_label">Название блюда</string>
+    <string name="food_library_recipe_label_empty">Состав (для составного блюда):</string>
+    <string name="food_library_recipe_label_filled">Состав — граммы за 1 шт/порцию:</string>
+    <string name="food_library_grams_label">г</string>
+    <string name="food_library_add_component_label">Добавить компонент</string>
+    <string name="food_library_component_suggestion_with_grams">＋ %1$s · ~%2$.0f г</string>
+    <string name="food_library_carbs_label">Углеводы, г</string>
+    <string name="food_library_carbs_label_live">Углеводы, г (сумма состава — живая)</string>
+    <string name="food_library_carbs_label_from_history">Углеводы, г (из истории: %1$s)</string>
+    <string name="food_library_restore_recipe_sum">↺ вернуть сумму состава (%1$s г)</string>
+    <string name="food_library_comment_label">Комментарий (порция, рецепт…)</string>
+    <string name="food_library_analyzing">Разбираю…</string>
+    <string name="food_library_parse_photo">🤖 Разобрать фото</string>
+    <string name="food_library_reparse_photo">🔄 Пересчитать по фото</string>
+    <string name="food_library_carbs_from_description">🤖 Углеводы по описанию</string>
+    <string name="food_library_reparse_description">🔄 Пересчитать по описанию</string>
+    <string name="food_library_name_suggestion">✨ Назвать «%1$s» — тап, чтобы применить</string>
+    <plurals name="food_library_pending_products">
+        <item quantity="one">＋ Записать %1$d продукт в библиотеку — тап, чтобы принять</item>
+        <item quantity="few">＋ Записать %1$d продукта в библиотеку — тап, чтобы принять</item>
+        <item quantity="many">＋ Записать %1$d продуктов в библиотеку — тап, чтобы принять</item>
+        <item quantity="other">＋ Записать %1$d продукта в библиотеку — тап, чтобы принять</item>
+    </plurals>
+    <plurals name="food_library_adopted_components">
+        <item quantity="one">＋%1$d компонент записано в библиотеку отдельными продуктами</item>
+        <item quantity="few">＋%1$d компонента записано в библиотеку отдельными продуктами</item>
+        <item quantity="many">＋%1$d компонентов записано в библиотеку отдельными продуктами</item>
+        <item quantity="other">＋%1$d компонента записано в библиотеку отдельными продуктами</item>
+    </plurals>
+    <string name="food_library_analysis_hide">▾ разбор</string>
+    <string name="food_library_analysis_show">▸ разбор</string>
+    <string name="food_library_used_in_dishes">Встречается в блюдах (%1$d)</string>
+    <string name="food_library_used_in_dishes_with_rise">Встречается в блюдах (%1$d) · суммарно ×%2$d · подъём ~%3$.1f</string>
+    <string name="food_library_dish_row_with_episodes">• %1$s · ×%2$d · подъём ~%3$.1f</string>
+    <string name="food_library_dish_row_no_episodes">• %1$s · ещё не ели</string>
+    <string name="food_library_shape_portion">Форма × порция: ~%1$.2f ммоль/г</string>
+    <string name="food_library_clean_n">чистых %1$d</string>
+    <string name="food_library_at_grams">при %1$dг → +%2$.1f</string>
+    <string name="food_library_flat_average">(плоское среднее +%1$.1f)</string>
+    <string name="food_library_episodes_title">Эпизоды (%1$d)</string>
+    <string name="food_library_episode_rise">+%1$.1f за %2$d мин</string>
+    <string name="food_library_episode_grams">%1$dг</string>
+    <string name="food_library_episode_dose">%1$.1f ед</string>
+    <string name="food_library_episode_lag">лаг %1$d мин</string>
+    <string name="food_library_episode_background">фон: %1$s</string>
+    <string name="food_library_error_empty_name">Название пустое</string>
+    <string name="food_library_error_duplicate_name">«%1$s» уже есть — переименование слило бы две истории</string>
+    <string name="food_library_save">Сохранить</string>
+    <string name="food_library_remove_title">Убрать из библиотеки?</string>
+    <string name="food_library_remove_text">История приёмов не пострадает — удалится только справочная запись.</string>
+    <string name="food_library_remove">Убрать</string>
+    <string name="food_library_merge_title">Объединить «%1$s» →</string>
+    <string name="food_library_merge_hint">Для НАСТОЯЩИХ дублей — одно блюдо под двумя именами. Истории эпизодов сольются в выбранное блюдо, «%1$s» исчезнет. Разные порции (2 пива / пиво) объединять НЕ нужно — им лучше рецепт.</string>
+    <string name="food_library_merge_target_label">В какое блюдо</string>
+    <string name="food_library_merge_confirm">Объединить</string>
+
+    <!-- FoodStructureAcceptance.kt -->
+    <string name="food_structure_acceptance_intro">Распознанное блюдо говорит модели, ЧТО вы съели — граммы и БЖУ. СКОРОСТЬ считается из этого состава и калорийной очереди, одинаково для всех блюд.</string>
+    <string name="food_structure_acceptance_title">Структура повторяющихся блюд</string>
+    <string name="food_structure_acceptance_hide">скрыть</string>
+    <string name="food_structure_acceptance_show">открыть</string>
+    <string name="food_structure_acceptance_collapsed_hint">Форма и скорость углеводов для блюд, которые повторяются. Ничего не применяется без вашего подтверждения.</string>
+    <string name="food_structure_acceptance_append_note">Принятие ДОПОЛНЯЕТ запись, а не переписывает: прежний текст остаётся, а момент принятия фиксируется, поэтому прошлые расчёты воспроизводимы.</string>
+    <string name="food_structure_acceptance_speed_line">быстрые %1$s · средние %2$s · медленные %3$s · %4$s</string>
+    <string name="food_structure_acceptance_speed_line_alcohol">быстрые %1$s · средние %2$s · медленные %3$s · %4$s · алкоголь</string>
+    <string name="food_structure_acceptance_preview_line">старт/пик/90%%: сейчас %1$s → станет %2$s мин</string>
+    <string name="food_structure_acceptance_blind_warning">⚠ оценка делалась при уже известной наблюдённой медиане этого блюда — в подтверждающем тесте не участвует</string>
+    <string name="food_structure_acceptance_pending">будет изменено записей: %1$d из %2$d</string>
+    <plurals name="food_structure_acceptance_already_accepted">
+        <item quantity="one">уже принято (%1$d запись)</item>
+        <item quantity="few">уже принято (%1$d записи)</item>
+        <item quantity="many">уже принято (%1$d записей)</item>
+        <item quantity="other">уже принято (%1$d записи)</item>
+    </plurals>
+    <string name="food_structure_acceptance_apply">Применить</string>
+    <string name="food_structure_acceptance_note_update">«%1$s»: изменено записей %2$d</string>
+    <string name="food_structure_acceptance_no_rows">Предложение не загрузилось.</string>
+</resources>

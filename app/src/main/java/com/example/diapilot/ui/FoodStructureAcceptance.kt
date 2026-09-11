@@ -19,7 +19,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.diapilot.R
 import com.example.diapilot.data.FoodStructureProposalRuntime
 import com.example.diapilot.data.SqliteCollectorStore
 import com.example.diapilot.data.Stores
@@ -57,25 +60,30 @@ fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "Распознанное блюдо говорит модели, ЧТО вы съели — граммы и БЖУ. СКОРОСТЬ " +
-                "считается из этого состава и калорийной очереди, одинаково для всех блюд.",
+            stringResource(R.string.food_structure_acceptance_intro),
             style = MaterialTheme.typography.bodySmall,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Структура повторяющихся блюд", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "скрыть" else "открыть") }
+            Text(stringResource(R.string.food_structure_acceptance_title), style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    if (expanded) {
+                        stringResource(R.string.food_structure_acceptance_hide)
+                    } else {
+                        stringResource(R.string.food_structure_acceptance_show)
+                    },
+                )
+            }
         }
         if (!expanded) {
             Text(
-                "Форма и скорость углеводов для блюд, которые повторяются. " +
-                    "Ничего не применяется без вашего подтверждения.",
+                stringResource(R.string.food_structure_acceptance_collapsed_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
             return@Column
         }
         Text(
-            "Принятие ДОПОЛНЯЕТ запись, а не переписывает: прежний текст остаётся, " +
-                "а момент принятия фиксируется, поэтому прошлые расчёты воспроизводимы.",
+            stringResource(R.string.food_structure_acceptance_append_note),
             style = MaterialTheme.typography.bodySmall,
         )
         note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -84,24 +92,39 @@ fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(row.proposed.title, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "быстрые ${pct(row.proposed.fast)} · средние ${pct(row.proposed.medium)} · " +
-                            "медленные ${pct(row.proposed.slow)} · ${row.proposed.form.name}" +
-                            if (row.proposed.alcohol) " · алкоголь" else "",
+                        if (row.proposed.alcohol) {
+                            stringResource(
+                                R.string.food_structure_acceptance_speed_line_alcohol,
+                                pct(row.proposed.fast), pct(row.proposed.medium),
+                                pct(row.proposed.slow), row.proposed.form.name,
+                            )
+                        } else {
+                            stringResource(
+                                R.string.food_structure_acceptance_speed_line,
+                                pct(row.proposed.fast), pct(row.proposed.medium),
+                                pct(row.proposed.slow), row.proposed.form.name,
+                            )
+                        },
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        "старт/пик/90%: сейчас ${row.previewNow} → станет ${row.previewThen} мин",
+                        stringResource(R.string.food_structure_acceptance_preview_line, row.previewNow, row.previewThen),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(row.proposed.why, style = MaterialTheme.typography.bodySmall)
                     if (!row.proposed.blind) Text(
-                        "⚠ оценка делалась при уже известной наблюдённой медиане этого блюда — " +
-                            "в подтверждающем тесте не участвует",
+                        stringResource(R.string.food_structure_acceptance_blind_warning),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        if (row.pending > 0) "будет изменено записей: ${row.pending} из ${row.matched}"
-                        else "уже принято (${row.alreadyAccepted} записей)",
+                        if (row.pending > 0) {
+                            stringResource(R.string.food_structure_acceptance_pending, row.pending, row.matched)
+                        } else {
+                            pluralStringResource(
+                                R.plurals.food_structure_acceptance_already_accepted,
+                                row.alreadyAccepted, row.alreadyAccepted,
+                            )
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(
@@ -117,16 +140,18 @@ fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
                                         )
                                     }.getOrDefault(0)
                                 }
-                                note = "«${row.proposed.title}»: изменено записей $n"
+                                note = context.getString(R.string.food_structure_acceptance_note_update, row.proposed.title, n)
                                 reload()
                                 busy = false
                             }
                         },
-                    ) { Text("Применить") }
+                    ) { Text(stringResource(R.string.food_structure_acceptance_apply)) }
                 }
             }
         }
-        if (rows.isEmpty()) Text("Предложение не загрузилось.", style = MaterialTheme.typography.bodySmall)
+        if (rows.isEmpty()) {
+            Text(stringResource(R.string.food_structure_acceptance_no_rows), style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

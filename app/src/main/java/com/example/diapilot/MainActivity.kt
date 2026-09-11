@@ -2,8 +2,8 @@ package com.example.diapilot
 
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -78,7 +79,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : ComponentActivity() {
+// AppCompatActivity (not ComponentActivity) only for the per-app language:
+// AppCompatDelegate.setApplicationLocales applies to AppCompat activities on
+// API < 33. Compose still draws everything.
+class MainActivity : AppCompatActivity() {
 
     /** Set by the UI so a pen scan can refresh the screens immediately. */
     var onPenScanned: (() -> Unit)? = null
@@ -135,22 +139,22 @@ class MainActivity : ComponentActivity() {
                 val now = System.currentTimeMillis()
                 val raw = libreScanner.scan(tag)
                 if (raw == null) {
-                    toast("Libre: скан не удался — подержите телефон у сенсора")
+                    toast(getString(R.string.main_activity_libre_scan_failed))
                     return@Thread
                 }
                 val serial = com.diapilot.core.libre.decodeLibreSerial(raw.uid)
                 val decoded = com.example.diapilot.nfc.LibreOop2Bridge.decode(this, raw, serial, now)
                 if (decoded == null) {
-                    toast("Libre $serial: OOP2 не ответил — расшифровка недоступна")
+                    toast(getString(R.string.main_activity_libre_oop2_no_response, serial))
                     return@Thread
                 }
                 if (!com.diapilot.core.libre.verifyFramCrc(decoded.fram)) {
-                    toast("Libre $serial: данные повреждены (CRC), повторите скан")
+                    toast(getString(R.string.main_activity_libre_data_corrupt, serial))
                     return@Thread
                 }
                 val parse = com.diapilot.core.libre.parseFram(decoded.fram, decoded.captureMs)
                 if (parse == null) {
-                    toast("Libre $serial: не удалось разобрать данные")
+                    toast(getString(R.string.main_activity_libre_parse_failed, serial))
                     return@Thread
                 }
                 val trend = com.diapilot.core.libre.attachBg(parse.trend, decoded.trendBg)
@@ -234,11 +238,11 @@ class MainActivity : ComponentActivity() {
                         this, raw.uid, raw.patchInfo, nextIndex,
                     )
                     bleNote = if (unlock == null) {
-                        " · BLE: OOP2 не выдал ключи"
+                        " · " + getString(R.string.main_activity_ble_no_keys)
                     } else {
                         val mac = libreScanner.enableStreaming(tag, unlock.nfcUnlock)
                         if (mac == null) {
-                            " · BLE: сенсор не принял команду — повторите скан"
+                            " · " + getString(R.string.main_activity_ble_rejected)
                         } else {
                             com.example.diapilot.data.Libre2State.save(
                                 this,
@@ -261,21 +265,29 @@ class MainActivity : ComponentActivity() {
                                 ),
                             )
                             com.example.diapilot.collect.CollectorService.start(this)
-                            " · BLE: стриминг наш, MAC $mac"
+                            " · " + getString(R.string.main_activity_ble_streaming, mac)
                         }
                     }
                 }
 
                 val cur = trend.lastOrNull { it.bgMgdl != null }?.bgMgdl
                 toast(
-                    "Libre $serial: " +
-                        (cur?.let { "%.0f мг/дл · ".format(it) } ?: "") +
-                        "${parse.status.labelRu}, день %.1f".format(parse.sensorTimeMin / 1440.0) +
-                        " · поток $saved" +
-                        (if (minCal != null) " · в историю +$mainFilled" +
-                            (if (mainSkipped > 0) " (уже было $mainSkipped)" else "")
-                        else " · история: нет калибровки") +
-                        (if (isNew) " · НОВЫЙ СЕНСОР" else "") +
+                    getString(R.string.main_activity_libre_prefix, serial) + " " +
+                        (cur?.let { getString(R.string.main_activity_libre_mgdl, it) + " · " } ?: "") +
+                        getString(
+                            R.string.main_activity_libre_status_day,
+                            com.example.diapilot.i18n.LibreText.status(this@MainActivity, parse.status),
+                            parse.sensorTimeMin / 1440.0,
+                        ) +
+                        " · " + getString(R.string.main_activity_libre_stream, saved) +
+                        (if (minCal != null) {
+                            " · " + if (mainSkipped > 0) {
+                                getString(R.string.main_activity_libre_backfill_with_skipped, mainFilled, mainSkipped)
+                            } else {
+                                getString(R.string.main_activity_libre_backfill, mainFilled)
+                            }
+                        } else " · " + getString(R.string.main_activity_libre_no_calibration)) +
+                        (if (isNew) " · " + getString(R.string.main_activity_libre_new_sensor_flag) else "") +
                         bleNote,
                 )
                 runOnUiThread { onPenScanned?.invoke() }
@@ -299,17 +311,28 @@ class MainActivity : ComponentActivity() {
                 // uuid ledger dedups across attempts, so several shaky taps
                 // converge to the full log.
                 val text = if (result == null || (result.doses.isEmpty() && !result.completed)) {
-                    "Ручка: скан не удался — поднесите ещё раз и держите"
+                    getString(R.string.main_activity_pen_scan_failed)
                 } else {
                     val saved = com.example.diapilot.nfc.PenDoseSaver.save(
                         com.example.diapilot.data.Stores.get(this), result,
                     )
-                    val suffix = if (!result.completed) " · скан неполный, приложите ещё раз" else ""
+                    val suffix = if (!result.completed) {
+                        " · " + getString(R.string.main_activity_pen_scan_incomplete)
+                    } else ""
+                    val serial = saved.serial ?: ""
                     when {
-                        saved.newDoses > 0 ->
-                            "Ручка ${saved.serial ?: ""}: новых доз — ${saved.newDoses}" +
-                                (if (saved.priming > 0) ", праймов — ${saved.priming}" else "") + suffix
-                        else -> "Ручка ${saved.serial ?: ""}: новых доз нет$suffix"
+                        saved.newDoses > 0 -> {
+                            val doses = resources.getQuantityString(
+                                R.plurals.main_activity_pen_new_doses, saved.newDoses, saved.newDoses,
+                            )
+                            val priming = if (saved.priming > 0) {
+                                ", " + resources.getQuantityString(
+                                    R.plurals.main_activity_pen_primes, saved.priming, saved.priming,
+                                )
+                            } else ""
+                            getString(R.string.main_activity_pen_result, serial, doses + priming) + suffix
+                        }
+                        else -> getString(R.string.main_activity_pen_no_new_doses, serial) + suffix
                     }
                 }
                 runOnUiThread {
@@ -324,6 +347,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A language switch recreates this activity; number formatting in
+        // :core follows the language from here on.
+        com.example.diapilot.i18n.AppLocaleFormats.sync(this)
         // WHAT THIS PHONE IS ACTUALLY DRAWING WITH, printed once per launch.
         //
         // The settings screen can import a triangle set that overrides the
@@ -346,7 +372,7 @@ class MainActivity : ComponentActivity() {
         runCatching {
             android.util.Log.i(
                 "PhysioTuning",
-                "configured: ${com.example.diapilot.data.PhysioTuning.summary(
+                "configured: ${com.example.diapilot.data.PhysioTuning.identity(
                     com.example.diapilot.data.PhysioTuning.read(this),
                 )} · triangles ${com.example.diapilot.data.PhysioTuning
                     .effectiveTriangles(this)
@@ -455,12 +481,21 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) {
-    TODAY("Сегодня"),
-    LABEL("История"),
-    ANALYSIS("Анализ"),
-    ASK("Чат"),
-    SETTINGS("Ещё"),
+private enum class Tab {
+    TODAY,
+    LABEL,
+    ANALYSIS,
+    ASK,
+    SETTINGS,
+}
+
+@Composable
+private fun tabLabel(tab: Tab): String = when (tab) {
+    Tab.TODAY -> stringResource(R.string.main_activity_tab_today)
+    Tab.LABEL -> stringResource(R.string.main_activity_tab_history)
+    Tab.ANALYSIS -> stringResource(R.string.main_activity_tab_analysis)
+    Tab.ASK -> stringResource(R.string.main_activity_tab_chat)
+    Tab.SETTINGS -> stringResource(R.string.main_activity_tab_more)
 }
 
 @Composable
@@ -470,10 +505,11 @@ private fun AppNavIcon(tab: Tab, selected: Boolean) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val label = tabLabel(tab)
     Canvas(
         Modifier
             .size(24.dp)
-            .semantics { contentDescription = tab.label },
+            .semantics { contentDescription = label },
     ) {
         val sx = size.width / 24f
         val sy = size.height / 24f
@@ -521,10 +557,11 @@ private fun AppNavIcon(tab: Tab, selected: Boolean) {
 @Composable
 private fun AddNavIcon() {
     val color = MaterialTheme.colorScheme.primary
+    val label = stringResource(R.string.main_activity_add_event)
     Canvas(
         Modifier
             .size(26.dp)
-            .semantics { contentDescription = "Добавить событие" },
+            .semantics { contentDescription = label },
     ) {
         val stroke = size.width / 10f
         drawLine(
@@ -560,7 +597,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         // charged to the collector foreground-service process for hours.
         // Cancel all screen work at STOP and restart it from fresh stamps only
         // when the Activity is visible again.
-        (context as ComponentActivity).lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        (context as androidx.activity.ComponentActivity).lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
         // First frame: render from the cached model as-is (null on cold start)
         // so the chart and current sugar appear at once — no synchronous twin
         // build blocking the open. The loop below then does the real build in
@@ -570,15 +607,15 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         // the whole analytical pass finished — the readings were never late, the
         // DISPLAY was, against a database that already had them.
         val tResume = android.os.SystemClock.elapsedRealtime()
-        android.util.Log.i("MainStatePerf", "STARTED: блок перезапущен")
+        android.util.Log.i("MainStatePerf", "STARTED: block restarted")
         runCatching {
             withContext(Dispatchers.IO) { loadLivePreview(state, Stores.get(context), context) }
         }.onSuccess {
             state = it
             android.util.Log.i(
                 "MainStatePerf",
-                "превью применено через ${android.os.SystemClock.elapsedRealtime() - tResume} ms " +
-                    "· прогноз ${it.prediction.size}",
+                "preview applied in ${android.os.SystemClock.elapsedRealtime() - tResume} ms " +
+                    "· forecast ${it.prediction.size}",
             )
         }
             .onFailure { android.util.Log.w("MainRefresh", "live preview failed", it) }
@@ -599,8 +636,8 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             state = it.withHistoryFrom(state).stabiliseHistoryAgainst(state)
             android.util.Log.i(
                 "MainStatePerf",
-                "состояние применено через ${android.os.SystemClock.elapsedRealtime() - tResume} ms " +
-                    "· прогноз ${it.prediction.size}",
+                "state applied in ${android.os.SystemClock.elapsedRealtime() - tResume} ms " +
+                    "· forecast ${it.prediction.size}",
             )
         }
             .onFailure { android.util.Log.e("MainRefresh", "cold state load failed; retrying", it) }
@@ -795,8 +832,8 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         withContext(Dispatchers.Main.immediate) { state = visible }
         android.util.Log.i(
             "MainStatePerf",
-            "reloadAfterEvent: проход ${tPass - t0} ms · история ${tPreview - tPass} ms" +
-                " · вкладка ${Tab.entries[tab]} · relearn=$relearn",
+            "reloadAfterEvent: pass ${tPass - t0} ms · history ${tPreview - tPass} ms" +
+                " · tab ${Tab.entries[tab]} · relearn=$relearn",
         )
         if (relearn) {
             val tRe0 = android.os.SystemClock.elapsedRealtime()
@@ -805,7 +842,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             withContext(Dispatchers.Main.immediate) { state = rebuilt.withHistoryFrom(visible) }
             android.util.Log.i(
                 "MainStatePerf",
-                "reloadAfterEvent: переобучение ${android.os.SystemClock.elapsedRealtime() - tRe0} ms",
+                "reloadAfterEvent: retrain ${android.os.SystemClock.elapsedRealtime() - tRe0} ms",
             )
         }
     }
@@ -1185,7 +1222,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         var single = 0
         val out = notes.mapNotNull { note ->
             try {
-                val analysis = com.example.diapilot.data.AskClaude.estimateCarbs(key, note.content)
+                val analysis = com.example.diapilot.data.AskClaude.estimateCarbs(key, note.content, context = context)
                 val comps = com.diapilot.core.analysis.parseComponents(analysis)
                 if (comps.size < 2) {
                     single++
@@ -1373,6 +1410,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             val store = Stores.get(context)
             val scaled = com.diapilot.core.analysis.FoodPortionScalingV1.scale(
                 note.content, note.estCarbs, note.analysis, factor,
+                portionWord = com.example.diapilot.i18n.FoodText.portionWord(context),
             )
             store.updateAnnotation(note.id, note.tsMs, scaled.text, note.mediaRef)
             store.setAnnotationCarbs(note.id, scaled.estCarbsG, source = "portion-scaled")
@@ -1452,7 +1490,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                         selected = tab == i,
                         onClick = { tab = i },
                         icon = { AppNavIcon(t, selected = tab == i) },
-                        label = { Text(t.label, maxLines = 1) },
+                        label = { Text(tabLabel(t), maxLines = 1) },
                         alwaysShowLabel = false,
                     )
                 }

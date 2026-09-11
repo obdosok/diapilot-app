@@ -4,6 +4,7 @@ package com.example.diapilot
  * The labeling tab: detected meals, history feed, meal cards.
  */
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -53,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.collector.CollectorStore
@@ -66,6 +69,9 @@ import com.example.diapilot.collect.CollectorService
 import com.example.diapilot.collect.MealNotifier
 import com.example.diapilot.collect.TreatmentsPollWorker
 import com.example.diapilot.data.Stores
+import com.example.diapilot.i18n.FoodText
+import com.example.diapilot.i18n.TokenText
+import com.example.diapilot.i18n.localized
 import com.example.diapilot.ui.AnalysisScreen
 import com.example.diapilot.ui.GlucoseChart
 import com.example.diapilot.ui.theme.DiaPilotTheme
@@ -117,9 +123,17 @@ private sealed class HistoryItem(val tsMs: Long) {
     class Meter(val reading: com.diapilot.core.collector.Reading) : HistoryItem(reading.tsMs)
 }
 
-private enum class HistoryFilter(val label: String) {
-    ALL("Всё"), FOOD("Еда"), INSULIN("Инсулин"), NOTES("Заметки")
-}
+private enum class HistoryFilter { ALL, FOOD, INSULIN, NOTES }
+
+@Composable
+private fun historyFilterLabel(f: HistoryFilter): String = stringResource(
+    when (f) {
+        HistoryFilter.ALL -> R.string.label_screen_filter_all
+        HistoryFilter.FOOD -> R.string.label_screen_filter_food
+        HistoryFilter.INSULIN -> R.string.label_screen_filter_insulin
+        HistoryFilter.NOTES -> R.string.label_screen_filter_notes
+    },
+)
 
 // Components a meal contributes to the concept model. A decomposed dish gives
 // its parsed composition; an ATOMIC one (beer, ice cream, smoothie — no
@@ -131,8 +145,15 @@ private enum class HistoryFilter(val label: String) {
 private fun hybridFoodLine(
     rows: List<com.example.diapilot.data.HybridFoodReadout>,
     mgdl: Boolean,
+    context: Context,
 ): String? {
     if (rows.isEmpty()) return null
+    val text = context.localized()
+    // Decimal separator follows the UI language, like core's fmtBg/fmtOneDecimal.
+    fun fmtCs(x: Double, digits: Int): String {
+        val s = String.format(java.util.Locale.ROOT, "%.${digits}f", x)
+        return if (com.diapilot.core.analysis.BgFormat.decimalComma) s.replace('.', ',') else s
+    }
     val total = rows.sumOf { it.amplitudeMmol }
     val weight = rows.sumOf { it.amplitudeMmol.coerceAtLeast(0.01) }
     // HALF-ARRIVAL, not the rate peak. The peak is the argmax of a two-humped
@@ -156,14 +177,18 @@ private fun hybridFoodLine(
         if (mgdl) perGram * com.diapilot.core.analysis.MGDL_PER_MMOL_F else perGram
     }
     val arithmetic = if (carbs != null && csDisplay != null)
-        "%.0f г × CS %s = +%s %s".format(
+        text.getString(
+            R.string.label_screen_food_arithmetic,
             carbs,
-            if (mgdl) "%.2f".format(java.util.Locale.ROOT, csDisplay).replace('.', ',')
-            else "%.3f".format(java.util.Locale.ROOT, csDisplay).replace('.', ','),
+            fmtCs(csDisplay, if (mgdl) 2 else 3),
             com.diapilot.core.analysis.fmtBg(total, mgdl),
-            com.diapilot.core.analysis.unitLabel(mgdl),
+            com.example.diapilot.i18n.unitLabel(mgdl),
         )
-    else "прогноз +${com.diapilot.core.analysis.fmtBg(total,mgdl)} ${com.diapilot.core.analysis.unitLabel(mgdl)}"
+    else text.getString(
+        R.string.label_screen_food_forecast_only,
+        com.diapilot.core.analysis.fmtBg(total, mgdl),
+        com.example.diapilot.i18n.unitLabel(mgdl),
+    )
     fun timingEvidence(row:com.example.diapilot.data.HybridFoodReadout):String=when(row.timingSource){
         // SAY WHAT IS BEHIND THE TIMING. The card described the structural
         // mixture without ever saying how much of the user's own history
@@ -190,10 +215,19 @@ private fun hybridFoodLine(
         // if that were a fact about the dish rather than about a field
         // nobody fills.
         "structured-feature-mixture-v2"->
-            row.kineticsSummary ?: "структурная смесь по БЖУ"
+            row.kinetics?.let { k ->
+                if (k.tailEndMin != null) text.getString(
+                    R.string.hybrid_readout_kinetics_tail, k.fastPct, k.mediumPct, k.slowPct, k.form, k.tailEndMin,
+                ) else text.getString(R.string.hybrid_readout_kinetics, k.fastPct, k.mediumPct, k.slowPct, k.form)
+            } ?: text.getString(R.string.label_screen_food_structured_mixture)
         "physiological-prior","physiological_prior"->
-            "общий физиологический шаблон (БЖУ не разобраны)"
-        else->row.timingBasis
+            text.getString(R.string.label_screen_food_physio_template)
+        else->when(row.timingBasis){
+            com.example.diapilot.data.FoodBasis.DISH_PROFILE->text.getString(R.string.label_screen_basis_dish_profile)
+            com.example.diapilot.data.FoodBasis.GLOBAL_CS->text.getString(R.string.label_screen_basis_global_cs)
+            com.example.diapilot.data.FoodBasis.MACROS_DURATION->text.getString(R.string.label_screen_basis_macros_duration)
+            else->row.timingBasis
+        }
     }
     val evidence=rows.map(::timingEvidence).distinct().joinToString(" + ")
     // THE CURVE THAT WAS APPLIED, when it differs from the dish's own.
@@ -211,9 +245,11 @@ private fun hybridFoodLine(
         val cDuration = clusterRows.mapNotNull { it.clusterDurationMin }.maxOrNull()
         val members = clusterRows.maxOf { it.clusterMembers }
         val prior = clusterRows.mapNotNull { it.clusterPriorRealised }.minOrNull()
-        "\nВ этом приёме (блюд: $members, желудок общий): половина пришла ~$cHalf" +
-            (cDuration?.let { " · 90% ~$it мин" } ?: "") +
-            (prior?.let { "\nК этому блюду предыдущее усвоено на ${(it * 100).toInt()}%" } ?: "")
+        "\n" + text.getString(R.string.label_screen_food_cluster_summary, members, cHalf) +
+            (cDuration?.let { " · " + text.getString(R.string.label_screen_food_cluster_p90, it) } ?: "") +
+            (prior?.let {
+                "\n" + text.getString(R.string.label_screen_food_cluster_prior_absorbed, (it * 100).toInt())
+            } ?: "")
     }
     // Macros and kcal on the main card: the macros are what the user
     // checks the LLM's parse against, and the kcal is what the gastric queue
@@ -222,47 +258,57 @@ private fun hybridFoodLine(
     val fat = rows.mapNotNull { it.fatG }.sum().takeIf { rows.any { r -> r.fatG != null } }
     val macroLine = if (protein == null && fat == null) "" else {
         val kcal = com.diapilot.core.analysis.MealCaloricExtentV1.kcal(carbs ?: 0.0, protein, fat)
-        "\nБЖУ: %.0f / %.0f / %.0f г · ~%.0f ккал".format(protein ?: 0.0, fat ?: 0.0, carbs ?: 0.0, kcal)
+        "\n" + text.getString(R.string.label_screen_food_macro_line, protein ?: 0.0, fat ?: 0.0, carbs ?: 0.0, kcal)
     }
-    val prediction = "Прогноз модели: $arithmetic · старт ~$onset · " +
-        "половина пришла ~$half · 90% основной реакции ~$duration мин" + macroLine + clusterLine +
-        "\nТайминг: $evidence"
+    val prediction = text.getString(R.string.label_screen_food_prediction, arithmetic, onset, half, duration) +
+        macroLine + clusterLine +
+        "\n" + text.getString(R.string.label_screen_food_timing, evidence)
     val observedRow = rows.firstOrNull { it.observed != null } ?: return prediction+
-        "\nФакт эпизода: пока не рассчитан — чистого окна деконволюции нет."
+        "\n" + text.getString(R.string.label_screen_food_fact_not_calculated)
     val observed = observedRow.observed ?: return prediction
     if(observed.amplitudeMmol==null&&observed.onsetMin==null&&observed.levelMaxMin==null&&observed.plateauMin==null){
         val reason=when(observed.status){
-            "overlapped_by_food"->"перекрыто соседней едой"
-            "carbs_missing"->"не записаны углеводы"
-            "not_extractable"->"не удалось выделить чистую кривую"
-            else->"недостаточно данных"
+            "overlapped_by_food"->text.getString(R.string.label_screen_food_reason_overlapped)
+            "carbs_missing"->text.getString(R.string.label_screen_food_reason_carbs_missing)
+            "not_extractable"->text.getString(R.string.label_screen_food_reason_not_extractable)
+            else->text.getString(R.string.label_screen_food_reason_insufficient_data)
         }
-        return prediction+"\nФакт эпизода: $reason."
+        return prediction+"\n"+text.getString(R.string.label_screen_food_fact_reason, reason)
     }
     fun minuteDelta(actual:Int,predicted:Int)=String.format(java.util.Locale.ROOT,"%+d",actual-predicted)
     val facts=buildList{
-        observed.onsetMin?.let{add("старт ~$it мин (${minuteDelta(it,observedRow.onsetMin)} к прогнозу)")}
-        observed.levelMaxMin?.let{
-            add(if(observed.levelMaxCensored)"рост виден как минимум до ~$it мин" else "максимум уровня ~$it мин")
+        observed.onsetMin?.let{
+            add(text.getString(R.string.label_screen_food_onset_fact, it, minuteDelta(it,observedRow.onsetMin)))
         }
-        observed.plateauMin?.let{add("плато ~$it мин (${minuteDelta(it,observedRow.durationMin)} к прогнозу)")}
-        if(observed.plateauMin==null&&observed.latePhaseObserved)add("поздняя фаза наблюдалась, точная минута плато не выделена")
+        observed.levelMaxMin?.let{
+            add(
+                if(observed.levelMaxCensored) text.getString(R.string.label_screen_food_level_max_censored, it)
+                else text.getString(R.string.label_screen_food_level_max, it),
+            )
+        }
+        observed.plateauMin?.let{
+            add(text.getString(R.string.label_screen_food_plateau_fact, it, minuteDelta(it,observedRow.durationMin)))
+        }
+        if(observed.plateauMin==null&&observed.latePhaseObserved)add(text.getString(R.string.label_screen_food_late_phase))
     }
+    // Only whether something was seen matters below (seen.isEmpty()) — the
+    // labels themselves are never displayed, so they need no translation.
     val seen=buildList{
-        if(observed.onsetMin!=null)add("старт")
-        if(observed.levelMaxMin!=null&&!observed.levelMaxCensored)add("максимум уровня")
-        if(observed.plateauMin!=null)add("плато")
-        else if(observed.latePhaseObserved)add("поздняя фаза")
+        if(observed.onsetMin!=null)add("onset")
+        if(observed.levelMaxMin!=null&&!observed.levelMaxCensored)add("level_max")
+        if(observed.plateauMin!=null)add("plateau")
+        else if(observed.latePhaseObserved)add("late_phase")
     }
     val amplitude=observed.amplitudeMmol?.let{
         val delta=com.diapilot.core.analysis.fmtBgDelta(it-observedRow.amplitudeMmol,mgdl)
         val bound=if(observed.levelMaxCensored)"≥" else ""
-        "$bound${com.diapilot.core.analysis.fmtBg(it,mgdl)} (Δ$delta к модели)"
+        "$bound${com.diapilot.core.analysis.fmtBg(it,mgdl)} " +
+            text.getString(R.string.label_screen_food_amplitude_delta, delta)
     }
     val missing=buildList{
-        if(observed.onsetMin==null)add("старт")
-        if(observed.levelMaxMin==null||observed.levelMaxCensored)add("конец роста")
-        if(observed.plateauMin==null)add("точное плато")
+        if(observed.onsetMin==null)add(text.getString(R.string.label_screen_food_missing_onset))
+        if(observed.levelMaxMin==null||observed.levelMaxCensored)add(text.getString(R.string.label_screen_food_missing_level_max))
+        if(observed.plateauMin==null)add(text.getString(R.string.label_screen_food_missing_plateau))
     }
     val quality=buildList{
         // "Insulin action accounted for" was true of every row this path can emit —
@@ -270,11 +316,11 @@ private fun hybridFoodLine(
         if(observed.neighbourMmol>0.0){
             val neighbour=com.diapilot.core.analysis.fmtBg(observed.neighbourMmol,mgdl)
             add(if(observed.neighbourResolved)
-                "перекрытие с соседом ~$neighbour (подъём и инсулин разделены между блюдами)"
-            else "перекрытие с соседом ~$neighbour — надёжно разделить не удалось")
+                text.getString(R.string.label_screen_food_overlap_resolved, neighbour)
+            else text.getString(R.string.label_screen_food_overlap_unresolved, neighbour))
         }
-        observed.confidence?.let{add("доверие %.0f%%".format(it*100))}
-        if(observed.sensorUnstable)add("сенсор нестабилен")
+        observed.confidence?.let{add(text.getString(R.string.label_screen_food_confidence_pct, it*100))}
+        if(observed.sensorUnstable)add(text.getString(R.string.label_screen_food_sensor_unstable))
     }
     // MODEL VS FACT AS ONE PICTURE — this replaces comparing separate number
     // rows by eye. Both rows share ONE maximum: normalising each to its own
@@ -305,35 +351,44 @@ private fun hybridFoodLine(
         }
         val lastTau = observed.curveTaus.lastOrNull()?.toInt()
         val paired = mixtureCurve.size >= 3
+        val dishLabel = text.getString(R.string.label_screen_food_curve_dish)
+        val modelLabel = text.getString(R.string.label_screen_food_curve_model)
+        val mixLabel = text.getString(R.string.label_screen_food_curve_mix)
+        val factLabel = text.getString(R.string.label_screen_food_curve_fact)
+        val labelWidth = maxOf(dishLabel.length, modelLabel.length, mixLabel.length, factLabel.length)
+        fun pad(s: String) = s.padEnd(labelWidth)
         buildString {
-            append("\n").append(if (paired) "Блюдо" else "Модель")
+            append("\n").append(pad(if (paired) dishLabel else modelLabel))
             append(" ").append(sparkRow(modelCurve))
-            if (paired) append("\nСостав ").append(sparkRow(mixtureCurve))
-            append("\nФакт  ").append(sparkRow(factCurve))
+            if (paired) append("\n").append(pad(mixLabel)).append(" ").append(sparkRow(mixtureCurve))
+            append("\n").append(pad(factLabel)).append(" ").append(sparkRow(factCurve))
             // The fact row is a PREFIX of the model grid - its window is cut at
             // the next meal - so a shorter row means the window ended, never
             // that the contribution ended.
             lastTau?.takeIf { factCurve.size < modelCurve.size }
-                ?.let { append(" (окно до ~$it мин)") }
+                ?.let { append(" ").append(text.getString(R.string.label_screen_food_curve_window, it)) }
             // And it is a RECONSTRUCTION, not a measurement: glucose with the
             // insulin model subtracted, sometimes a neighbour too. Drawn beside
             // two predictions it would otherwise read as ground truth, which is
             // exactly what we do not have.
-            append("\nФакт — восстановлено: глюкоза минус инсулин")
-            if (observed.neighbourMmol > 0.0) append(", минус сосед")
+            append("\n").append(
+                if (observed.neighbourMmol > 0.0)
+                    text.getString(R.string.label_screen_food_curve_reconstructed_neighbor)
+                else text.getString(R.string.label_screen_food_curve_reconstructed),
+            )
         }
     }
     return buildString{
         append(prediction)
         append(curveBlock)
-        append("\nФакт эпизода (деконволюция)")
+        append("\n").append(text.getString(R.string.label_screen_food_episode_header))
         amplitude?.let{append(": +$it")}
         if(facts.isNotEmpty())append(" · ").append(facts.joinToString(" · "))
         // The positive "seen" list restated the fact numbers printed
         // one line above it; only what is MISSING carries information.
-        if(missing.isNotEmpty())append("\nНе подтверждено: ").append(missing.joinToString(", "))
-        else if(seen.isEmpty())append("\nВиден только фрагмент подъёма")
-        if(quality.isNotEmpty())append("\nМетод: ").append(quality.joinToString(" · "))
+        if(missing.isNotEmpty())append("\n").append(text.getString(R.string.label_screen_food_missing, missing.joinToString(", ")))
+        else if(seen.isEmpty())append("\n").append(text.getString(R.string.label_screen_food_fragment_only))
+        if(quality.isNotEmpty())append("\n").append(text.getString(R.string.label_screen_food_quality, quality.joinToString(" · ")))
     }
 }
 
@@ -350,18 +405,22 @@ internal fun Stage10MealReceipt(
         val fraction=b.realisedFractionAtNext!!.coerceIn(0.0,1.0)
         val nextTime=java.text.SimpleDateFormat("HH:mm",java.util.Locale.getDefault()).format(java.util.Date(b.nextMealAtMs!!))
         Text(
-            "К следующей еде в $nextTime модель относит уже ${"%.0f".format(fraction*100)}% вклада: +${"%.1f".format(b.totalAmplitudeMmol*fraction)} из +${"%.1f".format(b.totalAmplitudeMmol)} ммоль/л; остаток ${"%.0f".format((1-fraction)*100)}%.",
+            stringResource(
+                R.string.label_screen_receipt_next_meal,
+                nextTime, fraction * 100, b.totalAmplitudeMmol * fraction, b.totalAmplitudeMmol, (1 - fraction) * 100,
+            ),
             style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=modifier,
         )
     }
     val cluster=com.example.diapilot.data.FoodCalculationRegistry.let{registry->annotationIds.mapNotNull(registry::get).firstOrNull{it.clusterMembers>1}}
     cluster?.let{c->
-        val text=when(c.timingScope){
-            "COMPLETED_BEFORE_CLUSTER"->"Ранний вклад завершён до следующей еды: углеводы входят в общую амплитуду, но не растягивают тайминг серии."
-            "CLUSTER_ONLY"->"Серия из ${c.clusterMembers} записей (~${c.clusterCarbsG?.let{"%.0f".format(it)}?:"?"} г) считается одним приёмом: блюда не разделились."
+        val clusterGrams = c.clusterCarbsG?.let { "%.0f".format(java.util.Locale.ROOT, it) } ?: "?"
+        val clusterText=when(c.timingScope){
+            "COMPLETED_BEFORE_CLUSTER"->stringResource(R.string.label_screen_receipt_cluster_completed)
+            "CLUSTER_ONLY"->stringResource(R.string.label_screen_receipt_cluster_only, c.clusterMembers, clusterGrams)
             else->null
         }
-        text?.let{Text(it,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.tertiary,modifier=modifier)}
+        clusterText?.let{Text(it,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.tertiary,modifier=modifier)}
     }
     val receipt=snapshot.receipts.filterKeys{it in annotationIds}.values
         .distinctBy{it.receiptVersion+it.allocation+it.resolution}.firstOrNull()
@@ -373,7 +432,7 @@ internal fun Stage10MealReceipt(
             // is noise and stays in the depth; above 1 mmol it is the most
             // important line on the card.
             if(e.unloggedResidualMmol>1.0)Text(
-                "Незакрытый остаток: +%.1f ммоль/л — в этом окне действовало что-то незаписанное".format(e.unloggedResidualMmol),
+                stringResource(R.string.label_screen_receipt_unlogged_residual, e.unloggedResidualMmol),
                 style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.error,
             )
             // ONE FACT PER CARD — the deconvolution's, not the user's decision.
@@ -384,13 +443,17 @@ internal fun Stage10MealReceipt(
             Text(
                 e.compactFinding.ifBlank{e.resolution},
                 style=MaterialTheme.typography.labelSmall,
-                color=if(e.resolution.contains("неразреш",ignoreCase=true)) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color=if(e.unresolved) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick={expanded=!expanded}){Text(if(expanded)"Скрыть расчёт" else "Как рассчитано?")}
+            val forecastPrefix = stringResource(R.string.label_screen_receipt_forecast_prefix, e.modelForecast)
+            val confidencePrefix = stringResource(R.string.label_screen_receipt_confidence_prefix, e.confidence)
+            TextButton(onClick={expanded=!expanded}){
+                Text(if(expanded)stringResource(R.string.label_screen_receipt_hide_calc) else stringResource(R.string.label_screen_receipt_how_calculated))
+            }
             if(expanded)Text(
-                "Прогноз: ${e.modelForecast}\n${e.allocatedMealContribution}\n${e.phases}\n${e.overlap}\n"+
+                "$forecastPrefix\n${e.allocatedMealContribution}\n${e.phases}\n${e.overlap}\n"+
                     "${e.allocation}; ${e.resolution}\n${e.timeResolvedCurve}\n${e.tailTransfer}\n"+
-                    "Уверенность: ${e.confidence}. ${e.caveats}\n${e.episodeKernel}\n${e.kernelDifference}\n"+
+                    "$confidencePrefix. ${e.caveats}\n${e.episodeKernel}\n${e.kernelDifference}\n"+
                     "${e.causalProvenance}\n${e.diagnosticProvenance}",
                 style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -414,7 +477,7 @@ internal fun Stage10MealReceipt(
         ) {
             val completed=snapshot.nextOffset.coerceIn(0,snapshot.totalClusters)
             Text(
-                "Подробная оценка эпизодов: $completed из ${snapshot.totalClusters}",
+                stringResource(R.string.label_screen_receipt_progress, completed, snapshot.totalClusters),
                 style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.tertiary,
             )
             androidx.compose.material3.LinearProgressIndicator(
@@ -422,7 +485,7 @@ internal fun Stage10MealReceipt(
                 modifier=Modifier.fillMaxWidth(),
             )
             Text(
-                "Досчитывается в фоне на вкладке «Сегодня» — ничего нажимать не нужно.",
+                stringResource(R.string.label_screen_receipt_progress_note),
                 style=MaterialTheme.typography.labelSmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -466,6 +529,8 @@ internal fun LabelScreen(
     onUnmarkMeal: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val text = context.localized()
     var reconcilePlan by remember {
         mutableStateOf<List<com.diapilot.core.analysis.LabelFix>?>(null)
     }
@@ -776,10 +841,13 @@ internal fun LabelScreen(
                 // Keep the title readable. The old header put seven emoji
                 // actions in this row, leaving only a few pixels for the
                 // screen title and forcing one letter per line on a phone.
+                val historyDaysText = pluralStringResource(
+                    R.plurals.label_screen_history_days, state.historyDays, state.historyDays,
+                )
                 Text(
                     if (state.historyAnchorMs != null)
-                        "${anchorFmt.format(Date(state.historyAnchorMs!!))} · ${state.historyDays} дней"
-                    else "История · ${state.historyDays} дней",
+                        "${anchorFmt.format(Date(state.historyAnchorMs!!))} · $historyDaysText"
+                    else "${stringResource(R.string.label_screen_history_title)} · $historyDaysText",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier
                         .weight(1f)
@@ -787,9 +855,9 @@ internal fun LabelScreen(
                     maxLines = 1,
                 )
                 if (state.historyAnchorMs != null) {
-                    TextButton(onClick = { onHistoryJump(-1L) }) { Text("Сейчас") }
+                    TextButton(onClick = { onHistoryJump(-1L) }) { Text(stringResource(R.string.label_screen_now)) }
                 }
-                TextButton(onClick = { showHistoryDate = true }) { Text("Дата") }
+                TextButton(onClick = { showHistoryDate = true }) { Text(stringResource(R.string.label_screen_date)) }
                 TextButton(onClick = {
                     searchOpen = !searchOpen
                     if (searchOpen) onSearchStart() else searchQuery = ""
@@ -800,7 +868,7 @@ internal fun LabelScreen(
                     onDismissRequest = { showHistoryTools = false },
                 ) {
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Блюда и рецепты") },
+                        text = { Text(stringResource(R.string.label_screen_menu_dishes_recipes)) },
                         onClick = {
                             showHistoryTools = false
                             showLibrary = true
@@ -809,7 +877,8 @@ internal fun LabelScreen(
                     androidx.compose.material3.DropdownMenuItem(
                         text = {
                             Text(
-                                if (nutritionBusy) "Оцениваю БЖУ…" else "Заполнить БЖУ и ккал",
+                                if (nutritionBusy) stringResource(R.string.label_screen_menu_estimating_macros)
+                                else stringResource(R.string.label_screen_menu_fill_macros),
                             )
                         },
                         enabled = !nutritionBusy,
@@ -823,7 +892,7 @@ internal fun LabelScreen(
                         },
                     )
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Обслуживание истории…") },
+                        text = { Text(stringResource(R.string.label_screen_menu_history_maintenance)) },
                         onClick = {
                             showHistoryTools = false
                             showHistoryMaintenance = true
@@ -835,14 +904,14 @@ internal fun LabelScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    label = { Text("Поиск по еде") },
-                    placeholder = { Text("блины, гречка, мороженое…") },
+                    label = { Text(stringResource(R.string.label_screen_search_label)) },
+                    placeholder = { Text(stringResource(R.string.label_screen_search_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (searchQuery.isNotBlank()) {
                     Text(
-                        "Найдено: ${visibleItems.size}",
+                        stringResource(R.string.label_screen_search_found, visibleItems.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -851,22 +920,22 @@ internal fun LabelScreen(
             if (showHistoryMaintenance) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showHistoryMaintenance = false },
-                    title = { Text("Обслуживание истории") },
+                    title = { Text(stringResource(R.string.label_screen_maintenance_title)) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                "Эти инструменты чинят старые записи; повседневно они не нужны.",
+                                stringResource(R.string.label_screen_maintenance_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             TextButton(onClick = {
                                 showHistoryMaintenance = false
                                 scope.launch { reconcilePlan = onReconcilePlan() }
-                            }) { Text("Проверить связи заметок") }
+                            }) { Text(stringResource(R.string.label_screen_maintenance_check_links)) }
                             TextButton(onClick = {
                                 showHistoryMaintenance = false
                                 scope.launch { decompPlan = onDecomposePlan() }
-                            }) { Text("Разобрать составные блюда") }
+                            }) { Text(stringResource(R.string.label_screen_maintenance_decompose)) }
                             TextButton(
                                 enabled = !decompBusy,
                                 onClick = {
@@ -877,12 +946,12 @@ internal fun LabelScreen(
                                         decompBusy = false
                                     }
                                 },
-                            ) { Text("Разобрать свободный текст через LLM") }
+                            ) { Text(stringResource(R.string.label_screen_maintenance_llm_decompose)) }
                         }
                     },
                     confirmButton = {
                         TextButton(onClick = { showHistoryMaintenance = false }) {
-                            Text("Закрыть")
+                            Text(stringResource(R.string.label_screen_close))
                         }
                     },
                 )
@@ -890,7 +959,7 @@ internal fun LabelScreen(
             nutritionPlan?.let { plan ->
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { nutritionPlan = null },
-                    title = { Text("БЖУ и ккал") },
+                    title = { Text(stringResource(R.string.label_screen_nutrition_title)) },
                     text = {
                         Column(
                             modifier = Modifier
@@ -900,20 +969,23 @@ internal fun LabelScreen(
                         ) {
                             if (plan.isEmpty()) {
                                 Text(
-                                    "Нет записей для заполнения либо не настроен ключ LLM.",
+                                    stringResource(R.string.label_screen_nutrition_empty),
                                 )
                             } else {
                                 Text(
-                                    "Один запрос · ${plan.size} типовых порций · " +
-                                        "${plan.sumOf { it.annotationIds.size }} записей. " +
-                                        "Углеводы и состав не меняются.",
+                                    stringResource(
+                                        R.string.label_screen_nutrition_summary,
+                                        plan.size, plan.sumOf { it.annotationIds.size },
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 plan.forEach { row ->
                                     Text(
-                                        "${row.dish}: Б %.0f · Ж %.0f · %.0f ккал"
-                                            .format(row.proteinG, row.fatG, row.kcal),
+                                        stringResource(
+                                            R.string.label_screen_nutrition_row,
+                                            row.dish, row.proteinG, row.fatG, row.kcal,
+                                        ),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
@@ -921,7 +993,7 @@ internal fun LabelScreen(
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { nutritionPlan = null }) { Text("Отмена") }
+                        TextButton(onClick = { nutritionPlan = null }) { Text(stringResource(R.string.label_screen_cancel)) }
                     },
                     confirmButton = {
                         TextButton(
@@ -930,7 +1002,7 @@ internal fun LabelScreen(
                                 onApplyNutrition(plan)
                                 nutritionPlan = null
                             },
-                        ) { Text("Сохранить") }
+                        ) { Text(stringResource(R.string.label_screen_save)) }
                     },
                 )
             }
@@ -974,7 +1046,7 @@ internal fun LabelScreen(
                     androidx.compose.material3.FilterChip(
                         selected = filter == i,
                         onClick = { filter = i },
-                        label = { Text(hf.label) },
+                        label = { Text(historyFilterLabel(hf)) },
                     )
                 }
             }
@@ -1045,13 +1117,14 @@ internal fun LabelScreen(
                     // delivered (history is the audit view and keeps air shots).
                     val pairedBolus: String? = run {
                         val eatTs = item.note?.tsMs ?: meal.onsetMs
-                        fun timing(dMin: Long) = when {
-                            dMin <= -2 -> " (за ${-dMin} мин до)"
-                            dMin >= 2 -> " (через $dMin мин)"
-                            else -> " (вместе с едой)"
+                        fun timing(dMin: Long) = " " + when {
+                            dMin <= -2 -> text.getString(R.string.label_screen_timing_before, -dMin)
+                            dMin >= 2 -> text.getString(R.string.label_screen_timing_after, dMin)
+                            else -> text.getString(R.string.label_screen_timing_with_meal)
                         }
                         val inWindow = state.historyBoluses
                             .filter {
+                                // Stored bolus-purpose token, not UI text.
                                 it.purpose != "воздух" &&
                                     it.tsMs in (eatTs - 45L * 60_000)..(eatTs + 45L * 60_000)
                             }
@@ -1063,7 +1136,7 @@ internal fun LabelScreen(
                             .sortedBy { it.tsMs }
                         when {
                             mine.isNotEmpty() -> mine.joinToString(" · ") {
-                                "%.1f".format(it.units) + timing((it.tsMs - eatTs) / 60_000)
+                                text.getString(R.string.label_screen_bolus_units, it.units) + timing((it.tsMs - eatTs) / 60_000)
                             }
                             // Shots were near, but they belong to a neighbour —
                             // show NOTHING. The detector's own bolusUnits must not
@@ -1073,7 +1146,7 @@ internal fun LabelScreen(
                             inWindow.isNotEmpty() -> null
                             // Nothing near at all: the detector may still have
                             // paired one from its own wider window.
-                            else -> meal.bolusUnits?.let { "%.1f ед".format(it) }
+                            else -> meal.bolusUnits?.let { text.getString(R.string.label_screen_bolus_units, it) }
                         }
                     }
                     // Dextrose by label OR by the merged note — a freshly
@@ -1183,8 +1256,8 @@ internal fun LabelScreen(
                             Column(Modifier.weight(1f)) {
                                 if (isDextrose) {
                                     Text(
-                                        "$emoji $time · лечение гипо" +
-                                            (item.totalCarbs?.let { " · ~%.0f г".format(it) } ?: ""),
+                                        "$emoji $time · " + text.getString(R.string.label_screen_hypo_treatment) +
+                                            (item.totalCarbs?.let { " · " + text.getString(R.string.label_screen_carbs_approx, it) } ?: ""),
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                 } else {
@@ -1196,20 +1269,21 @@ internal fun LabelScreen(
                                         // BELOW as their own tappable rows, so the
                                         // headline no longer hides them behind a
                                         // "+1 dish" counter that nothing opened.
-                                        "$emoji $time · ${item.note?.content ?: item.label ?: "не размечено"}" +
-                                            (item.totalCarbs?.let { " · ~%.0f г".format(it) } ?: ""),
+                                        "$emoji $time · ${item.note?.content ?: item.label ?: text.getString(R.string.label_screen_not_labeled)}" +
+                                            (item.totalCarbs?.let { " · " + text.getString(R.string.label_screen_carbs_approx, it) } ?: ""),
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                     val modelLine = hybridFoodLine(
                                         item.allNotes.mapNotNull { state.hybridFoodReadouts[it.id] },
                                         state.mgdl,
+                                        context,
                                     )
                                     Text(
                                         buildString {
                                             append(
-                                                modelLine ?: "Нет расчёта модели: нужны записанные углеводы",
+                                                modelLine ?: text.getString(R.string.label_screen_food_no_model),
                                             )
-                                            pairedBolus?.let { append(" · болюс $it") }
+                                            pairedBolus?.let { append(" · " + text.getString(R.string.label_screen_bolus_prefix, it)) }
                                         },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1245,7 +1319,7 @@ internal fun LabelScreen(
                                     onDismissRequest = { moreMenu = false },
                                 ) {
                                     Text(
-                                        "Это не еда:",
+                                        stringResource(R.string.label_screen_not_food_header),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1257,7 +1331,7 @@ internal fun LabelScreen(
                                         "↩" to com.diapilot.core.analysis.SysLabels.CONTINUATION,
                                     ).forEach { (ic, name) ->
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text("$ic $name") },
+                                            text = { Text("$ic " + FoodText.mealLabel(context, name)) },
                                             onClick = {
                                                 moreMenu = false
                                                 val labeled = state.labeled
@@ -1270,7 +1344,7 @@ internal fun LabelScreen(
                                     androidx.compose.material3.DropdownMenuItem(
                                         text = {
                                             Text(
-                                                "🗑 Ложный детект",
+                                                stringResource(R.string.label_screen_false_detection),
                                                 color = MaterialTheme.colorScheme.error,
                                             )
                                         },
@@ -1300,10 +1374,16 @@ internal fun LabelScreen(
                         // picker every other rise gets.
                         item.continuations.forEach { c ->
                             Text(
-                                "↩ ${timeFmt.format(Date(c.onsetMs))} · наблюдение сенсора: продолжение " +
-                                    "+${com.diapilot.core.analysis.fmtBg(c.rise, state.mgdl)} " +
-                                    "за %.0f мин".format(c.timeToPeakMin) +
-                                    (c.bolusUnits?.let { " · докол %.1f".format(it) } ?: "") + " ▾",
+                                "↩ ${timeFmt.format(Date(c.onsetMs))} · " +
+                                    text.getString(
+                                        R.string.label_screen_continuation_line,
+                                        com.diapilot.core.analysis.fmtBg(c.rise, state.mgdl),
+                                        c.timeToPeakMin,
+                                    ) +
+                                    (c.bolusUnits?.let {
+                                        " · " + TokenText.bolusPurpose(context, "докол") + " " +
+                                            com.diapilot.core.analysis.fmtOneDecimal(it)
+                                    } ?: "") + " ▾",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -1341,9 +1421,9 @@ internal fun LabelScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "💉 ${timeFmt.format(Date(item.tsMs))} · %.1f ед".format(item.point.units) +
-                                    (state.bgAtShot[item.tsMs]?.let { " · при ${com.diapilot.core.analysis.fmtBg(it, state.mgdl)}" } ?: "") +
-                                    (item.point.purpose?.let { " · $it" } ?: ""),
+                                "💉 ${timeFmt.format(Date(item.tsMs))} · " + text.getString(R.string.label_screen_bolus_units, item.point.units) +
+                                    (state.bgAtShot[item.tsMs]?.let { " · " + text.getString(R.string.label_screen_at_bg, com.diapilot.core.analysis.fmtBg(it, state.mgdl)) } ?: "") +
+                                    (item.point.purpose?.let { " · " + (TokenText.bolusPurpose(context, it) ?: it) } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -1360,11 +1440,11 @@ internal fun LabelScreen(
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                     ) {
                                         Text(
-                                            "💉 ${timeFmt.format(Date(item.tsMs))} · %.1f ед".format(item.point.units),
+                                            "💉 ${timeFmt.format(Date(item.tsMs))} · " + text.getString(R.string.label_screen_bolus_units, item.point.units),
                                             style = MaterialTheme.typography.titleSmall,
                                         )
                                         Text(
-                                            "Назначение:",
+                                            stringResource(R.string.label_screen_bolus_purpose_header),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -1374,7 +1454,7 @@ internal fun LabelScreen(
                                                 androidx.compose.material3.FilterChip(
                                                     selected = item.point.purpose == pr,
                                                     onClick = { editingBolus = null; onTagBolus(item.tsMs, pr) },
-                                                    label = { Text(pr) },
+                                                    label = { Text(TokenText.bolusPurpose(context, pr) ?: pr) },
                                                 )
                                             }
                                         }
@@ -1383,10 +1463,10 @@ internal fun LabelScreen(
                                                 editingBolus = null
                                                 editUnitsText = "%.1f".format(item.point.units)
                                                 editUnitsFor = item.tsMs
-                                            }) { Text("✎ доза") }
+                                            }) { Text(stringResource(R.string.label_screen_edit_dose)) }
                                             TextButton(onClick = {
                                                 editingBolus = null; onShowOnChart(item.tsMs)
-                                            }) { Text("📈 график") }
+                                            }) { Text(stringResource(R.string.label_screen_chart)) }
                                             TextButton(onClick = {
                                                 editingBolus = null; confirmBolusDelete = item.tsMs
                                             }) { Text("🗑", color = MaterialTheme.colorScheme.error) }
@@ -1414,8 +1494,8 @@ internal fun LabelScreen(
                             Text(
                                 // 🌙 — long-acting night shot, visually distinct
                                 // from prandial 💉 and meter 🩸.
-                                "🌙 ${timeFmt.format(Date(item.tsMs))} · базал %.0f ед".format(item.point.units) +
-                                    (state.bgAtShot[item.tsMs]?.let { " · при ${com.diapilot.core.analysis.fmtBg(it, state.mgdl)}" } ?: ""),
+                                "🌙 ${timeFmt.format(Date(item.tsMs))} · " + text.getString(R.string.label_screen_basal_units, item.point.units) +
+                                    (state.bgAtShot[item.tsMs]?.let { " · " + text.getString(R.string.label_screen_at_bg, com.diapilot.core.analysis.fmtBg(it, state.mgdl)) } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier
                                     .weight(1f)
@@ -1431,11 +1511,11 @@ internal fun LabelScreen(
                                     Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
-                                    Text("Базал", style = MaterialTheme.typography.titleSmall)
+                                    Text(stringResource(R.string.label_screen_basal_label), style = MaterialTheme.typography.titleSmall)
                                     OutlinedTextField(
                                         value = editBasalUnitsText,
                                         onValueChange = { editBasalUnitsText = it },
-                                        label = { Text("Доза, ед") },
+                                        label = { Text(stringResource(R.string.label_screen_dose_units_label)) },
                                         singleLine = true,
                                     )
                                     val basalFmt = remember { SimpleDateFormat("HH:mm, d MMM", Locale.getDefault()) }
@@ -1455,14 +1535,14 @@ internal fun LabelScreen(
                                         TextButton(onClick = {
                                             editBasalFor = null; confirmBasalDelete = item.tsMs
                                         }) { Text("🗑", color = MaterialTheme.colorScheme.error) }
-                                        TextButton(onClick = { editBasalFor = null }) { Text("Отмена") }
+                                        TextButton(onClick = { editBasalFor = null }) { Text(stringResource(R.string.label_screen_cancel)) }
                                         TextButton(onClick = {
                                             val u = editBasalUnitsText.replace(',', '.').toDoubleOrNull()
                                             if (u != null && u > 0) {
                                                 onUpdateBasal(item.tsMs, editBasalTs, u)
                                                 editBasalFor = null
                                             }
-                                        }) { Text("Сохранить") }
+                                        }) { Text(stringResource(R.string.label_screen_save)) }
                                     }
                                 }
                             }
@@ -1524,7 +1604,8 @@ internal fun LabelScreen(
                                 hybridFoodLine(
                                     all.mapNotNull { state.hybridFoodReadouts[it.id] },
                                     state.mgdl,
-                                ) ?: "Нет расчёта модели: нужны записанные углеводы",
+                                    context,
+                                ) ?: text.getString(R.string.label_screen_food_no_model),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 8.dp),
@@ -1539,7 +1620,7 @@ internal fun LabelScreen(
                             .takeIf { item.mates.isNotEmpty() && it.size > 1 }
                             ?.sum()?.let {
                                 Text(
-                                    "итого ~%.0f г углев".format(it),
+                                    text.getString(R.string.label_screen_note_total_carbs, it),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = 16.dp),
@@ -1563,9 +1644,9 @@ internal fun LabelScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "🩸 ${timeFmt.format(Date(item.tsMs))} · глюкометр " +
+                                "🩸 ${timeFmt.format(Date(item.tsMs))} · " + text.getString(R.string.label_screen_meter_label) + " " +
                                     "${com.diapilot.core.analysis.fmtBg(item.reading.mmol, state.mgdl)} " +
-                                    com.diapilot.core.analysis.unitLabel(state.mgdl),
+                                    com.example.diapilot.i18n.unitLabel(state.mgdl),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier
                                     .weight(1f)
@@ -1583,7 +1664,7 @@ internal fun LabelScreen(
     editUnitsFor?.let { ts ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { editUnitsFor = null },
-            title = { Text("Доза, ед") },
+            title = { Text(stringResource(R.string.label_screen_dose_units_label)) },
             text = {
                 androidx.compose.material3.OutlinedTextField(
                     value = editUnitsText,
@@ -1601,38 +1682,38 @@ internal fun LabelScreen(
                             onEditBolusUnits(ts, u)
                             editUnitsFor = null
                         }
-                }) { Text("Сохранить") }
+                }) { Text(stringResource(R.string.label_screen_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editUnitsFor = null }) { Text("Отмена") }
+                TextButton(onClick = { editUnitsFor = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
     confirmBolusDelete?.let { ts ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmBolusDelete = null },
-            title = { Text("Удалить укол?") },
-            text = { Text("Запись исчезнет из аналитики насовсем — синк из xDrip её не вернёт.") },
+            title = { Text(stringResource(R.string.label_screen_delete_bolus_title)) },
+            text = { Text(stringResource(R.string.label_screen_delete_bolus_text)) },
             confirmButton = {
                 TextButton(onClick = { confirmBolusDelete = null; onDeleteBolus(ts) }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.label_screen_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmBolusDelete = null }) { Text("Отмена") }
+                TextButton(onClick = { confirmBolusDelete = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
     editingMeter?.let { origTs ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { editingMeter = null },
-            title = { Text("Замер глюкометра") },
+            title = { Text(stringResource(R.string.label_screen_meter_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     androidx.compose.material3.OutlinedTextField(
                         value = meterText,
                         onValueChange = { meterText = it },
-                        label = { Text(com.diapilot.core.analysis.unitLabel(state.mgdl)) },
+                        label = { Text(com.example.diapilot.i18n.unitLabel(state.mgdl)) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -1643,10 +1724,10 @@ internal fun LabelScreen(
                             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(meterTs)),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        TextButton(onClick = { meterTs -= 30 * 60_000 }) { Text("−30м") }
+                        TextButton(onClick = { meterTs -= 30 * 60_000 }) { Text(stringResource(R.string.label_screen_minus_30m)) }
                         TextButton(onClick = {
                             meterTs = (meterTs + 30 * 60_000).coerceAtMost(System.currentTimeMillis())
-                        }) { Text("+30м") }
+                        }) { Text(stringResource(R.string.label_screen_plus_30m)) }
                     }
                 }
             },
@@ -1660,7 +1741,7 @@ internal fun LabelScreen(
                         onUpdateMeter(origTs, meterTs, mmol)
                         editingMeter = null
                     }
-                }) { Text("Сохранить") }
+                }) { Text(stringResource(R.string.label_screen_save)) }
             },
             dismissButton = {
                 // Delete moved off the list row: an × under the thumb in a
@@ -1668,21 +1749,21 @@ internal fun LabelScreen(
                 TextButton(onClick = {
                     editingMeter = null; confirmMeterDelete = origTs
                 }) { Text("🗑", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = { editingMeter = null }) { Text("Отмена") }
+                TextButton(onClick = { editingMeter = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
     confirmMeterDelete?.let { ts ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmMeterDelete = null },
-            title = { Text("Удалить замер глюкометра?") },
+            title = { Text(stringResource(R.string.label_screen_delete_meter_title)) },
             confirmButton = {
                 TextButton(onClick = { confirmMeterDelete = null; onDeleteMeter(ts) }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.label_screen_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmMeterDelete = null }) { Text("Отмена") }
+                TextButton(onClick = { confirmMeterDelete = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
@@ -1690,14 +1771,14 @@ internal fun LabelScreen(
     confirmBasalDelete?.let { ts ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmBasalDelete = null },
-            title = { Text("Удалить запись базала?") },
+            title = { Text(stringResource(R.string.label_screen_delete_basal_title)) },
             confirmButton = {
                 TextButton(onClick = { confirmBasalDelete = null; onDeleteBasal(ts) }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.label_screen_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmBasalDelete = null }) { Text("Отмена") }
+                TextButton(onClick = { confirmBasalDelete = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
@@ -1705,12 +1786,10 @@ internal fun LabelScreen(
     confirmDismiss?.let { onset ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmDismiss = null },
-            title = { Text("Убрать этот детект?") },
+            title = { Text(stringResource(R.string.label_screen_dismiss_title)) },
             text = {
                 Text(
-                    "Для ложных срабатываний (шум сенсора, компрессия во сне): событие " +
-                        "исчезнет из еды и аналитики насовсем. Настоящий подъём без еды " +
-                        "лучше пометить меткой — 🌅 заря, 💪 спорт или ❓ не знаю.",
+                    stringResource(R.string.label_screen_dismiss_text),
                 )
             },
             confirmButton = {
@@ -1718,10 +1797,10 @@ internal fun LabelScreen(
                     confirmDismiss = null
                     editingMeal = null
                     onDismissMeal(onset)
-                }) { Text("Убрать", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.label_screen_remove), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDismiss = null }) { Text("Отмена") }
+                TextButton(onClick = { confirmDismiss = null }) { Text(stringResource(R.string.label_screen_cancel)) }
             },
         )
     }
@@ -1746,6 +1825,7 @@ private fun MealCard(
     onDismissMeal: (() -> Unit)? = null,
 ) {
     val fmt = remember { SimpleDateFormat("HH:mm, d MMM", Locale.getDefault()) }
+    val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1758,58 +1838,58 @@ private fun MealCard(
             ) {
                 Text(
                     fmt.format(Date(meal.onsetMs)) +
-                        (if (meal.kind == MealEvent.Kind.UNANNOUNCED) " · без болюса" else "") +
-                        (currentLabel?.let { " · сейчас: $it" } ?: ""),
+                        (if (meal.kind == MealEvent.Kind.UNANNOUNCED) " · " + stringResource(R.string.label_screen_no_bolus) else "") +
+                        (currentLabel?.let { " · " + stringResource(R.string.label_screen_current_label, FoodText.mealLabel(context, it)) } ?: ""),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f),
                 )
                 if (onCancel != null) {
-                    TextButton(onClick = onCancel) { Text("Отмена") }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.label_screen_cancel)) }
                 }
             }
-            val mgdl = com.example.diapilot.data.Units.isMgdl(androidx.compose.ui.platform.LocalContext.current)
+            val mgdl = com.example.diapilot.data.Units.isMgdl(context)
             Text(
                 "${com.diapilot.core.analysis.fmtBg(meal.preBg, mgdl)} → " +
                     "${com.diapilot.core.analysis.fmtBg(meal.peakBg, mgdl)} " +
-                    "${com.diapilot.core.analysis.unitLabel(mgdl)} за %.0f мин".format(meal.timeToPeakMin) +
-                    (meal.bolusUnits?.let { " · болюс %.1f ед".format(it) } ?: ""),
+                    stringResource(R.string.label_screen_bg_rise_duration, com.example.diapilot.i18n.unitLabel(mgdl), meal.timeToPeakMin) +
+                    (meal.bolusUnits?.let { " · " + stringResource(R.string.label_screen_bolus_dose, it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
             )
             // A nearby context note likely names this meal — offer it first.
             suggested?.let { s ->
                 androidx.compose.material3.FilledTonalButton(onClick = { onLabel(s) }) {
-                    Text("✓ $s — из вашей заметки")
+                    Text(stringResource(R.string.label_screen_suggested_from_note, s))
                 }
             }
             // FOOD goes in through the food form, not a bare label: the note
             // carries the dish name, grams, photo — and the label follows it.
             if (onLogFood != null && suggested == null) {
                 androidx.compose.material3.FilledTonalButton(onClick = onLogFood) {
-                    Text("🍽 Записать еду…")
+                    Text(stringResource(R.string.label_screen_log_food))
                 }
             }
             // System categories: the rise is real but it's not a new meal.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SuggestionChip(
                     onClick = { onLabel(com.diapilot.core.analysis.SysLabels.CONTINUATION) },
-                    label = { Text("↩ продолжение еды") },
+                    label = { Text("↩ " + FoodText.mealLabel(context, com.diapilot.core.analysis.SysLabels.CONTINUATION)) },
                 )
                 SuggestionChip(
                     onClick = { onLabel(com.diapilot.core.analysis.SysLabels.DAWN) },
-                    label = { Text("🌅 заря") },
+                    label = { Text("🌅 " + FoodText.mealLabel(context, com.diapilot.core.analysis.SysLabels.DAWN)) },
                 )
                 SuggestionChip(
                     onClick = { onLabel(com.diapilot.core.analysis.SysLabels.SPORT) },
-                    label = { Text("💪 спорт") },
+                    label = { Text("💪 " + FoodText.mealLabel(context, com.diapilot.core.analysis.SysLabels.SPORT)) },
                 )
                 SuggestionChip(
                     onClick = { onLabel(com.diapilot.core.analysis.SysLabels.UNKNOWN) },
-                    label = { Text("❓ не знаю") },
+                    label = { Text("❓ " + FoodText.mealLabel(context, com.diapilot.core.analysis.SysLabels.UNKNOWN)) },
                 )
             }
             onDismissMeal?.let {
                 TextButton(onClick = it) {
-                    Text("🗑 Ложный детект", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.label_screen_false_detection), color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -1831,15 +1911,14 @@ private fun ReconcileDialog(
     val checked = remember(plan) { mutableStateListOf<Boolean>().apply { repeat(plan.size) { add(true) } } }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (plan.isEmpty()) "Всё согласовано" else "Пересобрать метки (${plan.size})") },
+        title = { Text(if (plan.isEmpty()) stringResource(R.string.label_screen_reconcile_all_matched) else stringResource(R.string.label_screen_reconcile_title, plan.size)) },
         text = {
             if (plan.isEmpty()) {
-                Text("Метки эпизодов совпадают с заметками — чинить нечего.")
+                Text(stringResource(R.string.label_screen_reconcile_empty_text))
             } else {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "Заметку переименовали, а метка эпизода (что учит модель) осталась " +
-                            "старой. Отметьте, что переметить:",
+                        stringResource(R.string.label_screen_reconcile_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1852,7 +1931,7 @@ private fun ReconcileDialog(
                             )
                             Column(Modifier.padding(start = 4.dp)) {
                                 Text(
-                                    "«${f.from}» → «${f.to}»",
+                                    stringResource(R.string.label_screen_reconcile_change, f.from, f.to),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
@@ -1868,15 +1947,15 @@ private fun ReconcileDialog(
         },
         confirmButton = {
             if (plan.isEmpty()) {
-                TextButton(onClick = onDismiss) { Text("Ок") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.label_screen_ok)) }
             } else {
                 TextButton(onClick = {
                     onApply(plan.filterIndexed { i, _ -> checked[i] })
-                }) { Text("Применить (${checked.count { it }})") }
+                }) { Text(stringResource(R.string.label_screen_apply, checked.count { it })) }
             }
         },
         dismissButton = {
-            if (plan.isNotEmpty()) TextButton(onClick = onDismiss) { Text("Отмена") }
+            if (plan.isNotEmpty()) TextButton(onClick = onDismiss) { Text(stringResource(R.string.label_screen_cancel)) }
         },
     )
 }
@@ -1906,18 +1985,16 @@ private fun DecomposeDialog(
     }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (plan.isEmpty()) "Нечего разбирать" else "Разобрать на компоненты (${plan.size})") },
+        title = { Text(if (plan.isEmpty()) stringResource(R.string.label_screen_decompose_empty_title) else stringResource(R.string.label_screen_decompose_title, plan.size)) },
         text = {
             if (plan.isEmpty()) {
                 Text(
-                    "Составных приёмов с распознаваемым списком не осталось — атомарные " +
-                        "(пиво, декстроза) и уже разобранные не трогаем.",
+                    stringResource(R.string.label_screen_decompose_empty_text),
                 )
             } else {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "Имя не меняем — только пишем состав (метаданные модели). " +
-                            "Компоненты можно править и удалять:",
+                        stringResource(R.string.label_screen_decompose_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1955,7 +2032,7 @@ private fun DecomposeDialog(
                                         onValueChange = { comp.gramsText = it.filter { ch -> ch.isDigit() || ch == '.' } },
                                         modifier = Modifier.width(56.dp),
                                         singleLine = true,
-                                        placeholder = { Text("г") },
+                                        placeholder = { Text(stringResource(R.string.label_screen_grams_placeholder)) },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                     )
                                     Text(
@@ -1972,7 +2049,7 @@ private fun DecomposeDialog(
         },
         confirmButton = {
             if (plan.isEmpty()) {
-                TextButton(onClick = onDismiss) { Text("Ок") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.label_screen_ok)) }
             } else {
                 TextButton(onClick = {
                     val result = plan.mapIndexedNotNull { i, d ->
@@ -1983,11 +2060,11 @@ private fun DecomposeDialog(
                         if (comps.isEmpty()) null else d.copy(components = comps)
                     }
                     onApply(result)
-                }) { Text("Применить (${checked.count { it }})") }
+                }) { Text(stringResource(R.string.label_screen_apply, checked.count { it })) }
             }
         },
         dismissButton = {
-            if (plan.isNotEmpty()) TextButton(onClick = onDismiss) { Text("Отмена") }
+            if (plan.isNotEmpty()) TextButton(onClick = onDismiss) { Text(stringResource(R.string.label_screen_cancel)) }
         },
     )
 }

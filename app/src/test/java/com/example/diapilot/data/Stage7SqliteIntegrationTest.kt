@@ -62,7 +62,7 @@ class Stage7SqliteIntegrationTest {
             store.appendCarbEvidence(id,event,u,event+1_000,event+1_000)
             val rr=(-1..72).map{i->GlucosePoint(event+i*5*60_000L,5.5+if(i>0)i.coerceAtMost(30)/30.0*4 else 0.0)}
             fun receipt()=Stage9EpisodeRuntime.build(store.annotations(event-1,cutoff+1),rr,emptyList(),emptyList(),event,cutoff,
-                carbEvidenceAsOf={annotationId,asOf->store.carbEvidenceKnownAt(annotationId,asOf)}).getValue(id)
+                carbEvidenceAsOf={annotationId,asOf->store.carbEvidenceKnownAt(annotationId,asOf)},context=context).getValue(id)
             val before=receipt()
             store.appendCarbEvidence(id,event,u.copy(weighedEdibleG=300.0,totalCarbsG=60.0),cutoff+1_000,cutoff+1_000)
             val after=receipt()

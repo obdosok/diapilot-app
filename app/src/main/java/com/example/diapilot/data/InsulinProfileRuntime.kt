@@ -8,6 +8,8 @@ import com.diapilot.core.physio.PersonalInsulinCurveV1
 import com.diapilot.core.physio.SegmentLandmarkReaderV1
 import com.diapilot.core.physio.SegmentLandmarksV1
 import com.diapilot.core.physio.isTrustedDosePurposeV1
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.time.Instant
 import java.time.ZoneId
 
@@ -50,7 +52,7 @@ object InsulinProfileRuntime {
         val curve: PersonalInsulinCurveV1?,
         val profile: AssembledProfileV1?,
         /** Doses that produced no landmark at all, by named reason. */
-        val refusals: Map<String, Int>,
+        val refusals: Map<com.diapilot.core.physio.LandmarkRefusal, Int>,
         val dosesConsidered: Int,
     )
 
@@ -158,7 +160,7 @@ object InsulinProfileRuntime {
             return boluses.firstOrNull { it.tsMs > tsMs && it.tsMs <= cap }?.tsMs ?: cap
         }
 
-        val refusals = LinkedHashMap<String, Int>()
+        val refusals = LinkedHashMap<com.diapilot.core.physio.LandmarkRefusal, Int>()
         val samples = mutableListOf<SegmentLandmarksV1>()
         val contributingDays = LinkedHashSet<Long>()
         boluses.forEach { b ->
@@ -210,35 +212,81 @@ object InsulinProfileRuntime {
         return State(curve, profile, refusals, boluses.size)
     }
 
-    /** One line for the screen: what is in use, or precisely what is missing. */
-    fun explain(state: State): String {
+    /**
+     * One line for the screen: what is in use, or precisely what is missing.
+     * [context] renders the landmark messages in the UI language; without one
+     * (the log line) they come out as their data form.
+     */
+    fun explain(state: State, context: android.content.Context? = null): String {
         val p = state.profile
         val curve = state.curve
+        fun coercedText(moved: List<com.diapilot.core.physio.CoercedLandmark>) =
+            context?.let { com.example.diapilot.i18n.PhysioText.coerced(it, moved) } ?: moved.joinToString(", ")
+        fun conflictText(c: com.diapilot.core.physio.OrderingConflict) =
+            context?.let { com.example.diapilot.i18n.PhysioText.orderingConflict(it, c) } ?: c.toString()
+        if (context == null) {
+            // Developer log line only (see the call site below) — plain English
+            // in its data form, no resources: there is no Context to resolve them.
+            return when {
+                curve != null && p != null ->
+                    "measured from %d doses, %d days · onset %.0f · peak %.0f · active until %.0f · end %.0f min"
+                        .format(
+                            curve.observations, curve.independentDays,
+                            curve.landmarks.onsetMin, curve.landmarks.peakMin,
+                            curve.landmarks.activeEndMin, curve.landmarks.tailMin,
+                        ) +
+                        (if (p.arm == com.diapilot.core.physio.ProfileArmV1.FOOD_FREE)
+                            " · from doses with no food active"
+                        else " · from all doses (too few clean ones yet)") +
+                        (if (curve.coerced.isEmpty()) ""
+                        else " · coerced to the model bounds: ${coercedText(curve.coerced)}")
+                p?.orderingConflict != null -> "curve not built: ${conflictText(p.orderingConflict!!)}"
+                p != null -> "not enough landmarks: " + listOf(
+                    p.onset.on(p.arm)?.let { "onset ${it.samples}" } ?: "no onset",
+                    p.peakRate.on(p.arm)?.let { "peak ${it.samples}" } ?: "no peak",
+                    p.tailEnd?.let { "end ${it.samples}" } ?: "no end",
+                ).joinToString(" · ")
+                else -> "prior only: no dose produced a landmark, out of ${state.dosesConsidered}"
+            }
+        }
+        val res = context.localized()
         return when {
             curve != null && p != null ->
-                "измерено по %d уколам, %d дней · старт %.0f · пик %.0f · активно до %.0f · конец %.0f мин"
-                    .format(
-                        curve.observations, curve.independentDays,
-                        curve.landmarks.onsetMin, curve.landmarks.peakMin,
-                        curve.landmarks.activeEndMin, curve.landmarks.tailMin,
-                    ) +
+                res.getString(
+                    R.string.insulin_profile_runtime_measured,
+                    curve.observations, curve.independentDays,
+                    curve.landmarks.onsetMin, curve.landmarks.peakMin,
+                    curve.landmarks.activeEndMin, curve.landmarks.tailMin,
+                ) +
                     // The arm is part of the answer. When it flips, the profile
                     // can move by several minutes in one step, and without this
                     // the user would read that as the model changing its mind
                     // about their body rather than as one population replacing
                     // another.
-                    (if (p.arm == com.diapilot.core.physio.ProfileArmV1.FOOD_FREE)
-                        " · по уколам без действующей еды"
-                    else " · по всем уколам (чистых пока мало)") +
+                    res.getString(
+                        if (p.arm == com.diapilot.core.physio.ProfileArmV1.FOOD_FREE)
+                            R.string.insulin_profile_runtime_arm_food_free
+                        else R.string.insulin_profile_runtime_arm_mixed,
+                    ) +
                     (if (curve.coerced.isEmpty()) ""
-                    else " · приведено к границам модели: ${curve.coerced.joinToString(", ")}")
-            p?.orderingConflict != null -> "кривая не построена: ${p.orderingConflict}"
-            p != null -> "ориентиров не хватает: " + listOf(
-                p.onset.on(p.arm)?.let { "старт ${it.samples}" } ?: "старта нет",
-                p.peakRate.on(p.arm)?.let { "пик ${it.samples}" } ?: "пика нет",
-                p.tailEnd?.let { "конец ${it.samples}" } ?: "конца нет",
-            ).joinToString(" · ")
-            else -> "пока приор: ни один укол не дал ориентиров из ${state.dosesConsidered}"
+                    else res.getString(R.string.insulin_profile_runtime_coerced, coercedText(curve.coerced)))
+            p?.orderingConflict != null ->
+                res.getString(R.string.insulin_profile_runtime_no_curve, conflictText(p.orderingConflict!!))
+            p != null -> res.getString(
+                R.string.insulin_profile_runtime_missing_landmarks,
+                listOf(
+                    p.onset.on(p.arm)?.let {
+                        res.getString(R.string.insulin_profile_runtime_onset_present, it.samples)
+                    } ?: res.getString(R.string.insulin_profile_runtime_onset_missing),
+                    p.peakRate.on(p.arm)?.let {
+                        res.getString(R.string.insulin_profile_runtime_peak_present, it.samples)
+                    } ?: res.getString(R.string.insulin_profile_runtime_peak_missing),
+                    p.tailEnd?.let {
+                        res.getString(R.string.insulin_profile_runtime_tail_present, it.samples)
+                    } ?: res.getString(R.string.insulin_profile_runtime_tail_missing),
+                ).joinToString(" · "),
+            )
+            else -> res.getString(R.string.insulin_profile_runtime_prior_only, state.dosesConsidered)
         }
     }
 }

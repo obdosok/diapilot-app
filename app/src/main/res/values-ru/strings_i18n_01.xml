@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="annotation_composer_one_entry_components">
+        <item quantity="one">✂ Одной записью (%1$d комп.)</item>
+        <item quantity="few">✂ Одной записью (%1$d комп.)</item>
+        <item quantity="many">✂ Одной записью (%1$d комп.)</item>
+        <item quantity="other">✂ Одной записью (%1$d комп.)</item>
+    </plurals>
+    <string-array name="annotation_composer_offset_labels">
+        <item>сейчас</item>
+        <item>−30м</item>
+        <item>−1ч</item>
+        <item>−2ч</item>
+        <item>−4ч</item>
+    </string-array>
+    <string name="annotation_composer_time_exact">точно…</string>
+    <string-array name="annotation_composer_modes">
+        <item>Еда</item>
+        <item>Запись</item>
+        <item>💪</item>
+        <item>Укол</item>
+        <item>Сахар</item>
+        <item>🗣</item>
+    </string-array>
+    <string name="annotation_composer_section_title">Контекст</string>
+    <string name="annotation_composer_collapse">Свернуть</string>
+    <string name="annotation_composer_expand">+ Добавить</string>
+    <string name="annotation_composer_cancel">Отмена</string>
+    <string name="annotation_composer_command_food_grams">🍽 еда «%1$s» ~%2$.0f г</string>
+    <string name="annotation_composer_command_food_no_grams">🍽 еда «%1$s» (граммы уточним потом)</string>
+    <string name="annotation_composer_command_meter">🩸 глюкометр %1$s</string>
+    <string name="annotation_composer_command_meter_unknown">🩸 глюкометр ?</string>
+    <string name="annotation_composer_command_bolus_with_purpose">💉 болюс %1$.1f ед · %2$s</string>
+    <string name="annotation_composer_command_bolus">💉 болюс %1$.1f ед</string>
+    <string name="annotation_composer_command_basal">💉 базал %1$.1f ед</string>
+    <string name="annotation_composer_command_activity">💪 активность «%1$s»</string>
+    <string name="annotation_composer_command_dextrose">🍬 декстроза ×1</string>
+    <string name="annotation_composer_command_hint">Скажи или напиши, что произошло — приложение поймёт и добавит:</string>
+    <string name="annotation_composer_command_placeholder">поел смузи · калибровка 7.2 · уколол 4 на еду · погулял</string>
+    <string name="annotation_composer_command_not_understood">Не понял команду — переформулируй или введи вручную.</string>
+    <string name="annotation_composer_command_blocked">Распознал: %1$s — но не записал: %2$s. Проверь и введи вручную.</string>
+    <string name="annotation_composer_command_parsing">Разбираю…</string>
+    <string name="annotation_composer_command_parse">Разобрать</string>
+    <string name="annotation_composer_command_need_key">Нужен API-ключ (вкладка Чат) для распознавания команд.</string>
+    <string name="annotation_composer_command_add_preview">Добавить: %1$s</string>
+    <string name="annotation_composer_command_add">✓ Добавить</string>
+    <string name="annotation_composer_default_food_label">еда</string>
+    <string name="annotation_composer_barcode_searching">Ищу %1$s в Open Food Facts…</string>
+    <string name="annotation_composer_barcode_not_found">Штрих-код %1$s не найден в базе — заполните этикетку вручную.</string>
+    <string name="annotation_composer_scanner_unavailable">Сканер недоступен: %1$s</string>
+    <string name="annotation_composer_capture_photo">📷 Снять блюдо</string>
+    <string name="annotation_composer_pick_gallery">🖼 Из галереи</string>
+    <string name="annotation_composer_scan_barcode">▮▯ Штрих-код</string>
+    <string name="annotation_composer_scanned_product">▮▯ %1$s: %2$.1f г угл/100 г — проверьте и введите СЪЕДЕННЫЙ вес</string>
+    <string name="annotation_composer_scanned_product_serving">▮▯ %1$s: %2$.1f г угл/100 г — проверьте и введите СЪЕДЕННЫЙ вес (порция по этикетке %3$.0f г)</string>
+    <string name="annotation_composer_photo_dish_desc">фото блюда</string>
+    <string name="annotation_composer_photo_analyzing">Разбираю фото…</string>
+    <string name="annotation_composer_photo_ready">Фото готово — проверьте и нажмите ✓</string>
+    <string name="annotation_composer_vision_candidate">Похоже на ваше блюдо: «%1$s»</string>
+    <string name="annotation_composer_vision_candidate_portion">Похоже на ваше блюдо: «%1$s» · порция ~%2$.0f%% от обычной</string>
+    <string name="annotation_composer_photo_past_desc">как выглядело раньше</string>
+    <string name="annotation_composer_past_photo_caption">У вас это блюдо выглядело так</string>
+    <string name="annotation_composer_confirm_yes">Да, это оно</string>
+    <string name="annotation_composer_confirm_no">Нет</string>
+    <string name="annotation_composer_evidence_incomplete">Заполните пересчитываемые поля этикетки/рецепта</string>
+    <string name="annotation_composer_food_placeholder">Что съели?</string>
+    <string name="annotation_composer_add_dish_composite">＋ %1$s (составное)</string>
+    <string name="annotation_composer_add_dish">＋ %1$s</string>
+    <string name="annotation_composer_approx_grams">~%1$.0f г</string>
+    <string name="annotation_composer_has_composition">состав</string>
+    <string name="annotation_composer_composition_header">Состав «%1$s» (− порция ＋, ✕):</string>
+    <string name="annotation_composer_component_with_grams">%1$s · %2$.0f г</string>
+    <string name="annotation_composer_composed_carbs_summary">≈ %1$.0f г углеводов · пишется как одно блюдо «%2$s»</string>
+    <string name="annotation_composer_last_composition">состав прошлого раза:</string>
+    <string name="annotation_composer_add_component">＋ %1$s</string>
+    <string name="annotation_composer_add_all">все сразу</string>
+    <string name="annotation_composer_dish_with_grams">%1$s · ~%2$.0f г</string>
+    <string name="annotation_composer_repeat_label">Повторить:</string>
+    <string name="annotation_composer_dish_recognized">Узнано: «%1$s» — структура и кривая блюда пойдут в запись; граммы можно поправить.</string>
+    <string name="annotation_composer_typical_time">Обычно в это время:</string>
+    <string name="annotation_composer_food_memory_topup">🍽 «%1$s» раньше: пик +%2$s · докол %3$d/%4$d</string>
+    <string name="annotation_composer_food_memory_topup_dose">🍽 «%1$s» раньше: пик +%2$s · доза ~%3$.1f ед · докол %4$d/%5$d</string>
+    <string name="annotation_composer_food_memory_times">🍽 «%1$s» раньше: пик +%2$s · ×%3$d</string>
+    <string name="annotation_composer_food_memory_times_dose">🍽 «%1$s» раньше: пик +%2$s · доза ~%3$.1f ед · ×%4$d</string>
+    <string name="annotation_composer_portion_label">порция:</string>
+    <string name="annotation_composer_portion_usual">обычная</string>
+    <string name="annotation_composer_carbs_g_label">г угл.</string>
+    <string name="annotation_composer_default_meal_label">приём</string>
+    <string name="annotation_composer_evidence_toggle_hide">Скрыть источник и длительность</string>
+    <string name="annotation_composer_evidence_toggle_show">＋ Уточнить источник / длительность</string>
+    <string-array name="annotation_composer_evidence_source_modes">
+        <item>Обычно</item>
+        <item>Этикетка+вес</item>
+        <item>Рецепт</item>
+    </string-array>
+    <string name="annotation_composer_intake_duration_label">приём, мин</string>
+    <string name="annotation_composer_alcohol_label">алкоголь</string>
+    <string name="annotation_composer_label_evidence_hint">Из этикетки и фактической порции</string>
+    <string name="annotation_composer_scan_searching">ищу…</string>
+    <string name="annotation_composer_scan_action">▮▯ сканировать</string>
+    <string-array name="annotation_composer_label_weight_fields">
+        <item>угл./100 г</item>
+        <item>вес, г</item>
+        <item>угл./порцию</item>
+        <item>порций</item>
+    </string-array>
+    <string name="annotation_composer_recipe_version_hint">Версия сохранённого рецепта и текущая порция</string>
+    <string name="annotation_composer_fill_saved_recipe">↻ Заполнить сохранённый рецепт</string>
+    <string-array name="annotation_composer_recipe_fields">
+        <item>версия</item>
+        <item>угл. всего</item>
+        <item>вес всего</item>
+        <item>съедено, г</item>
+        <item>доля 0–1</item>
+    </string-array>
+    <string name="annotation_composer_recomputed">Пересчитано: %1$.1f г · измерено количество, не физиология</string>
+    <string name="annotation_composer_fill_full_path">Заполните один полный путь пересчёта</string>
+    <string name="annotation_composer_nutrition_hint">Питательность · можно уточнить</string>
+    <string-array name="annotation_composer_nutrition_fields">
+        <item>Белки, г</item>
+        <item>Жиры, г</item>
+        <item>ккал</item>
+    </string-array>
+    <string name="annotation_composer_computing_carbs">Считаю углеводы…</string>
+    <string name="annotation_composer_recompute_with_text">🔄 Пересчитать (учтёт текст)</string>
+    <string name="annotation_composer_carbs_from_description">🤖 Углеводы по описанию</string>
+    <string name="annotation_composer_evidence_not_confirmed">LLM не подтверждает измерение: заполните этикетку и порцию</string>
+    <string name="annotation_composer_absorption_hint">Замедлит усвоение следующей еды:</string>
+    <string-array name="annotation_composer_absorption_modifiers">
+        <item>🌾 псилиум</item>
+        <item>🥗 клетчатка</item>
+        <item>🧈 жирное</item>
+    </string-array>
+    <string name="annotation_composer_note_placeholder">Место укола, сон, стресс…</string>
+    <string name="annotation_composer_activity_hint">Активность (кормит модель):</string>
+    <string-array name="annotation_composer_activity_types">
+        <item>💪 тренировка</item>
+        <item>🚶 прогулка</item>
+        <item>🚴 велосипед</item>
+        <item>🏃 бег</item>
+    </string-array>
+    <string name="annotation_composer_minutes_compact">%1$d мин</string>
+    <string name="annotation_composer_hours_minutes_compact">%1$dч%2$02d</string>
+    <string name="annotation_composer_activity_start">▶ начинаю</string>
+    <string name="annotation_composer_activity_finished">✔ закончил</string>
+    <string name="annotation_composer_activity_finished_hint">«Закончил» ставит начало на %1$d мин назад — окно активности ложится в прошлое, как и было на самом деле.</string>
+    <string name="annotation_composer_insulin_kind_bolus">болюс</string>
+    <string name="annotation_composer_insulin_kind_basal">базал</string>
+    <string name="annotation_composer_units_label">ед</string>
+    <string name="annotation_composer_manual_entry_hint">Ручной ввод — для уколов мимо ручки: дозы с NovoPen и из xDrip приходят сами. Время — через 🕐 выше.</string>
+    <string name="annotation_composer_no_recent_boluses">Уколов за последние 6 часов нет.</string>
+    <string name="annotation_composer_recent_boluses_hint">Назначение недавних уколов — выберите укол, затем метку:</string>
+    <string name="annotation_composer_hours_minutes_ago">%1$d ч %2$d мин</string>
+    <string name="annotation_composer_minutes_ago">%1$d мин</string>
+    <string name="annotation_composer_bolus_chip">%1$.1f ед · %2$s назад</string>
+    <string name="annotation_composer_bolus_chip_bg">%1$.1f ед · %2$s назад · при %3$s</string>
+    <string name="annotation_composer_bolus_chip_purpose">%1$.1f ед · %2$s назад · %3$s</string>
+    <string name="annotation_composer_bolus_chip_bg_purpose">%1$.1f ед · %2$s назад · при %3$s · %4$s</string>
+    <string name="annotation_composer_meter_label">Глюкометр, %1$s</string>
+    <string name="annotation_composer_meter_moving_fast_warning">⚠ Сахар сейчас быстро меняется — калибровка по этому замеру менее точна (кровь опережает сенсор). Точка на график попадёт, но для калибровки лучше замер на ровном сахаре.</string>
+    <string name="annotation_composer_meter_hint">Замер глюкометром попадает на график и в аналитику как точка (источник «глюкометр»). Основа для слепых дней без сенсора.</string>
+    <string name="annotation_composer_minus_30m">−30м</string>
+    <string name="annotation_composer_plus_30m">+30м</string>
+    <string name="annotation_composer_repeat_now">↺ Повторить сейчас</string>
+    <string name="annotation_composer_half_portion">½ порции</string>
+    <string name="annotation_composer_double_portion">×2 порции</string>
+    <string name="annotation_composer_note_time_is_start">Время заметки = начало активности.</string>
+    <string name="annotation_composer_component_split_header">🧩 Состав · порция → углеводы, г:</string>
+    <string name="annotation_composer_component_placeholder">компонент</string>
+    <string name="annotation_composer_grams_arrow">" г  →"</string>
+    <string name="annotation_composer_grams_unit">" г"</string>
+    <string name="annotation_composer_concept_missing_warning">⚠ «%1$s» не в словаре — модель не увидит эти %2$.0f г. Нажми, чтобы указать, что это.</string>
+    <string name="annotation_composer_split_into_components">🧩 Разложить на компоненты</string>
+    <string name="annotation_composer_add_component_plain">＋ компонент</string>
+    <string name="annotation_composer_total_carbs">Итого углеводов: %1$.0f г</string>
+    <string name="annotation_composer_model_sees_partial">🔬 модель увидит %1$.0f из %2$.0f г (%3$.0f%% без имени)</string>
+    <string name="annotation_composer_carbs_g_field_label">Углеводы, г</string>
+    <string name="annotation_composer_example_45">например 45</string>
+    <string name="annotation_composer_duration_min_label">Длительность, мин</string>
+    <string name="annotation_composer_example_30">например 30</string>
+    <string name="annotation_composer_legacy_exact_flag_warning">Старый флаг «точные»: сохранён как legacy и не считается измерением без арифметики.</string>
+    <string name="annotation_composer_minutes_short">%1$dм</string>
+    <string name="annotation_composer_immediately">сразу</string>
+    <string name="annotation_composer_amount_duration_hint">Количество и длительность — разные свидетельства; измеренные граммы не означают точную физиологию.</string>
+    <string name="annotation_composer_nutrition_estimate_hint">Питательность · оценка, можно поправить</string>
+    <string name="annotation_composer_analysis_expanded">▾ разбор</string>
+    <string name="annotation_composer_analysis_collapsed">▸ разбор</string>
+    <string name="annotation_composer_recompute_from_description">🔄 Пересчитать по описанию</string>
+    <string name="annotation_composer_use_as_name">→ в название</string>
+    <string name="annotation_composer_whats_in_photo">🔍 Что на фото?</string>
+    <string name="annotation_composer_regenerate">🔄 Перегенерить</string>
+    <string name="annotation_composer_fill_recomputable_path">Заполните один полный пересчитываемый путь</string>
+    <string name="annotation_composer_new_recipe_version_needed">Изменённому рецепту нужна новая версия</string>
+    <string name="annotation_composer_save">Сохранить</string>
+    <string name="annotation_composer_delete_note_title">Удалить заметку?</string>
+    <string name="annotation_composer_delete_note_confirm">«%1$s» — %2$s</string>
+    <string name="annotation_composer_delete_button">Удалить</string>
+</resources>

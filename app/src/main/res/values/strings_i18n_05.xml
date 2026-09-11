@@ -1,0 +1,53 @@
+<resources>
+    <!-- AskScreen.kt -->
+    <string name="ask_screen_setup_title">Ask your data</string>
+    <string name="ask_screen_intro">Ask your data questions in plain language: “why was glucose high at night?”, “how does beer affect me?”. Claude builds the answers from a summary of your data.\n\nYou need your own Anthropic API key (console.anthropic.com → API Keys). The key is stored only on this device. The data summary is sent to the API only when you ask a question.</string>
+    <string name="ask_screen_key_placeholder" translatable="false">sk-ant-…</string>
+    <string name="ask_screen_save">Save</string>
+    <string name="ask_screen_chat_title">Ask</string>
+    <string name="ask_screen_digest_button">📋 Digest</string>
+    <string name="ask_screen_clear">Clear</string>
+    <string name="ask_screen_disclaimer">Answers are explanations of your data, not medical advice. Doses and settings — only with a doctor.</string>
+    <string name="ask_screen_thinking">Thinking…</string>
+    <string name="ask_screen_quick_explain_day">Explain my day</string>
+    <string name="ask_screen_quick_why_spike">Why was there a spike?</string>
+    <string name="ask_screen_quick_walk_effect">How does a walk affect me?</string>
+    <string name="ask_screen_quick_late_tail">What consistently gives a long tail?</string>
+    <string name="ask_screen_quick_inject_earlier">Should I inject earlier?</string>
+    <string name="ask_screen_input_placeholder">Why was glucose high at night?</string>
+
+    <!-- ForecastAtPointStrip.kt -->
+    <string name="forecast_at_point_strip_title">Forecast at %1$s</string>
+    <string name="forecast_at_point_strip_title_with_bg">Forecast at %1$s · glucose %2$s</string>
+    <string name="forecast_at_point_strip_hide">Hide</string>
+    <plurals name="forecast_at_point_strip_no_saved">
+        <item quantity="one">No saved forecast here — only a recompute with today\'s model (%1$d point).</item>
+        <item quantity="other">No saved forecast here — only a recompute with today\'s model (%1$d points).</item>
+    </plurals>
+    <string name="forecast_at_point_strip_applied">applied then: %1$s</string>
+    <string name="forecast_at_point_strip_coeffs_missing">the coefficients for that run weren\'t recorded (old entry)</string>
+    <string name="forecast_at_point_strip_miss_entry">%1$dm %2$s%3$s</string>
+    <string name="forecast_at_point_strip_no_actual">no actual reading recorded yet</string>
+    <string name="forecast_at_point_strip_miss_prefix">miss: </string>
+    <string name="forecast_at_point_strip_late_meal_warning">a meal logged AFTER this forecast fell inside the window — the miss here is about the logging delay, not the model</string>
+    <string name="forecast_at_point_strip_fallback_twin_warning">the pale line is a fallback digital twin, not what was on screen</string>
+
+    <!-- PhysioAutoFitController.kt -->
+    <string name="physio_auto_fit_controller_no_model">no model set</string>
+    <plurals name="physio_auto_fit_controller_too_few_episodes">
+        <item quantity="one">%1$d episode — too few for a median</item>
+        <item quantity="other">%1$d episodes — too few for a median</item>
+    </plurals>
+    <string name="physio_auto_fit_controller_corridor_unmeasured">timings not measured yet — the corridor is wide</string>
+    <string name="physio_auto_fit_controller_no_episode_scored">not a single episode could be scored</string>
+
+    <!-- DailyDiscrepancyRuntime.kt -->
+    <string name="daily_discrepancy_runtime_effective_line">Observed combined food and insulin response: %1$+.0f%% [%2$.0f…%3$.0f] vs. the previous/inertial state; P(increase)=%4$.0f%%, vs. rolling baseline %5$.0f%%; practical threshold: %6$s</string>
+    <string name="daily_discrepancy_runtime_threshold_crossed">crossed</string>
+    <string name="daily_discrepancy_runtime_threshold_not_crossed">not crossed</string>
+    <string name="daily_discrepancy_runtime_isf_unclear">Pure ISF can\'t be separated out yet</string>
+    <string name="daily_discrepancy_runtime_residual_line">Residual: observed %1$+.2f, expected %2$+.2f mmol/L; provenance: %3$s</string>
+
+    <!-- AskClaude.kt -->
+    <string name="ask_claude_digest_display">📋 Weekly digest</string>
+</resources>

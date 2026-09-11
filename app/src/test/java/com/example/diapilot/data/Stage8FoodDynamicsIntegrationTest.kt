@@ -195,8 +195,11 @@ class Stage8FoodDynamicsIntegrationTest {
         assertEquals("PHYSIO",merged.model) // live forecast fields are untouched
         assertEquals(8.68,merged.totalAmplitudeMmol,0.0)
         assertEquals(explanation,merged.episodeAttribution)
-        assertTrue(merged.uncertaintySummary.contains("unresolved"))
-        assertTrue(merged.uncertaintySummary.contains("owner = legacy"))
+        // The receipt is shown beside the live summary in the dialog's uncertainty line.
+        val shown=FoodCalculationRegistry.uncertaintyText(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>(),merged)
+        assertTrue(shown.contains("base uncertainty"))
+        assertTrue(shown.contains("unresolved"))
+        assertTrue(shown.contains("owner = legacy"))
         FoodCalculationRegistry.updateEpisodeAttribution(emptyMap())
     }
 
@@ -233,7 +236,7 @@ class Stage8FoodDynamicsIntegrationTest {
         val note=com.diapilot.core.collector.Annotation(t,"food","meal",id=1,estCarbs=20.0,carbsSource="label",carbsKnownAtMs=t)
         val readings=(0..20).map{com.diapilot.core.collector.GlucosePoint(t+it*5*60_000L,5.5)}
         val started=System.nanoTime()
-        val out=Stage9EpisodeRuntime.build(listOf(note),readings,emptyList(),emptyList(),t,t+100*60_000L,budgetMs=-1)
+        val out=Stage9EpisodeRuntime.build(listOf(note),readings,emptyList(),emptyList(),t,t+100*60_000L,budgetMs=-1,context=androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>())
         assertTrue(out.isEmpty())
         assertTrue((System.nanoTime()-started)/1_000_000<500)
     }
@@ -246,9 +249,9 @@ class Stage8FoodDynamicsIntegrationTest {
             com.diapilot.core.collector.Annotation(t+110*60_000L,"food","two",id=702,estCarbs=12.0,carbsSource="label",carbsKnownAtMs=t+110*60_000L,analysis=kinetics,analysisKnownAtMs=t+110*60_000L),
         )
         val rr=(-1..72).map{i->com.diapilot.core.collector.GlucosePoint(t+i*5*60_000L,5.5+if(i>0)i.coerceAtMost(30)/30.0*3 else 0.0)}
-        val out=Stage9EpisodeRuntime.build(notes,rr,emptyList(),emptyList(),t,t+360*60_000L)
+        val out=Stage9EpisodeRuntime.build(notes,rr,emptyList(),emptyList(),t,t+360*60_000L,context=androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>())
         assertEquals(setOf(701L),out.keys)
-        assertTrue(out.getValue(701).caveats.contains("12.0 г"))
+        assertTrue(out.getValue(701).caveats.contains("12.0 g"))
         assertTrue(out.getValue(701).caveats.count{it==';'}>=2)
     }
 

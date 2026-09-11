@@ -27,6 +27,6 @@ class Stage10HistoryRecompositionRobolectricTest {
         // noise). This test pins recomposition-on-publication, so
         // it asserts the resolution text that publication reveals.
         compose.onNode(hasText("неразрешимо",substring=true)).assertIsDisplayed()
-        compose.onNode(hasText("Как рассчитано?",substring=true)).assertIsDisplayed()
+        compose.onNode(hasText("How was this calculated?",substring=true)).assertIsDisplayed()
     }
 }

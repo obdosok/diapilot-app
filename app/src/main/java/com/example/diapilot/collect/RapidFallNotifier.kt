@@ -9,6 +9,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.diapilot.core.analysis.RapidFall
 import com.example.diapilot.MainActivity
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
+import com.example.diapilot.i18n.unitLabel
 
 /**
  * Early rapid-fall alert from the per-minute stream — fires minutes before
@@ -48,18 +51,24 @@ object RapidFallNotifier {
         if (System.currentTimeMillis() - last < DEBOUNCE_MS) return
 
         ensureChannel(context)
+        val localizedText = context.localized()
         val title = if (fall.urgent) {
-            "⬇ Быстрое падение — возможна гипо"
+            localizedText.getString(R.string.rapid_fall_notifier_title_urgent)
         } else {
-            "⬇ Сахар быстро падает"
+            localizedText.getString(R.string.rapid_fall_notifier_title)
         }
         val mgdl = com.example.diapilot.data.Units.isMgdl(context)
         val slope = if (mgdl) {
-            "%.0f мг/дл".format(fall.slopePerMin * com.diapilot.core.analysis.MGDL_PER_MMOL_F)
-        } else "%.2f ммоль/л".format(fall.slopePerMin)
-        val text = "Сейчас ${com.diapilot.core.analysis.fmtBg(fall.currentMmol, mgdl)} · " +
-            "$slope в минуту · через ~20 мин может быть " +
-            com.diapilot.core.analysis.fmtBg(fall.projected20Mmol.coerceAtLeast(2.0), mgdl)
+            "%.0f %s".format(fall.slopePerMin * com.diapilot.core.analysis.MGDL_PER_MMOL_F, unitLabel(true))
+        } else {
+            "%.2f %s".format(fall.slopePerMin, unitLabel(false))
+        }
+        val text = localizedText.getString(
+            R.string.rapid_fall_notifier_text,
+            com.diapilot.core.analysis.fmtBg(fall.currentMmol, mgdl),
+            slope,
+            com.diapilot.core.analysis.fmtBg(fall.projected20Mmol.coerceAtLeast(2.0), mgdl),
+        )
         val openApp = PendingIntent.getActivity(
             context, NOTIF_ID, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -80,11 +89,13 @@ object RapidFallNotifier {
     }
 
     private fun ensureChannel(context: Context) {
+        val text = context.localized()
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
-                CHANNEL_ID, "Быстрое падение сахара", NotificationManager.IMPORTANCE_HIGH,
+                CHANNEL_ID, text.getString(R.string.rapid_fall_notifier_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Раннее предупреждение по минутному потоку — на 3–4 минуты раньше обычных алармов"
+                description = text.getString(R.string.rapid_fall_notifier_channel_desc)
             },
         )
     }

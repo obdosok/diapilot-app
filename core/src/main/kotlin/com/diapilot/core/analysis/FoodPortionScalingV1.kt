@@ -43,13 +43,24 @@ object FoodPortionScalingV1 {
      *
      * Returns the inputs unchanged for a factor of 1, or one that is not finite
      * and positive — a caller passing nonsense must not silently zero a meal.
+     *
+     * [portionWord] is the word written into the note, in the UI language at the
+     * time of the edit ([PORTION_WORD_RU], "portion"); the note is the user's own text, so
+     * it keeps whatever language it was written in. A mark in either language is
+     * recognised and replaced.
      */
-    fun scale(text: String, estCarbsG: Double?, analysis: String?, factor: Double): Scaled {
+    fun scale(
+        text: String,
+        estCarbsG: Double?,
+        analysis: String?,
+        factor: Double,
+        portionWord: String = PORTION_WORD_RU,
+    ): Scaled {
         if (!factor.isFinite() || factor <= 0.0 || factor == 1.0) {
             return Scaled(text, estCarbsG, analysis)
         }
         return Scaled(
-            text = markPortion(text, factor),
+            text = markPortion(text, factor, portionWord),
             estCarbsG = estCarbsG?.takeIf { it.isFinite() }?.let { it * factor },
             analysis = analysis?.let { scaleAnalysis(it, factor) },
         )
@@ -69,10 +80,13 @@ object FoodPortionScalingV1 {
      * «½» once and not «½ ½» — the mark describes the note's current state, not
      * its edit history.
      */
-    private fun markPortion(text: String, factor: Double): String {
-        val stripped = Regex("\\s*\\((?:½|×[0-9.,]+)\\s*порци[яи]\\)\\s*$").replace(text, "")
-        return "$stripped (${label(factor)} порция)"
+    private fun markPortion(text: String, factor: Double, portionWord: String): String {
+        val stripped = Regex("\\s*\\((?:½|×[0-9.,]+)\\s*(?:порци[яи]|portions?)\\)\\s*$").replace(text, "")
+        return "$stripped (${label(factor)} $portionWord)"
     }
+
+    /** The portion mark's word in Russian — the historical default. */
+    const val PORTION_WORD_RU = "порция"
 
     private fun scaleAnalysis(analysis: String, factor: Double): String =
         analysis.lineSequence().joinToString("\n") { line ->

@@ -51,11 +51,19 @@ object InsulinTailFromAmplitudeV1 {
         val doses: Int,
         /** Every horizon's median fall per unit, so the plateau can be seen. */
         val curve: List<Pair<Int, Double>>,
-        val refusal: String? = null,
+        val refusal: TailRefusal? = null,
     )
 
-    const val NOT_ENOUGH_DOSES = "меньше трёх чистых доз"
-    const val NEVER_SETTLES = "падение растёт до конца горизонта — хвост длиннее наблюдений"
+    /** Why no tail was read; the app renders the sentence. */
+    enum class TailRefusal {
+        /** Fewer than three clean doses. */
+        NOT_ENOUGH_DOSES,
+        /** The fall grows to the end of the horizon: the tail is longer than the observations. */
+        NEVER_SETTLES,
+    }
+
+    val NOT_ENOUGH_DOSES = TailRefusal.NOT_ENOUGH_DOSES
+    val NEVER_SETTLES = TailRefusal.NEVER_SETTLES
 
     /**
      * A horizon counts as the end when the fall stops growing MATERIALLY: the

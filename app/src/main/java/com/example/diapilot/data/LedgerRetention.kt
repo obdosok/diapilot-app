@@ -435,8 +435,8 @@ object LedgerRetention {
             val after = java.io.File(db.path).length() / 1_048_576
             android.util.Log.i(
                 "LedgerRetention",
-                "подрезано: точек ${swept.points} · оценок ${swept.scores}; " +
-                    "$before МБ -> $after МБ",
+                "trimmed: points ${swept.points} · scores ${swept.scores}; " +
+                    "$before MB -> $after MB",
             )
         }.onFailure { android.util.Log.w("LedgerRetention", "reclaim failed open", it) }
             .onSuccess { prefs.edit().putBoolean(KEY_RECLAIMED, true).apply() }

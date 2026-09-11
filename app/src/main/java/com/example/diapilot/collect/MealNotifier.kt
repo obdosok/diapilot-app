@@ -15,6 +15,8 @@ import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import com.diapilot.core.collector.MealEvent
 import com.example.diapilot.MainActivity
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,19 +39,24 @@ object MealNotifier {
         ) == PackageManager.PERMISSION_GRANTED
 
     private fun ensureChannel(context: Context) {
+        val text = context.localized()
         val manager = context.getSystemService(NotificationManager::class.java)
+        // Re-creating a channel with the same id updates its name and
+        // description, so a language switch reaches them on the next post.
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Разметка еды",
+                text.getString(R.string.meal_notifier_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply { description = "Вопросы «что вы ели?» по детекту приёмов пищи" },
+            ).apply { description = text.getString(R.string.meal_notifier_channel_description) },
         )
     }
 
     fun notifyMeal(context: Context, meal: MealEvent, topLabels: List<String>) {
         if (!canNotify(context)) return
         ensureChannel(context)
+        // Text from the localized context; system calls keep the original one.
+        val text = context.localized()
         val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
         val notifId = (meal.onsetMs / 60_000).toInt()
 
@@ -70,30 +77,37 @@ object MealNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val mgdl = com.example.diapilot.data.Units.isMgdl(context)
+        val from = com.diapilot.core.analysis.fmtBg(meal.preBg, mgdl)
+        val to = com.diapilot.core.analysis.fmtBg(meal.peakBg, mgdl)
+        val unit = com.example.diapilot.i18n.unitLabel(mgdl)
+        val body = meal.bolusUnits
+            ?.let { text.getString(R.string.meal_notifier_text_bolus, from, to, unit, it) }
+            ?: text.getString(R.string.meal_notifier_text_no_bolus, from, to, unit)
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
-            .setContentTitle("Похоже, вы поели в ${fmt.format(Date(meal.onsetMs))}")
-            .setContentText(
-                run {
-                    val mgdl = com.example.diapilot.data.Units.isMgdl(context)
-                    "${com.diapilot.core.analysis.fmtBg(meal.preBg, mgdl)} → " +
-                        "${com.diapilot.core.analysis.fmtBg(meal.peakBg, mgdl)} " +
-                        com.diapilot.core.analysis.unitLabel(mgdl)
-                } +
-                    (meal.bolusUnits?.let { " · болюс %.1f ед".format(it) } ?: " · без болюса") +
-                    " — что это было?",
-            )
+            .setContentTitle(text.getString(R.string.meal_notifier_title, fmt.format(Date(meal.onsetMs))))
+            .setContentText(body)
             .setContentIntent(openApp)
             .setAutoCancel(true)
 
-        // Up to two frequent-label buttons…
+        // Up to two frequent-label buttons — the user's own labels, shown as stored…
         topLabels.take(2).forEachIndexed { i, name ->
             builder.addAction(0, name, labelIntent(name, notifId * 10 + i, mutable = false))
         }
         // …plus a free-text reply.
         builder.addAction(
-            NotificationCompat.Action.Builder(0, "Другое…", labelIntent(null, notifId * 10 + 9, mutable = true))
-                .addRemoteInput(RemoteInput.Builder(KEY_REPLY).setLabel("Два слова о еде…").build())
+            NotificationCompat.Action.Builder(
+                0,
+                text.getString(R.string.meal_notifier_action_other),
+                labelIntent(null, notifId * 10 + 9, mutable = true),
+            )
+                .addRemoteInput(
+                    RemoteInput.Builder(KEY_REPLY)
+                        .setLabel(text.getString(R.string.meal_notifier_reply_hint))
+                        .build(),
+                )
                 .build(),
         )
 

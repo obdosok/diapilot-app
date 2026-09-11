@@ -1,6 +1,10 @@
 package com.example.diapilot.data
 
 import android.content.Context
+import com.example.diapilot.R
+import com.example.diapilot.i18n.UiText
+import com.example.diapilot.i18n.localized
+import com.example.diapilot.i18n.uiLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
@@ -15,7 +19,7 @@ data class FoodCalculationV1(
     val insulinContribution60:Double,val backgroundContribution60:Double,val isfMedian:Double,val isfLow:Double,
     val isfHigh:Double,val uncertaintySummary:String,val globalCsOnlineEpisodes:Int=0,val globalCsOnlineDays:Int=0,
     val globalCsEvidencePolicy:String="structured evidence known at forecast time only",
-    val kineticsSummary:String="структурные признаки не записаны; нейтральный приор",
+    val kineticsSummary:UiText=UiText.res(R.string.hybrid_shadow_kinetics_none),
     val timingScope:String="INDIVIDUAL",
     val clusterCarbsG:Double?=null,
     val clusterMembers:Int=1,
@@ -50,6 +54,8 @@ data class EpisodeAttributionExplanationV1(
     /** Unclosed meal residual in mmol — a signal that "something unlogged
      *  was acting". Appended LAST: positional constructors live in tests. */
     val unloggedResidualMmol:Double=0.0,
+    /** The neighbouring meals could not be split — the card tints the line. */
+    val unresolved:Boolean=false,
 )
 
 object FoodCalculationRegistry {
@@ -78,12 +84,35 @@ object FoodCalculationRegistry {
     private val episode get()=mutableEpisode.value.receipts
     private fun decorated(id:Long,v:FoodCalculationV1):FoodCalculationV1 {
         val e=episode[id]?:return v
-        val stage10=" Stage 10 side-by-side — прогноз: ${e.modelForecast}; отнесённый вклад: ${e.allocatedMealContribution}; " +
-            "фазы: ${e.phases}; перекрытие: ${e.overlap}; распределение: ${e.allocation}; ${e.resolution}; " +
-            "${e.episodeKernel}; ${e.kernelDifference}; ${e.timeResolvedCurve}; ${e.tailTransfer}; уверенность ${e.confidence}; ${e.caveats}. " +
-            "Диагностика не управляет предупреждениями: owner = legacy."
-        return v.copy(episodeAttribution=e,uncertaintySummary=v.uncertaintySummary+stage10)
+        return v.copy(episodeAttribution=e)
     }
+
+    /** The uncertainty line of the "How it was calculated" dialog: the live
+     *  summary, plus the Stage 10 receipt side by side when there is one. */
+    fun uncertaintyText(context:Context,v:FoodCalculationV1):String {
+        val e=v.episodeAttribution?:return v.uncertaintySummary
+        return context.localized().getString(
+            R.string.food_calculation_uncertainty_stage10,
+            v.uncertaintySummary,e.modelForecast,e.allocatedMealContribution,e.phases,e.overlap,e.allocation,
+            e.resolution,e.episodeKernel,e.kernelDifference,e.timeResolvedCurve,e.tailTransfer,e.confidence,e.caveats,
+        )
+    }
+
+    /**
+     * The cache key of the Stage 10 receipts. The receipts are display text
+     * built in the app language, so the language is part of the key: after a
+     * switch the key no longer matches and TwinCache rebuilds them.
+     */
+    fun sourceKey(store:SqliteCollectorStore,context:Context,nowMs:Long):String =
+        store.stage10ReceiptCacheKey(Stage9EpisodeRuntime.CACHE_VERSION,nowMs)+"|ui="+context.uiLanguage()
+
+    /** The language the receipts in memory were written in (null: none yet). */
+    @Volatile private var receiptsLanguage:String?=null
+
+    /** True when the receipts in memory are in another language than the UI's
+     *  — the next pass must rebuild the whole history, not only the hot tail. */
+    fun needsLanguageRefresh(context:Context):Boolean =
+        mutableEpisode.value.receipts.isNotEmpty()&&receiptsLanguage!=context.uiLanguage()
     @Synchronized fun update(next:Map<Long,FoodCalculationV1>){baseValues=next.toMap();values=baseValues.mapValues{(id,v)->decorated(id,v)}}
     @Synchronized fun updateEpisodeAttribution(
         next:Map<Long,EpisodeAttributionExplanationV1>,generation:Long=maxOf(expectedGeneration,mutableEpisode.value.generation)+1,
@@ -102,9 +131,13 @@ object FoodCalculationRegistry {
         runComplete:Boolean,processedClusters:Int,totalClusters:Int,budgetLimited:Boolean,
         fullRefresh:Boolean,nowMs:Long,
         nextOffset:Int=0,
+        /** The UI language the [next] receipts were built in. */
+        language:String?=null,
     ):Boolean {
         if(generation<expectedGeneration||generation<mutableEpisode.value.generation)return false
         val previous=mutableEpisode.value
+        // A full rebuild replaces every receipt, so from then on they share one language.
+        if(fullRefresh&&runComplete||previous.receipts.isEmpty())receiptsLanguage=language
         val receipts=when {
             fullRefresh&&runComplete -> next.toMap()
             runComplete -> previous.receipts.filterKeys{it !in replaceIds}+next
@@ -130,6 +163,8 @@ object FoodCalculationRegistry {
         restoreAttemptedKey=key
         val root=runCatching{JSONObject(File(context.filesDir,DISK_FILE).readText())}.getOrNull()?:return false
         if(root.optInt("schema")!=DISK_SCHEMA||root.optString("algorithmVersion")!=Stage9EpisodeRuntime.CACHE_VERSION)return false
+        // Receipts are display text: never restore them into another language.
+        if(root.optString("language")!=context.uiLanguage())return false
         val rows=root.optJSONObject("receipts")?:return false
         val receipts=buildMap<Long,EpisodeAttributionExplanationV1>{
             rows.keys().forEach{rawId->
@@ -147,6 +182,7 @@ object FoodCalculationRegistry {
             nextOffset=root.optInt("nextOffset"),lastAttemptAtMs=root.optLong("lastAttemptAtMs"),
         )
         sourceKey=root.optString("sourceKey")
+        receiptsLanguage=root.optString("language")
         values=baseValues.mapValues{(id,v)->decorated(id,v)}
         return true
     }
@@ -163,6 +199,7 @@ object FoodCalculationRegistry {
             .put("totalClusters",snapshot.totalClusters).put("budgetLimited",snapshot.budgetLimited)
             .put("fullRefreshAtMs",snapshot.fullRefreshAtMs)
             .put("nextOffset",snapshot.nextOffset).put("lastAttemptAtMs",snapshot.lastAttemptAtMs)
+            .put("language",receiptsLanguage?:context.uiLanguage())
             .put("receipts",JSONObject().apply{snapshot.receipts.forEach{(id,e)->put(id.toString(),explanationToJson(e))}})
         val target=File(context.filesDir,DISK_FILE);val tmp=File(context.filesDir,"$DISK_FILE.tmp")
         return runCatching{
@@ -230,6 +267,7 @@ object FoodCalculationRegistry {
         .put("unloggedResidualMmol",e.unloggedResidualMmol)
         .put("timeResolvedCurve",e.timeResolvedCurve).put("tailTransfer",e.tailTransfer)
         .put("compactSummary",e.compactSummary).put("compactFinding",e.compactFinding)
+        .put("unresolved",e.unresolved)
 
     private fun explanationFromJson(o:JSONObject)=EpisodeAttributionExplanationV1(
         receiptVersion=o.optString("receiptVersion"),modelForecast=o.optString("modelForecast"),
@@ -241,6 +279,7 @@ object FoodCalculationRegistry {
         unloggedResidualMmol=o.optDouble("unloggedResidualMmol",0.0),
         timeResolvedCurve=o.optString("timeResolvedCurve"),tailTransfer=o.optString("tailTransfer"),
         compactSummary=o.optString("compactSummary"),compactFinding=o.optString("compactFinding"),
+        unresolved=o.optBoolean("unresolved"),
     )
     @Synchronized fun expectEpisodeGeneration(generation:Long){if(generation>expectedGeneration)expectedGeneration=generation}
     @Synchronized internal fun resetEpisodeStateForTest(){expectedGeneration=0;sourceKey=null;restoreAttemptedKey=null;closedEligibilityBlocked=emptySet();requestedContinuationBudgetMs=0;mutableEpisode.value=EpisodeSnapshot();values=baseValues}

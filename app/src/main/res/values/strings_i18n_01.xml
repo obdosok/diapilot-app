@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="annotation_composer_one_entry_components">
+        <item quantity="one">✂ As one entry (%1$d component)</item>
+        <item quantity="other">✂ As one entry (%1$d components)</item>
+    </plurals>
+    <string-array name="annotation_composer_offset_labels">
+        <item>now</item>
+        <item>−30m</item>
+        <item>−1h</item>
+        <item>−2h</item>
+        <item>−4h</item>
+    </string-array>
+    <string name="annotation_composer_time_exact">exact…</string>
+    <string-array name="annotation_composer_modes">
+        <item>Food</item>
+        <item>Note</item>
+        <item>💪</item>
+        <item>Injection</item>
+        <item>Glucose</item>
+        <item>🗣</item>
+    </string-array>
+    <string name="annotation_composer_section_title">Context</string>
+    <string name="annotation_composer_collapse">Collapse</string>
+    <string name="annotation_composer_expand">+ Add</string>
+    <string name="annotation_composer_cancel">Cancel</string>
+    <string name="annotation_composer_command_food_grams">🍽 food “%1$s” ~%2$.0f g</string>
+    <string name="annotation_composer_command_food_no_grams">🍽 food “%1$s” (grams to be added later)</string>
+    <string name="annotation_composer_command_meter">🩸 meter %1$s</string>
+    <string name="annotation_composer_command_meter_unknown">🩸 meter ?</string>
+    <string name="annotation_composer_command_bolus_with_purpose">💉 bolus %1$.1f U · %2$s</string>
+    <string name="annotation_composer_command_bolus">💉 bolus %1$.1f U</string>
+    <string name="annotation_composer_command_basal">💉 basal %1$.1f U</string>
+    <string name="annotation_composer_command_activity">💪 activity “%1$s”</string>
+    <string name="annotation_composer_command_dextrose">🍬 dextrose ×1</string>
+    <string name="annotation_composer_command_hint">Say or type what happened — the app will understand and add it:</string>
+    <string name="annotation_composer_command_placeholder">had a smoothie · calibration 7.2 · injected 4 for a meal · went for a walk</string>
+    <string name="annotation_composer_command_not_understood">Didn\'t understand the command — rephrase it or enter it by hand.</string>
+    <string name="annotation_composer_command_blocked">Recognized: %1$s — but didn\'t save it: %2$s. Check it and enter it by hand.</string>
+    <string name="annotation_composer_command_parsing">Parsing…</string>
+    <string name="annotation_composer_command_parse">Parse</string>
+    <string name="annotation_composer_command_need_key">An API key (Chat tab) is needed to recognize commands.</string>
+    <string name="annotation_composer_command_add_preview">Add: %1$s</string>
+    <string name="annotation_composer_command_add">✓ Add</string>
+    <string name="annotation_composer_default_food_label">food</string>
+    <string name="annotation_composer_barcode_searching">Looking up %1$s in Open Food Facts…</string>
+    <string name="annotation_composer_barcode_not_found">Barcode %1$s not found in the database — fill in the label by hand.</string>
+    <string name="annotation_composer_scanner_unavailable">Scanner unavailable: %1$s</string>
+    <string name="annotation_composer_capture_photo">📷 Photograph dish</string>
+    <string name="annotation_composer_pick_gallery">🖼 From gallery</string>
+    <string name="annotation_composer_scan_barcode">▮▯ Barcode</string>
+    <string name="annotation_composer_scanned_product">▮▯ %1$s: %2$.1f g carbs/100 g — check and enter the CONSUMED weight</string>
+    <string name="annotation_composer_scanned_product_serving">▮▯ %1$s: %2$.1f g carbs/100 g — check and enter the CONSUMED weight (label serving %3$.0f g)</string>
+    <string name="annotation_composer_photo_dish_desc">dish photo</string>
+    <string name="annotation_composer_photo_analyzing">Analyzing photo…</string>
+    <string name="annotation_composer_photo_ready">Photo ready — check it and tap ✓</string>
+    <string name="annotation_composer_vision_candidate">Looks like your dish: “%1$s”</string>
+    <string name="annotation_composer_vision_candidate_portion">Looks like your dish: “%1$s” · portion ~%2$.0f%% of usual</string>
+    <string name="annotation_composer_photo_past_desc">how it looked before</string>
+    <string name="annotation_composer_past_photo_caption">This is how this dish looked for you before</string>
+    <string name="annotation_composer_confirm_yes">Yes, that\'s it</string>
+    <string name="annotation_composer_confirm_no">No</string>
+    <string name="annotation_composer_evidence_incomplete">Fill in the recomputable label/recipe fields</string>
+    <string name="annotation_composer_food_placeholder">What did you eat?</string>
+    <string name="annotation_composer_add_dish_composite">＋ %1$s (composite)</string>
+    <string name="annotation_composer_add_dish">＋ %1$s</string>
+    <string name="annotation_composer_approx_grams">~%1$.0f g</string>
+    <string name="annotation_composer_has_composition">composition</string>
+    <string name="annotation_composer_composition_header">Composition of “%1$s” (− portion ＋, ✕):</string>
+    <string name="annotation_composer_component_with_grams">%1$s · %2$.0f g</string>
+    <string name="annotation_composer_composed_carbs_summary">≈ %1$.0f g carbs · saved as one dish “%2$s”</string>
+    <string name="annotation_composer_last_composition">last time\'s composition:</string>
+    <string name="annotation_composer_add_component">＋ %1$s</string>
+    <string name="annotation_composer_add_all">all at once</string>
+    <string name="annotation_composer_dish_with_grams">%1$s · ~%2$.0f g</string>
+    <string name="annotation_composer_repeat_label">Repeat:</string>
+    <string name="annotation_composer_dish_recognized">Recognized: “%1$s” — the dish\'s structure and curve will go into the entry; grams can still be adjusted.</string>
+    <string name="annotation_composer_typical_time">Usually at this time:</string>
+    <string name="annotation_composer_food_memory_topup">🍽 “%1$s” before: peak +%2$s · top-up %3$d/%4$d</string>
+    <string name="annotation_composer_food_memory_topup_dose">🍽 “%1$s” before: peak +%2$s · dose ~%3$.1f U · top-up %4$d/%5$d</string>
+    <string name="annotation_composer_food_memory_times">🍽 “%1$s” before: peak +%2$s · ×%3$d</string>
+    <string name="annotation_composer_food_memory_times_dose">🍽 “%1$s” before: peak +%2$s · dose ~%3$.1f U · ×%4$d</string>
+    <string name="annotation_composer_portion_label">portion:</string>
+    <string name="annotation_composer_portion_usual">usual</string>
+    <string name="annotation_composer_carbs_g_label">carbs, g</string>
+    <string name="annotation_composer_default_meal_label">meal</string>
+    <string name="annotation_composer_evidence_toggle_hide">Hide source and duration</string>
+    <string name="annotation_composer_evidence_toggle_show">＋ Specify source / duration</string>
+    <string-array name="annotation_composer_evidence_source_modes">
+        <item>Usual</item>
+        <item>Label+weight</item>
+        <item>Recipe</item>
+    </string-array>
+    <string name="annotation_composer_intake_duration_label">meal, min</string>
+    <string name="annotation_composer_alcohol_label">alcohol</string>
+    <string name="annotation_composer_label_evidence_hint">From the label and the actual portion</string>
+    <string name="annotation_composer_scan_searching">looking…</string>
+    <string name="annotation_composer_scan_action">▮▯ scan</string>
+    <string-array name="annotation_composer_label_weight_fields">
+        <item>carbs/100 g</item>
+        <item>weight, g</item>
+        <item>carbs/serving</item>
+        <item>servings</item>
+    </string-array>
+    <string name="annotation_composer_recipe_version_hint">Saved recipe version and today\'s portion</string>
+    <string name="annotation_composer_fill_saved_recipe">↻ Fill in saved recipe</string>
+    <string-array name="annotation_composer_recipe_fields">
+        <item>version</item>
+        <item>total carbs</item>
+        <item>total weight</item>
+        <item>consumed, g</item>
+        <item>fraction 0–1</item>
+    </string-array>
+    <string name="annotation_composer_recomputed">Recomputed: %1$.1f g · a measured amount, not physiology</string>
+    <string name="annotation_composer_fill_full_path">Fill in one complete recomputation path</string>
+    <string name="annotation_composer_nutrition_hint">Nutrition · can be refined</string>
+    <string-array name="annotation_composer_nutrition_fields">
+        <item>Protein, g</item>
+        <item>Fat, g</item>
+        <item>kcal</item>
+    </string-array>
+    <string name="annotation_composer_computing_carbs">Computing carbs…</string>
+    <string name="annotation_composer_recompute_with_text">🔄 Recompute (will use the text)</string>
+    <string name="annotation_composer_carbs_from_description">🤖 Carbs from description</string>
+    <string name="annotation_composer_evidence_not_confirmed">The LLM doesn\'t confirm a measurement: fill in the label and portion</string>
+    <string name="annotation_composer_absorption_hint">Will slow absorption of the next meal:</string>
+    <string-array name="annotation_composer_absorption_modifiers">
+        <item>🌾 psyllium</item>
+        <item>🥗 fiber</item>
+        <item>🧈 fatty</item>
+    </string-array>
+    <string name="annotation_composer_note_placeholder">Injection site, sleep, stress…</string>
+    <string name="annotation_composer_activity_hint">Activity (feeds the model):</string>
+    <string-array name="annotation_composer_activity_types">
+        <item>💪 workout</item>
+        <item>🚶 walk</item>
+        <item>🚴 bike</item>
+        <item>🏃 run</item>
+    </string-array>
+    <string name="annotation_composer_minutes_compact">%1$d min</string>
+    <string name="annotation_composer_hours_minutes_compact">%1$dh%2$02d</string>
+    <string name="annotation_composer_activity_start">▶ start</string>
+    <string name="annotation_composer_activity_finished">✔ finished</string>
+    <string name="annotation_composer_activity_finished_hint">“Finished” sets the start %1$d min ago — the activity window lands in the past, as it actually happened.</string>
+    <string name="annotation_composer_insulin_kind_bolus">bolus</string>
+    <string name="annotation_composer_insulin_kind_basal">basal</string>
+    <string name="annotation_composer_units_label">U</string>
+    <string name="annotation_composer_manual_entry_hint">Manual entry — for injections that bypass the pen: doses from NovoPen and xDrip arrive on their own. Time — via 🕐 above.</string>
+    <string name="annotation_composer_no_recent_boluses">No injections in the last 6 hours.</string>
+    <string name="annotation_composer_recent_boluses_hint">Tag a recent injection — pick it, then the label:</string>
+    <string name="annotation_composer_hours_minutes_ago">%1$d h %2$d min</string>
+    <string name="annotation_composer_minutes_ago">%1$d min</string>
+    <string name="annotation_composer_bolus_chip">%1$.1f U · %2$s ago</string>
+    <string name="annotation_composer_bolus_chip_bg">%1$.1f U · %2$s ago · at %3$s</string>
+    <string name="annotation_composer_bolus_chip_purpose">%1$.1f U · %2$s ago · %3$s</string>
+    <string name="annotation_composer_bolus_chip_bg_purpose">%1$.1f U · %2$s ago · at %3$s · %4$s</string>
+    <string name="annotation_composer_meter_label">Meter, %1$s</string>
+    <string name="annotation_composer_meter_moving_fast_warning">⚠ Glucose is changing fast right now — calibrating on this reading is less accurate (blood leads the sensor). The point will still land on the chart, but a reading on flat glucose calibrates better.</string>
+    <string name="annotation_composer_meter_hint">A meter reading lands on the chart and in analytics as a point (source “meter”). The basis for blind days without a sensor.</string>
+    <string name="annotation_composer_minus_30m">−30m</string>
+    <string name="annotation_composer_plus_30m">+30m</string>
+    <string name="annotation_composer_repeat_now">↺ Repeat now</string>
+    <string name="annotation_composer_half_portion">½ portion</string>
+    <string name="annotation_composer_double_portion">×2 portion</string>
+    <string name="annotation_composer_note_time_is_start">The note\'s time = the start of the activity.</string>
+    <string name="annotation_composer_component_split_header">🧩 Composition · portion → carbs, g:</string>
+    <string name="annotation_composer_component_placeholder">component</string>
+    <string name="annotation_composer_grams_arrow">" g  →"</string>
+    <string name="annotation_composer_grams_unit">" g"</string>
+    <string name="annotation_composer_concept_missing_warning">⚠ “%1$s” isn\'t in the dictionary — the model won\'t see these %2$.0f g. Tap to say what it is.</string>
+    <string name="annotation_composer_split_into_components">🧩 Split into components</string>
+    <string name="annotation_composer_add_component_plain">＋ component</string>
+    <string name="annotation_composer_total_carbs">Total carbs: %1$.0f g</string>
+    <string name="annotation_composer_model_sees_partial">🔬 the model will see %1$.0f of %2$.0f g (%3$.0f%% unnamed)</string>
+    <string name="annotation_composer_carbs_g_field_label">Carbs, g</string>
+    <string name="annotation_composer_example_45">e.g. 45</string>
+    <string name="annotation_composer_duration_min_label">Duration, min</string>
+    <string name="annotation_composer_example_30">e.g. 30</string>
+    <string name="annotation_composer_legacy_exact_flag_warning">Old “exact” flag: kept as legacy and not counted as a measurement without the arithmetic.</string>
+    <string name="annotation_composer_minutes_short">%1$dm</string>
+    <string name="annotation_composer_immediately">right away</string>
+    <string name="annotation_composer_amount_duration_hint">Amount and duration are separate kinds of evidence; measured grams don\'t mean calibrated physiology.</string>
+    <string name="annotation_composer_nutrition_estimate_hint">Nutrition · an estimate, can be corrected</string>
+    <string name="annotation_composer_analysis_expanded">▾ analysis</string>
+    <string name="annotation_composer_analysis_collapsed">▸ analysis</string>
+    <string name="annotation_composer_recompute_from_description">🔄 Recompute from description</string>
+    <string name="annotation_composer_use_as_name">→ Use as name</string>
+    <string name="annotation_composer_whats_in_photo">🔍 What\'s in the photo?</string>
+    <string name="annotation_composer_regenerate">🔄 Regenerate</string>
+    <string name="annotation_composer_fill_recomputable_path">Fill in one complete recomputable path</string>
+    <string name="annotation_composer_new_recipe_version_needed">A changed recipe needs a new version</string>
+    <string name="annotation_composer_save">Save</string>
+    <string name="annotation_composer_delete_note_title">Delete the note?</string>
+    <string name="annotation_composer_delete_note_confirm">“%1$s” — %2$s</string>
+    <string name="annotation_composer_delete_button">Delete</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">Язык</string>
+    <string name="language_system">Системный</string>
+    <string name="language_hint">Меняет только текст приложения. Ваши заметки и названия еды остаются как есть.</string>
+</resources>

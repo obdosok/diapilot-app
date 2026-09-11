@@ -12,8 +12,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.hybrid.HybridCdfKnot
+import com.example.diapilot.R
 
 /**
  * The insulin shape actually in force, drawn as the RATE of action.
@@ -76,8 +78,7 @@ fun InsulinShapeSpark(
             )
         }
         Text(
-            "скорость действия · вертикали: начало и пик · сетка — часы, всего %.0f мин"
-                .format(java.util.Locale.ROOT, knots.last().minute),
+            stringResource(R.string.insulin_shape_spark_caption, knots.last().minute),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

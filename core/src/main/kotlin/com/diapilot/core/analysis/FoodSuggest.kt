@@ -33,13 +33,21 @@ data class DishPrediction(
 data class FoodSuggestion(
     /** When the food likely happened — the trigger's own time, NOT "now". */
     val triggerTsMs: Long,
-    /** The stored value is the Russian word for "injection" (meal-sized dose, no note) or for "detected" (detected rise, no note). */
-    val trigger: String,
+    /** What made the app ask: a detected rise or a meal-sized dose, with no note. */
+    val trigger: SuggestTrigger,
     /** Dose units when the trigger is (or includes) a bolus. */
     val units: Double?,
     /** Time-of-day prediction; null = no confident guess (still worth asking). */
     val prediction: DishPrediction?,
 )
+
+/** Why a food suggestion was raised; the app renders the word. */
+enum class SuggestTrigger {
+    /** The meal detector saw a rise (possibly with a dose next to it). */
+    DETECTED_RISE,
+    /** A meal-sized dose with no rise detected. */
+    DOSE,
+}
 
 private const val NOTE_COVER_MS = 45L * 60_000     // a note this close = already logged
 private const val MERGE_MS = 45L * 60_000          // bolus+detect this close = one meal
@@ -128,7 +136,7 @@ fun suggestFood(
         dose?.let { usedDoses.add(it.tsMs) }
         out.add(
             FoodSuggestion(
-                triggerTsMs = m.onsetMs, trigger = "детект", units = dose?.units,
+                triggerTsMs = m.onsetMs, trigger = SuggestTrigger.DETECTED_RISE, units = dose?.units,
                 prediction = predictDishAt(notes, m.onsetMs, zone),
             ),
         )
@@ -137,7 +145,7 @@ fun suggestFood(
         if (d.tsMs in usedDoses) continue
         out.add(
             FoodSuggestion(
-                triggerTsMs = d.tsMs, trigger = "укол", units = d.units,
+                triggerTsMs = d.tsMs, trigger = SuggestTrigger.DOSE, units = d.units,
                 prediction = predictDishAt(notes, d.tsMs, zone),
             ),
         )

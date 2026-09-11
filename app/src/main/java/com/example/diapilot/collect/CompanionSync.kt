@@ -2,6 +2,7 @@ package com.example.diapilot.collect
 
 import android.content.Context
 import android.util.Log
+import com.example.diapilot.i18n.localized
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -151,6 +152,7 @@ object CompanionSync {
 
     /** The same lenses as the widget/watch — the dashboard must agree. */
     private fun buildSnapshot(context: Context, now: Long): JSONObject? {
+        val text = context.localized()
         val store = com.example.diapilot.data.Stores.get(context)
         val mgdl = com.example.diapilot.data.Units.isMgdl(context)
         val minuteCal = com.example.diapilot.data.MinuteCalCache.get(store, context)
@@ -200,12 +202,15 @@ object CompanionSync {
             lastBolus?.let { b ->
                 if (isNotEmpty()) append(" · ")
                 val min = (now - b.tsMs) / 60_000
-                append(
-                    "укол %.1f ед · %s".format(
-                        java.util.Locale.ENGLISH, b.units,
-                        if (min < 60) "${min}м" else "${min / 60}ч${min % 60}м",
-                    ),
-                )
+                val durationText = if (min < 60) {
+                    text.getString(com.example.diapilot.R.string.companion_sync_minutes_compact, min)
+                } else {
+                    text.getString(
+                        com.example.diapilot.R.string.companion_sync_hours_minutes_compact,
+                        min / 60, min % 60,
+                    )
+                }
+                append(text.getString(com.example.diapilot.R.string.companion_sync_insulin_line, b.units, durationText))
             }
         }
 
@@ -214,16 +219,19 @@ object CompanionSync {
         val settleIdx = com.diapilot.core.analysis.settleIndex(future.map { it.mmol })
         val settlePt = settleIdx?.let { future[it] }
         val statusLine = settlePt?.let { p ->
-            com.diapilot.core.analysis.statusSummary(
-                com.diapilot.core.analysis.StatusInput(
-                    iobUnits = null, lastBolusUnits = null, lastBolusAgeMin = null,
-                    foodLabel = null, foodAgeMin = null, foodCarbs = null,
-                    predMmolIn60 = p.mmol, predLoIn60 = p.loMid, predHiIn60 = p.hiMid,
-                    predSettleMin = (p.tsMs - now) / 60_000,
-                    predSettled = settleIdx < future.size - 1,
-                    mgdl = mgdl,
+            com.example.diapilot.i18n.StatusText.lines(
+                context,
+                com.diapilot.core.analysis.statusSummary(
+                    com.diapilot.core.analysis.StatusInput(
+                        iobUnits = null, lastBolusUnits = null, lastBolusAgeMin = null,
+                        foodLabel = null, foodAgeMin = null, foodCarbs = null,
+                        predMmolIn60 = p.mmol, predLoIn60 = p.loMid, predHiIn60 = p.hiMid,
+                        predSettleMin = (p.tsMs - now) / 60_000,
+                        predSettled = settleIdx < future.size - 1,
+                        mgdl = mgdl,
+                    ),
                 ),
-            ).joinToString(" · ")
+            ).joinToString(com.example.diapilot.i18n.StatusText.SEPARATOR)
         } ?: ""
 
         // Events: food/notes + boluses over the last 3h, newest first.
@@ -232,11 +240,23 @@ object CompanionSync {
         (
             store.annotations(now - 3L * 3_600_000, now)
                 .filter { it.kind != "tag" || it.content.isNotBlank() }
-                .map { it.tsMs to "📝 ${fmt.format(java.util.Date(it.tsMs))} ${it.content}" +
-                    (it.estCarbs?.let { c -> " · ~%.0f г".format(c) } ?: "") } +
+                .map { a ->
+                    val time = fmt.format(java.util.Date(a.tsMs))
+                    val content = com.example.diapilot.i18n.TokenText.noteTag(context, a.content)
+                    val line = a.estCarbs?.let { c ->
+                        text.getString(com.example.diapilot.R.string.companion_sync_event_note_with_carbs, time, content, c)
+                    } ?: text.getString(com.example.diapilot.R.string.companion_sync_event_note, time, content)
+                    a.tsMs to line
+                } +
                 store.boluses(now - 3L * 3_600_000, now)
-                    .map { it.tsMs to "💉 ${fmt.format(java.util.Date(it.tsMs))} %.1f ед".format(it.units) +
-                        (it.purpose?.let { p -> " · $p" } ?: "") }
+                    .map { b ->
+                        val time = fmt.format(java.util.Date(b.tsMs))
+                        val purpose = com.example.diapilot.i18n.TokenText.bolusPurpose(context, b.purpose)
+                        val line = purpose?.let { p ->
+                            text.getString(com.example.diapilot.R.string.companion_sync_event_bolus_with_purpose, time, b.units, p)
+                        } ?: text.getString(com.example.diapilot.R.string.companion_sync_event_bolus, time, b.units)
+                        b.tsMs to line
+                    }
             )
             .sortedByDescending { it.first }
             .take(8)
@@ -275,7 +295,7 @@ object CompanionSync {
                 com.diapilot.core.trendGlyph(com.diapilot.core.trendName(it))
             } ?: "")
             .put("delta_mmol", trend?.delta5Mmol)
-            .put("nuance", trend?.nuance ?: "")
+            .put("nuance", trend?.nuance?.let { com.example.diapilot.i18n.TwinText.nuance(context, it) } ?: "")
             .put("status_line", statusLine)
             .put("insulin_line", insulinLine)
             .put("range_lo", rangeLo)

@@ -24,7 +24,8 @@ object InsulinCurveRuntime {
 
     fun applyWithReason(person:HybridPersonModel,curve:PersonalInsulinCurveV1?):Applied {
         if(curve==null)return Applied(person)
-        if(!curve.ready)return Applied(person,"наблюдений ${curve.observations}/${PersonalInsulinCurveV1.MIN_SHAPE_OBSERVATIONS}, дней ${curve.independentDays}/${PersonalInsulinCurveV1.MIN_SHAPE_DAYS}")
+        // The refusal is developer text: PhysioRuntime logs it as a model conflict.
+        if(!curve.ready)return Applied(person,"observations ${curve.observations}/${PersonalInsulinCurveV1.MIN_SHAPE_OBSERVATIONS}, days ${curve.independentDays}/${PersonalInsulinCurveV1.MIN_SHAPE_DAYS}")
         val knots=curve.knots
         // ONE landmark convention: they travel ON the curve. Deriving them
         // here independently is how a curve could pass one bounds check and be
@@ -37,14 +38,14 @@ object InsulinCurveRuntime {
         // Still a defensive boundary for persisted/old receipts: fail closed
         // rather than throw and collapse the selected PHYSIO arm — but say so.
         val broken=when{
-            knots.size<4->"узлов ${knots.size}, нужно ≥4"
-            knots.firstOrNull()?.let{it.minute==0.0&&it.fraction==0.0}!=true->"кривая не начинается с нуля"
-            knots.lastOrNull()?.fraction!=1.0->"кривая не заканчивается на 1.0"
-            knots.zipWithNext().any{(a,b)->b.minute<=a.minute||b.fraction<a.fraction}->"кривая не монотонна"
-            onset !in bounds.insulinOnsetMinRange->"старт %.0f вне %.0f..%.0f".format(onset,bounds.insulinOnsetMinRange.start,bounds.insulinOnsetMinRange.endInclusive)
-            peak !in bounds.insulinPeakMinRange->"пик %.0f вне %.0f..%.0f".format(peak,bounds.insulinPeakMinRange.start,bounds.insulinPeakMinRange.endInclusive)
-            tail !in bounds.insulinTailMinRange->"хвост %.0f вне %.0f..%.0f".format(tail,bounds.insulinTailMinRange.start,bounds.insulinTailMinRange.endInclusive)
-            peak>=tail->"пик не раньше хвоста"
+            knots.size<4->"knots ${knots.size}, need ≥4"
+            knots.firstOrNull()?.let{it.minute==0.0&&it.fraction==0.0}!=true->"curve does not start at zero"
+            knots.lastOrNull()?.fraction!=1.0->"curve does not end at 1.0"
+            knots.zipWithNext().any{(a,b)->b.minute<=a.minute||b.fraction<a.fraction}->"curve is not monotonic"
+            onset !in bounds.insulinOnsetMinRange->"onset %.0f outside %.0f..%.0f".format(onset,bounds.insulinOnsetMinRange.start,bounds.insulinOnsetMinRange.endInclusive)
+            peak !in bounds.insulinPeakMinRange->"peak %.0f outside %.0f..%.0f".format(peak,bounds.insulinPeakMinRange.start,bounds.insulinPeakMinRange.endInclusive)
+            tail !in bounds.insulinTailMinRange->"tail %.0f outside %.0f..%.0f".format(tail,bounds.insulinTailMinRange.start,bounds.insulinTailMinRange.endInclusive)
+            peak>=tail->"peak is not before tail"
             else->null
         }
         if(broken!=null)return Applied(person,broken)

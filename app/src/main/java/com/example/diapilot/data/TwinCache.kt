@@ -1,5 +1,6 @@
 package com.example.diapilot.data
 
+import com.example.diapilot.i18n.uiLanguage
 import android.util.Log
 import com.diapilot.core.analysis.ContextStats
 import com.diapilot.core.analysis.IsfAggregate
@@ -327,8 +328,8 @@ object TwinCache {
                     builtKey = restored.key
                     Log.i(
                         TAG,
-                        "снимок с диска принят — возраст " +
-                            "${(now - restored.builtAtMs) / 60_000} мин, сборка не нужна",
+                        "disk snapshot accepted — age " +
+                            "${(now - restored.builtAtMs) / 60_000} min, no build needed",
                     )
                     return restored.model
                 }
@@ -922,14 +923,18 @@ object TwinCache {
             // Model is safely published BEFORE the diagnostic is scheduled.
             // Exceptions, OOM and queue rejection fail open; the sidecar has a
             // time budget and can never block this forecast/alert caller.
-            val stage10SourceKey=(store as? SqliteCollectorStore)?.stage10ReceiptCacheKey(Stage9EpisodeRuntime.CACHE_VERSION,now)
+            val stage10SourceKey=(store as? SqliteCollectorStore)?.let{FoodCalculationRegistry.sourceKey(it,context,now)}
             if(stage10SourceKey==null||!FoodCalculationRegistry.isCurrent(stage10SourceKey)) {
                 publishThenScheduleStage9(Unit, {}, task = { generation ->
                     // Closed-episode eligibility controls learning weight, not
                     // whether the user may see a diagnostic receipt. Filtering
                     // here made History blank for every estimated meal.
                     val diagnosticAnnotations=annotationsAll
-                    val fullRefresh=FoodCalculationRegistry.needsFullRefresh(now)
+                    // Receipts are display text: after a language switch the whole
+                    // history is rebuilt, not only the hot tail.
+                    val fullRefresh=FoodCalculationRegistry.needsFullRefresh(now)||
+                        FoodCalculationRegistry.needsLanguageRefresh(context)
+                    val receiptLanguage=context.uiLanguage()
                     // The visible hot tail is 72 h; eight preceding hours are
                     // included so a meal/bolus just before the boundary can
                     // still contribute its physiological tail to the first day.
@@ -968,10 +973,12 @@ object TwinCache {
                             deconvPhysio?.personModelAt(hour) ?:deconvLegacy
                         },
                         clusterOffset=FoodCalculationRegistry.continuationOffset(),
+                        context=context,
                     )
                     var accepted=FoodCalculationRegistry.updateEpisodeAttributionWindow(
                         result.receipts,replaceIds,generation,result.complete,result.processedClusters,result.totalClusters,
                         result.budgetLimited,fullRefresh,now,result.nextOffset,
+                        language=receiptLanguage,
                     )
                     if(accepted&&stage10SourceKey!=null)FoodCalculationRegistry.persist(context,stage10SourceKey)
                     val drainUntil=android.os.SystemClock.elapsedRealtime()+STAGE10_DRAIN_MS
@@ -995,10 +1002,12 @@ object TwinCache {
                                 deconvPhysio?.personModelAt(hour) ?:deconvLegacy
                             },
                             clusterOffset=result.nextOffset,
+                            context=context,
                         )
                         accepted=FoodCalculationRegistry.updateEpisodeAttributionWindow(
                             result.receipts,replaceIds,generation,result.complete,result.processedClusters,
                             result.totalClusters,result.budgetLimited,fullRefresh,now,result.nextOffset,
+                            language=receiptLanguage,
                         )
                         if(accepted&&stage10SourceKey!=null)FoodCalculationRegistry.persist(context,stage10SourceKey)
                     }

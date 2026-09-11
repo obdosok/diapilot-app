@@ -2,6 +2,8 @@ package com.example.diapilot.data
 
 import android.content.Context
 import android.net.Uri
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.io.File
 
 /**
@@ -60,9 +62,10 @@ object BackupRestore {
      * the process (all SQLiteOpenHelper handles point at the old inode).
      */
     fun restore(context: Context, uri: Uri): String {
+        val text = context.localized()
         val tmp = File(context.cacheDir, "restore_candidate.sqlite")
         context.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "файл недоступен" }
+            requireNotNull(input) { text.getString(R.string.backup_restore_file_unavailable) }
             tmp.outputStream().use { input.copyTo(it) }
         }
         try {
@@ -79,7 +82,7 @@ object BackupRestore {
                 readings = count("glucose_readings")
                 insulin = count("insulin_events")
             }
-            require(readings > 0) { "в файле нет показаний глюкозы — это не копия DiaPilot?" }
+            require(readings > 0) { text.getString(R.string.backup_restore_no_readings) }
 
             // Swap: close every handle, drop WAL sidecars, move the file in.
             Stores.close()
@@ -88,7 +91,7 @@ object BackupRestore {
             File(dbFile.path + "-wal").delete()
             File(dbFile.path + "-shm").delete()
             tmp.copyTo(dbFile, overwrite = true)
-            return "Восстановлено: $readings показаний, $insulin уколов. Перезапускаю…"
+            return text.getString(R.string.backup_restore_success, readings, insulin)
         } finally {
             tmp.delete()
         }
@@ -223,6 +226,6 @@ object BackupRestore {
             resolver,
             android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, treeDoc),
             "application/octet-stream", name,
-        ) ?: error("не удалось создать файл в облачной папке")
+        ) ?: error(context.localized().getString(R.string.backup_restore_cloud_create_failed))
     }
 }

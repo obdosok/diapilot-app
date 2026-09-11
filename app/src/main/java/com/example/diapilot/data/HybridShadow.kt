@@ -658,10 +658,14 @@ object HybridShadow {
                 val amplitude=engine.foodAmplitude(event).first
                 val features=event.kineticFeatures?.normalized()
                 val kineticsSummary=features?.let{
-                    val trace=if(timing.tailEndMin>timing.plateauMin+30)
-                        "; остаточный БЖУ-хвост модели до ~${"%.0f".format(timing.tailEndMin)} мин (после 90% реакции)" else ""
-                    "углеводы: быстрые ${"%.0f".format(it.fastFraction*100)}%, средние ${"%.0f".format(it.mediumFraction*100)}%, медленные ${"%.0f".format(it.slowFraction*100)}%; форма ${it.physicalForm.name}; доверие ${"%.0f".format(it.confidence*100)}%; источник ${it.provenance}$trace"
-                }?:"структурные признаки не записаны; нейтральный приор"
+                    val args=arrayOf<Any>(
+                        "%.0f".format(it.fastFraction*100),"%.0f".format(it.mediumFraction*100),"%.0f".format(it.slowFraction*100),
+                        it.physicalForm.name,"%.0f".format(it.confidence*100),it.provenance,
+                    )
+                    if(timing.tailEndMin>timing.plateauMin+30)
+                        com.example.diapilot.i18n.UiText.res(com.example.diapilot.R.string.hybrid_shadow_kinetics_tail,*args,"%.0f".format(timing.tailEndMin))
+                    else com.example.diapilot.i18n.UiText.res(com.example.diapilot.R.string.hybrid_shadow_kinetics,*args)
+                }?:com.example.diapilot.i18n.UiText.res(com.example.diapilot.R.string.hybrid_shadow_kinetics_none)
                 note.id to FoodCalculationV1(
                     annotationId=note.id,eventTsMs=note.tsMs,dish=note.content,
                     model="PHYSIO_V1:${physioArtifact.artifactId}",carbsG=event.carbsG,
@@ -953,10 +957,9 @@ object HybridShadow {
             // the status to LIMITED.
             if (hybrid.floorClampedPoints == 0) v else com.diapilot.core.twin.ForecastHealthV1.Verdict(
                 health = com.diapilot.core.twin.ForecastHealth.LIMITED,
-                reasons = v.reasons + ("модель упёрлась в физиологический пол " +
-                    "%.1f ммоль на %d точках — за этой границей она ничего не значит"
-                        .format(java.util.Locale.ROOT,
-                            com.diapilot.core.hybrid.HYBRID_FLOOR_MMOL, hybrid.floorClampedPoints)),
+                reasons = v.reasons + com.diapilot.core.twin.HealthReason.FloorClamped(
+                    com.diapilot.core.hybrid.HYBRID_FLOOR_MMOL, hybrid.floorClampedPoints,
+                ),
             )
         }
         android.util.Log.i(

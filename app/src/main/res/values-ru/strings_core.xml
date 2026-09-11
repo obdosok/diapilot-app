@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Russian text these values had in :core, verbatim. -->
+<resources>
+    <!-- UnitsFmt -->
+    <string name="unit_mmol_l">ммоль/л</string>
+    <string name="unit_mg_dl">мг/дл</string>
+
+    <!-- StatusSummary -->
+    <string name="status_age_min">%1$dм</string>
+    <string name="status_age_hm">%1$dч%2$02dм</string>
+    <string name="status_food">«%1$s» %2$s</string>
+    <string name="status_food_cob">«%1$s» %2$s · COB ~%3$s г</string>
+    <string name="status_food_eaten">«%1$s» %2$s ~%3$sг</string>
+    <string name="status_iob">IOB %1$s</string>
+    <string name="status_iob_injected">IOB %1$s · укол %2$s</string>
+    <string name="status_last_bolus">%1$s ед · %2$s</string>
+    <string name="status_forecast_in_an_hour">Через час %1$s</string>
+    <string name="status_forecast_still_moving">Через %1$s %2$s, ещё в движении</string>
+    <string name="status_forecast_flat">Дальше ровно: %1$s</string>
+    <string name="status_forecast_settles">Выровняется на %1$s через %2$s</string>
+
+    <!-- WatchHint -->
+    <string name="watch_hint_hypo_plan">гипо? план: %1$s</string>
+    <string name="watch_hint_hypo_check">риск гипо — проверьте</string>
+    <string name="watch_hint_above_target">выше цели, к ~%1$s</string>
+
+    <!-- CommandGuard -->
+    <string name="command_guard_not_a_number">число не распознано (NaN/≤0)</string>
+    <string name="command_guard_glucose_missing">не распознано значение глюкозы</string>
+    <string name="command_guard_glucose_out_of_range">глюкоза вне физиологического диапазона (1–35 ммоль/л)</string>
+    <string name="command_guard_dose_missing">не распознана доза</string>
+    <string name="command_guard_bolus_above_fuse">болюс %1$.1f ед выше персонального предохранителя (%2$.0f ед)</string>
+    <string name="command_guard_unknown_purpose">неизвестное назначение «%1$s»</string>
+    <string name="command_guard_basal_above_fuse">базал %1$.1f ед выше персонального предохранителя (%2$.0f ед)</string>
+    <string name="command_guard_food_empty">пустое описание еды</string>
+    <string name="command_guard_food_too_long">описание еды слишком длинное</string>
+    <string name="command_guard_carbs_implausible">углеводы > 300 г — похоже на ошибку распознавания</string>
+    <string name="command_guard_activity_empty">пустое описание активности</string>
+    <string name="command_guard_activity_too_long">описание активности слишком длинное</string>
+    <string name="command_guard_unknown_action">неизвестное действие «%1$s»</string>
+
+    <!-- IsfAnalysis -->
+    <string name="isf_tod_night">ночь 00–06</string>
+    <string name="isf_tod_morning">утро 06–12</string>
+    <string name="isf_tod_day">день 12–18</string>
+    <string name="isf_tod_evening">вечер 18–24</string>
+    <string name="isf_confidence_insufficient">данных недостаточно</string>
+    <string name="isf_confidence_preliminary">предварительная оценка</string>
+    <string name="isf_confidence_stable">устойчивая оценка</string>
+    <string name="isf_reject_dose_too_small">доза слишком мала</string>
+    <string name="isf_reject_activity_in_window">активность рядом (сенситизация)</string>
+    <string name="isf_reject_dose_too_large">доза слишком велика</string>
+    <string name="isf_reject_other_bolus_in_window">другой болюс в окне</string>
+    <string name="isf_reject_food_in_window">еда в окне (детект)</string>
+    <string name="isf_reject_no_pre_bolus_readings">нет показаний перед болюсом</string>
+    <string name="isf_reject_start_bg_too_low">стартовый сахар ниже порога</string>
+    <string name="isf_reject_insufficient_cgm_coverage">мало точек CGM в окне</string>
+    <string name="isf_reject_hypo_in_window">гипо в окне наблюдения</string>
+    <string name="isf_reject_no_end_window_readings">нет показаний в конце окна</string>
+    <string name="isf_reject_likely_unlogged_food">похоже на незалогированную еду (сахар рос после укола)</string>
+
+    <!-- LibreFram -->
+    <string name="libre_status_not_started">не запущен</string>
+    <string name="libre_status_starting">прогрев</string>
+    <string name="libre_status_ready">работает</string>
+    <string name="libre_status_expired">истёк</string>
+    <string name="libre_status_shutdown">остановлен</string>
+    <string name="libre_status_failure">сбой</string>
+    <string name="libre_status_unknown">неизвестно</string>
+
+    <!-- Momentum -->
+    <string name="trend_nuance_accelerating">ускоряется</string>
+    <string name="trend_nuance_decelerating">замедляется</string>
+    <string name="trend_nuance_reversed">развернулся</string>
+
+    <!-- RegimeV1 -->
+    <string name="regime_night">ночь</string>
+    <string name="regime_activity">активность</string>
+    <string name="regime_post_meal">после еды</string>
+    <string name="regime_post_bolus">после укола</string>
+    <string name="regime_quiet">спокойно</string>
+
+    <!-- ForecastHealthV1 -->
+    <string name="health_reason_stale">данные устарели (%1$d мин)</string>
+    <string name="health_reason_thin_evidence">эффективно свежих коррекций всего %1$.0f — модель опирается на мало данных</string>
+    <string name="health_reason_wide_band">коридор очень широк — модель не уверена в этом режиме</string>
+    <string name="health_reason_no_minute_stream">минутный поток недоступен — без momentum</string>
+    <string name="health_reason_sensor_implausible">датчик читает неправдоподобно (%1$s) — якорю не доверяем</string>
+    <plurals name="health_reason_floor_clamped">
+        <item quantity="one">модель упёрлась в физиологический пол %1$.1f ммоль на %2$d точке — за этой границей она ничего не значит</item>
+        <item quantity="few">модель упёрлась в физиологический пол %1$.1f ммоль на %2$d точках — за этой границей она ничего не значит</item>
+        <item quantity="many">модель упёрлась в физиологический пол %1$.1f ммоль на %2$d точках — за этой границей она ничего не значит</item>
+        <item quantity="other">модель упёрлась в физиологический пол %1$.1f ммоль на %2$d точках — за этой границей она ничего не значит</item>
+    </plurals>
+
+    <!-- Insulin action curve -->
+    <string name="insulin_landmark_onset">старт</string>
+    <string name="insulin_landmark_visible_fall">видимое падение</string>
+    <string name="insulin_landmark_peak">пик</string>
+    <string name="insulin_landmark_active_end">конец активной фазы</string>
+    <string name="insulin_landmark_slowdown">замедление</string>
+    <string name="insulin_landmark_tail_end">конец</string>
+    <string name="insulin_ordering_conflict">%1$s %2$.0f мин не позже %3$s %4$.0f мин — медианы пришли с разных уколов</string>
+    <string name="landmark_refusal_window_too_short">окно короче горизонта старта</string>
+    <string name="landmark_refusal_line_unreadable">линия не читается (мало точек до/после)</string>
+    <string name="landmark_refusal_no_break">линия не ломается — компенсировано или доза не подействовала</string>
+    <string name="landmark_refusal_all_rejected">лендмарки прочитаны, но ни один не прошёл проверки</string>
+    <string name="landmark_refusal_all_rejected_because">лендмарки прочитаны, но ни один не прошёл проверки: %1$s</string>
+    <string name="landmark_rejection_out_of_order">%1$s вне порядка/границ</string>
+    <string name="landmark_rejection_beyond_horizon">%1$s за горизонтом наблюдения</string>
+    <string name="landmark_rejection_onset_out_of_range">старт вне своего диапазона</string>
+    <string name="landmark_rejection_onset_dropped_for_peak">старт снят ИЗ-ЗА ПИКА (не разнесён на 10 мин)</string>
+    <string name="tail_refusal_not_enough_doses">меньше трёх чистых доз</string>
+    <string name="tail_refusal_never_settles">падение растёт до конца горизонта — хвост длиннее наблюдений</string>
+
+    <!-- DishRecognitionV1 -->
+    <string name="dish_question">Это ваш %1$s?</string>
+    <string name="dish_question_with_facts">Это ваш %1$s? (%2$s)</string>
+    <plurals name="dish_question_times">
+        <item quantity="one">%d раз</item>
+        <item quantity="few">%d раза</item>
+        <item quantity="many">%d раз</item>
+        <item quantity="other">%d раза</item>
+    </plurals>
+    <string name="dish_question_usual_carbs">обычно %1$.0f г</string>
+
+    <!-- MealMark -->
+    <string name="mark_kind_grams_more">граммов было больше</string>
+    <string name="mark_kind_grams_less">граммов было меньше</string>
+    <string name="mark_kind_rescue">это было купирование</string>
+    <string name="mark_kind_sensor_lied">сенсор врал</string>
+    <string name="mark_kind_ate_more">съел что-то ещё</string>
+    <string name="mark_kind_context">активность/стресс/болезнь</string>
+    <string name="mark_kind_model_wrong">дело в модели — ядро/вычитание</string>
+    <string name="mark_kind_unknown">не знаю</string>
+
+    <!-- FoodSuggest / FoodMemory / SysLabels / portion scaling -->
+    <string name="suggest_trigger_dose">укол</string>
+    <string name="suggest_trigger_detected_rise">подъём сахара</string>
+    <string name="background_force_insulin">инсулин</string>
+    <string name="background_force_food">еда</string>
+    <string name="sys_label_continuation">продолжение еды</string>
+    <string name="sys_label_dawn">утренняя заря</string>
+    <string name="sys_label_sport">спорт/адреналин</string>
+    <string name="sys_label_unknown">не знаю</string>
+    <string name="food_portion_word">порция</string>
+
+    <!-- TokenText: in Russian the stored token itself is shown; these mirror it. -->
+    <string name="bolus_purpose_correction">коррекция</string>
+    <string name="bolus_purpose_meal">на еду</string>
+    <string name="bolus_purpose_top_up">докол</string>
+    <string name="bolus_purpose_air">воздух</string>
+    <string name="note_tag_injection_belly">укол в живот</string>
+    <string name="note_tag_injection_thigh">укол в бедро</string>
+    <string name="note_tag_injection_arm">укол в руку</string>
+    <string name="note_tag_sleep_debt">недосып</string>
+    <string name="note_tag_ill">болею</string>
+    <string name="note_tag_stress">стресс</string>
+    <string name="note_tag_alcohol">алкоголь</string>
+    <string name="note_tag_workout">тренировка</string>
+    <string name="note_tag_walk">прогулка</string>
+    <string name="note_tag_new_sensor">новый сенсор</string>
+    <string name="note_tag_new_cartridge">новая ампула</string>
+    <string name="note_tag_photo">фото</string>
+    <string name="note_tag_sport">спорт</string>
+    <string name="note_tag_gym">зал</string>
+    <string name="note_tag_run">бег</string>
+    <string name="note_tag_bike">велосипед</string>
+    <string name="note_tag_psyllium">псилиум</string>
+    <string name="note_tag_fiber">клетчатка</string>
+    <string name="note_tag_fatty">жирное</string>
+    <string name="note_tag_vinegar">уксус</string>
+    <string name="note_tag_protein_first">белок первым</string>
+    <string name="note_tag_dextrose">декстроза</string>
+    <string name="note_tag_cartridge_warming">нагрев ампулы</string>
+    <string name="note_tag_minutes">%1$d мин</string>
+</resources>

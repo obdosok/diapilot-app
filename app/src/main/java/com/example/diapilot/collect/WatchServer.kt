@@ -3,7 +3,9 @@ package com.example.diapilot.collect
 import android.content.Context
 import android.os.BatteryManager
 import android.util.Log
+import com.example.diapilot.R
 import com.example.diapilot.data.Stores
+import com.example.diapilot.i18n.localized
 import org.json.JSONObject
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -309,7 +311,7 @@ class WatchServer(private val context: Context) {
                         mgdl = mgdlPref,
                         hypoProtocol = com.example.diapilot.data.Settings.hypoProtocol(context),
                     ),
-                )?.let { treatment.put("predictBWP", it) }
+                )?.let { treatment.put("predictBWP", com.example.diapilot.i18n.StatusText.watchHint(context, it)) }
             }
 
         val root = JSONObject()
@@ -458,7 +460,7 @@ class WatchServer(private val context: Context) {
         carbs?.let {
             store.addAnnotation(
                 com.diapilot.core.collector.Annotation(
-                    now, "food", "еда с часов", estCarbs = it,
+                    now, "food", context.localized().getString(R.string.watch_server_food_from_watch), estCarbs = it,
                 ),
             )
         }

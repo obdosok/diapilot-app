@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- History filter chips -->
+    <string name="label_screen_filter_all">All</string>
+    <string name="label_screen_filter_food">Food</string>
+    <string name="label_screen_filter_insulin">Insulin</string>
+    <string name="label_screen_filter_notes">Notes</string>
+
+    <!-- hybridFoodLine: the per-meal model-vs-fact card -->
+    <string name="label_screen_food_arithmetic">%1$.0f g × CS %2$s = +%3$s %4$s</string>
+    <string name="label_screen_food_forecast_only">forecast +%1$s %2$s</string>
+    <string name="label_screen_food_structured_mixture">structured mixture by macros</string>
+    <string name="label_screen_food_physio_template">general physiological template (macros not broken down)</string>
+    <string name="label_screen_food_cluster_summary">In this meal (%1$d dishes, shared stomach): half arrived ~%2$d</string>
+    <string name="label_screen_food_cluster_p90">90%% ~%1$d min</string>
+    <string name="label_screen_food_cluster_prior_absorbed">Previous dish is %1$d%% absorbed by this one</string>
+    <string name="label_screen_food_macro_line">Macros: %1$.0f / %2$.0f / %3$.0f g · ~%4$.0f kcal</string>
+    <string name="label_screen_food_prediction">Model forecast: %1$s · start ~%2$d · half arrived ~%3$d · 90%% of main reaction ~%4$d min</string>
+    <string name="label_screen_food_timing">Timing: %1$s</string>
+    <string name="label_screen_food_fact_not_calculated">Episode measurement: not yet calculated — no clean deconvolution window.</string>
+    <string name="label_screen_food_fact_reason">Episode measurement: %1$s.</string>
+    <string name="label_screen_food_reason_overlapped">overlapped by a neighboring meal</string>
+    <string name="label_screen_food_reason_carbs_missing">carbs not logged</string>
+    <string name="label_screen_food_reason_not_extractable">could not isolate a clean curve</string>
+    <string name="label_screen_food_reason_insufficient_data">not enough data</string>
+    <string name="label_screen_food_onset_fact">start ~%1$d min (%2$s vs forecast)</string>
+    <string name="label_screen_food_level_max_censored">rise seen up to at least ~%1$d min</string>
+    <string name="label_screen_food_level_max">peak level ~%1$d min</string>
+    <string name="label_screen_food_plateau_fact">plateau ~%1$d min (%2$s vs forecast)</string>
+    <string name="label_screen_food_late_phase">late phase observed, exact plateau minute not isolated</string>
+    <string name="label_screen_food_amplitude_delta">(Δ%1$s vs model)</string>
+    <string name="label_screen_food_missing_onset">start</string>
+    <string name="label_screen_food_missing_level_max">end of rise</string>
+    <string name="label_screen_food_missing_plateau">exact plateau</string>
+    <string name="label_screen_food_missing">Not confirmed: %1$s</string>
+    <string name="label_screen_food_fragment_only">Only a fragment of the rise is visible</string>
+    <string name="label_screen_food_overlap_resolved">overlap with neighbor ~%1$s (rise and insulin split between meals)</string>
+    <string name="label_screen_food_overlap_unresolved">overlap with neighbor ~%1$s — could not reliably split</string>
+    <string name="label_screen_food_confidence_pct">confidence %1$.0f%%</string>
+    <string name="label_screen_food_sensor_unstable">sensor unstable</string>
+    <string name="label_screen_food_quality">Method: %1$s</string>
+    <string name="label_screen_food_curve_dish">Dish</string>
+    <string name="label_screen_food_curve_model">Model</string>
+    <string name="label_screen_food_curve_mix">Mix</string>
+    <string name="label_screen_food_curve_fact">Fact</string>
+    <string name="label_screen_food_curve_window">(window to ~%1$d min)</string>
+    <string name="label_screen_food_curve_reconstructed">Fact — reconstructed: glucose minus insulin</string>
+    <string name="label_screen_food_curve_reconstructed_neighbor">Fact — reconstructed: glucose minus insulin, minus neighbor</string>
+    <string name="label_screen_food_episode_header">Episode measurement (deconvolution)</string>
+    <string name="label_screen_food_no_model">No model calculation: needs logged carbs</string>
+
+    <!-- Stage10MealReceipt -->
+    <string name="label_screen_receipt_next_meal">By the next meal at %1$s, the model attributes %2$.0f%% of the contribution: +%3$.1f out of +%4$.1f mmol/L; %5$.0f%% remains.</string>
+    <string name="label_screen_receipt_cluster_completed">Early contribution finished before the next meal: the carbs count toward the total, but don\'t stretch the series timing.</string>
+    <string name="label_screen_receipt_cluster_only">A series of %1$d entries (~%2$s g) counts as one meal: the dishes never separated.</string>
+    <string name="label_screen_receipt_unlogged_residual">Unlogged residual: +%1$.1f mmol/L — something unlogged was active in this window.</string>
+    <string name="label_screen_receipt_hide_calc">Hide calculation</string>
+    <string name="label_screen_receipt_how_calculated">How was this calculated?</string>
+    <string name="label_screen_receipt_forecast_prefix">Forecast: %1$s</string>
+    <string name="label_screen_receipt_confidence_prefix">Confidence: %1$s</string>
+    <string name="label_screen_receipt_progress">Detailed episode estimate: %1$d of %2$d</string>
+    <string name="label_screen_receipt_progress_note">Finishing in the background on the “Today” tab — nothing to tap.</string>
+
+    <!-- Top bar: title, search, menu -->
+    <string name="label_screen_history_title">History</string>
+    <plurals name="label_screen_history_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="label_screen_now">Now</string>
+    <string name="label_screen_date">Date</string>
+    <string name="label_screen_menu_dishes_recipes">Dishes and recipes</string>
+    <string name="label_screen_menu_estimating_macros">Estimating macros…</string>
+    <string name="label_screen_menu_fill_macros">Fill in macros and kcal</string>
+    <string name="label_screen_menu_history_maintenance">History maintenance…</string>
+    <string name="label_screen_search_label">Search food</string>
+    <string name="label_screen_search_placeholder">pancakes, buckwheat, ice cream…</string>
+    <string name="label_screen_search_found">Found: %1$d</string>
+    <string name="label_screen_maintenance_title">History maintenance</string>
+    <string name="label_screen_maintenance_hint">These tools fix old records; you won\'t need them day to day.</string>
+    <string name="label_screen_maintenance_check_links">Check note links</string>
+    <string name="label_screen_maintenance_decompose">Break down composite dishes</string>
+    <string name="label_screen_maintenance_llm_decompose">Parse free text via LLM</string>
+    <string name="label_screen_close">Close</string>
+    <string name="label_screen_nutrition_title">Macros and kcal</string>
+    <string name="label_screen_nutrition_empty">No records to fill in, or the LLM key isn\'t set.</string>
+    <string name="label_screen_nutrition_summary">One request · %1$d typical portions · %2$d records. Carbs and composition stay unchanged.</string>
+    <string name="label_screen_nutrition_row">%1$s: P %2$.0f · F %3$.0f · %4$.0f kcal</string>
+
+    <!-- Shared buttons -->
+    <string name="label_screen_cancel">Cancel</string>
+    <string name="label_screen_save">Save</string>
+    <string name="label_screen_delete">Delete</string>
+    <string name="label_screen_ok">OK</string>
+
+    <!-- Meal row: timing, dose, headline -->
+    <string name="label_screen_timing_before">(%1$d min before)</string>
+    <string name="label_screen_timing_after">(in %1$d min)</string>
+    <string name="label_screen_timing_with_meal">(with the meal)</string>
+    <string name="label_screen_bolus_units">%1$.1f U</string>
+    <string name="label_screen_hypo_treatment">hypo treatment</string>
+    <string name="label_screen_carbs_approx">~%1$.0f g</string>
+    <string name="label_screen_not_labeled">not labeled</string>
+    <string name="label_screen_bolus_prefix">bolus %1$s</string>
+    <string name="label_screen_not_food_header">This isn\'t food:</string>
+    <string name="label_screen_false_detection">🗑 False detection</string>
+
+    <!-- Continuation line -->
+    <string name="label_screen_continuation_line">sensor observation: continuation +%1$s over %2$.0f min</string>
+
+    <!-- Bolus row / editor -->
+    <string name="label_screen_at_bg">at %1$s</string>
+    <string name="label_screen_bolus_purpose_header">Purpose:</string>
+    <string name="label_screen_edit_dose">✎ dose</string>
+    <string name="label_screen_chart">📈 chart</string>
+
+    <!-- Basal row / editor -->
+    <string name="label_screen_basal_units">basal %1$.0f U</string>
+    <string name="label_screen_basal_label">Basal</string>
+    <string name="label_screen_dose_units_label">Dose, U</string>
+
+    <!-- Note row -->
+    <string name="label_screen_note_total_carbs">total ~%1$.0f g carbs</string>
+
+    <!-- Meter row -->
+    <string name="label_screen_meter_label">meter</string>
+    <string name="label_screen_meter_dialog_title">Meter reading</string>
+    <string name="label_screen_minus_30m">−30m</string>
+    <string name="label_screen_plus_30m">+30m</string>
+
+    <!-- Bottom dialogs -->
+    <string name="label_screen_delete_bolus_title">Delete injection?</string>
+    <string name="label_screen_delete_bolus_text">The record will disappear from analytics for good — syncing from xDrip won\'t bring it back.</string>
+    <string name="label_screen_delete_meter_title">Delete meter reading?</string>
+    <string name="label_screen_delete_basal_title">Delete basal record?</string>
+    <string name="label_screen_dismiss_title">Remove this detection?</string>
+    <string name="label_screen_dismiss_text">For false detections (sensor noise, compression during sleep): the event will disappear from food and analytics for good. A real rise without food is better marked with a label — 🌅 dawn, 💪 sport, or ❓ not sure.</string>
+    <string name="label_screen_remove">Remove</string>
+
+    <!-- MealCard -->
+    <string name="label_screen_no_bolus">no bolus</string>
+    <string name="label_screen_current_label">now: %1$s</string>
+    <string name="label_screen_bg_rise_duration">%1$s over %2$.0f min</string>
+    <string name="label_screen_bolus_dose">bolus %1$.1f U</string>
+    <string name="label_screen_suggested_from_note">✓ %1$s — from your note</string>
+    <string name="label_screen_log_food">🍽 Log food…</string>
+
+    <!-- ReconcileDialog -->
+    <string name="label_screen_reconcile_all_matched">All matched</string>
+    <string name="label_screen_reconcile_title">Rebuild labels (%1$d)</string>
+    <string name="label_screen_reconcile_empty_text">Episode labels match the notes — nothing to fix.</string>
+    <string name="label_screen_reconcile_hint">A note was renamed, but the episode label (what trains the model) stayed old. Check which ones to relabel:</string>
+    <string name="label_screen_reconcile_change">“%1$s” → “%2$s”</string>
+    <string name="label_screen_apply">Apply (%1$d)</string>
+
+    <!-- DecomposeDialog -->
+    <string name="label_screen_decompose_empty_title">Nothing to break down</string>
+    <string name="label_screen_decompose_title">Break into components (%1$d)</string>
+    <string name="label_screen_decompose_empty_text">No composite meals left with a recognizable list — atomic ones (beer, dextrose) and already broken-down ones are left alone.</string>
+    <string name="label_screen_decompose_hint">The name stays as is — only the composition (model metadata) is written. Components can be edited or removed:</string>
+    <string name="label_screen_grams_placeholder">g</string>
+</resources>

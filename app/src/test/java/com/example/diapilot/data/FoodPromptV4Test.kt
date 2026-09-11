@@ -23,11 +23,11 @@ class FoodPromptV4Test {
     @Test fun `the prompt requires naming every material assumption`() {
         assertTrue(
             "the text instruction must require naming guesses",
-            src.contains("НАЗЫВАЙ в assumptions — не предполагай молча"),
+            src.contains("Name every material assumption you had to make because the description was ambiguous in assumptions — never assume silently"),
         )
         assertTrue(
             "and the same duty in the photo instruction",
-            src.split("FOOD_VISION_INSTR")[1].contains("НАЗЫВАЙ в assumptions"),
+            src.split("foodVisionInstr")[1].contains("Name every material assumption"),
         )
     }
 
@@ -35,12 +35,12 @@ class FoodPromptV4Test {
         // The −0.45 defect was the model answering "how fast for the user" when
         // asked about the food. The assumptions field must not reopen it.
         assertTrue(
-            src.contains("Только факты о ЕДЕ — никогда о дозах или") ||
-                src.contains("никогда о дозах"),
+            src.contains("Only facts about FOOD — never about doses or") ||
+                src.contains("never about doses"),
         )
         assertTrue(
             "the instruction must forbid the question \"how fast will this raise the user's glucose\"",
-            src.contains("как быстро это поднимет сахар у него"),
+            src.contains("how fast this will raise the user's glucose"),
         )
     }
 
@@ -71,21 +71,21 @@ class FoodPromptV4Test {
             ),
         )
         val text = body.getJSONArray("messages").getJSONObject(0).getString("content")
-        assertTrue("no known-components block", "ИЗВЕСТНЫЕ КОМПОНЕНТЫ" in text)
-        assertTrue("the user's hummus is missing", "хумус: 8 г/порция" in text)
+        assertTrue("no known-components block", "KNOWN COMPONENTS" in text)
+        assertTrue("the user's hummus is missing", "хумус: 8 g/portion" in text)
         assertTrue("the confirmed fact about the bread did not arrive", "цельнозерновой" in text)
         assertFalse("the unmentioned buckwheat must be filtered out", "гречка" in text)
         assertFalse("the unmentioned nutella must be filtered out", "нутелла" in text)
         assertTrue(
             "the rule \"use the user's own values instead of reference ones\" must be in the instruction",
-            "бери ЕГО углеводы на порцию и записанные факты вместо справочных" in text,
+            "use ITS carbs per portion and the recorded facts instead of reference" in text,
         )
     }
 
     @Test fun `an empty library adds no block`() {
         val body = AskClaude.textRequestBody("яблоко", null, emptyList())
         val text = body.getJSONArray("messages").getJSONObject(0).getString("content")
-        assertFalse("ИЗВЕСТНЫЕ КОМПОНЕНТЫ" in text)
+        assertFalse("KNOWN COMPONENTS" in text)
     }
 
     private fun visionText(caption: String?): String {
@@ -101,11 +101,11 @@ class FoodPromptV4Test {
     }
 
     @Test fun `vision gets the components when the caption names them`() {
-        assertTrue("ИЗВЕСТНЫЕ КОМПОНЕНТЫ" in visionText("тост с хлебом"))
+        assertTrue("KNOWN COMPONENTS" in visionText("тост с хлебом"))
     }
 
     @Test fun `a captionless photo gets no component block — stability over a speculative match`() {
-        assertFalse("ИЗВЕСТНЫЕ КОМПОНЕНТЫ" in visionText(null))
+        assertFalse("KNOWN COMPONENTS" in visionText(null))
     }
 
     // ---- the response budget clears the v4 output --------------------------

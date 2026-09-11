@@ -63,7 +63,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         // BT off, sensor gone) must become a notification, not an empty
         // chart discovered an hour later. The notifier no-ops on fresh data.
         if (ownBle) {
-            StreamStallNotifier.maybeNotify(applicationContext, "Поток с сенсора остановился")
+            StreamStallNotifier.maybeNotify(applicationContext, com.example.diapilot.R.string.stream_stall_notifier_reason_stopped)
         }
 
         // 1. Glucose backfill from sgv.json (confirmed reachable in the phone browser).

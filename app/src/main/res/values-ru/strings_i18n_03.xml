@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- History filter chips -->
+    <string name="label_screen_filter_all">Всё</string>
+    <string name="label_screen_filter_food">Еда</string>
+    <string name="label_screen_filter_insulin">Инсулин</string>
+    <string name="label_screen_filter_notes">Заметки</string>
+
+    <!-- hybridFoodLine: the per-meal model-vs-fact card -->
+    <string name="label_screen_food_arithmetic">%1$.0f г × CS %2$s = +%3$s %4$s</string>
+    <string name="label_screen_food_forecast_only">прогноз +%1$s %2$s</string>
+    <string name="label_screen_food_structured_mixture">структурная смесь по БЖУ</string>
+    <string name="label_screen_food_physio_template">общий физиологический шаблон (БЖУ не разобраны)</string>
+    <string name="label_screen_food_cluster_summary">В этом приёме (блюд: %1$d, желудок общий): половина пришла ~%2$d</string>
+    <string name="label_screen_food_cluster_p90">90%% ~%1$d мин</string>
+    <string name="label_screen_food_cluster_prior_absorbed">К этому блюду предыдущее усвоено на %1$d%%</string>
+    <string name="label_screen_food_macro_line">БЖУ: %1$.0f / %2$.0f / %3$.0f г · ~%4$.0f ккал</string>
+    <string name="label_screen_food_prediction">Прогноз модели: %1$s · старт ~%2$d · половина пришла ~%3$d · 90%% основной реакции ~%4$d мин</string>
+    <string name="label_screen_food_timing">Тайминг: %1$s</string>
+    <string name="label_screen_food_fact_not_calculated">Факт эпизода: пока не рассчитан — чистого окна деконволюции нет.</string>
+    <string name="label_screen_food_fact_reason">Факт эпизода: %1$s.</string>
+    <string name="label_screen_food_reason_overlapped">перекрыто соседней едой</string>
+    <string name="label_screen_food_reason_carbs_missing">не записаны углеводы</string>
+    <string name="label_screen_food_reason_not_extractable">не удалось выделить чистую кривую</string>
+    <string name="label_screen_food_reason_insufficient_data">недостаточно данных</string>
+    <string name="label_screen_food_onset_fact">старт ~%1$d мин (%2$s к прогнозу)</string>
+    <string name="label_screen_food_level_max_censored">рост виден как минимум до ~%1$d мин</string>
+    <string name="label_screen_food_level_max">максимум уровня ~%1$d мин</string>
+    <string name="label_screen_food_plateau_fact">плато ~%1$d мин (%2$s к прогнозу)</string>
+    <string name="label_screen_food_late_phase">поздняя фаза наблюдалась, точная минута плато не выделена</string>
+    <string name="label_screen_food_amplitude_delta">(Δ%1$s к модели)</string>
+    <string name="label_screen_food_missing_onset">старт</string>
+    <string name="label_screen_food_missing_level_max">конец роста</string>
+    <string name="label_screen_food_missing_plateau">точное плато</string>
+    <string name="label_screen_food_missing">Не подтверждено: %1$s</string>
+    <string name="label_screen_food_fragment_only">Виден только фрагмент подъёма</string>
+    <string name="label_screen_food_overlap_resolved">перекрытие с соседом ~%1$s (подъём и инсулин разделены между блюдами)</string>
+    <string name="label_screen_food_overlap_unresolved">перекрытие с соседом ~%1$s — надёжно разделить не удалось</string>
+    <string name="label_screen_food_confidence_pct">доверие %1$.0f%%</string>
+    <string name="label_screen_food_sensor_unstable">сенсор нестабилен</string>
+    <string name="label_screen_food_quality">Метод: %1$s</string>
+    <string name="label_screen_food_curve_dish">Блюдо</string>
+    <string name="label_screen_food_curve_model">Модель</string>
+    <string name="label_screen_food_curve_mix">Состав</string>
+    <string name="label_screen_food_curve_fact">Факт</string>
+    <string name="label_screen_food_curve_window">(окно до ~%1$d мин)</string>
+    <string name="label_screen_food_curve_reconstructed">Факт — восстановлено: глюкоза минус инсулин</string>
+    <string name="label_screen_food_curve_reconstructed_neighbor">Факт — восстановлено: глюкоза минус инсулин, минус сосед</string>
+    <string name="label_screen_food_episode_header">Факт эпизода (деконволюция)</string>
+    <string name="label_screen_food_no_model">Нет расчёта модели: нужны записанные углеводы</string>
+
+    <!-- Stage10MealReceipt -->
+    <string name="label_screen_receipt_next_meal">К следующей еде в %1$s модель относит уже %2$.0f%% вклада: +%3$.1f из +%4$.1f ммоль/л; остаток %5$.0f%%.</string>
+    <string name="label_screen_receipt_cluster_completed">Ранний вклад завершён до следующей еды: углеводы входят в общую амплитуду, но не растягивают тайминг серии.</string>
+    <string name="label_screen_receipt_cluster_only">Серия из %1$d записей (~%2$s г) считается одним приёмом: блюда не разделились.</string>
+    <string name="label_screen_receipt_unlogged_residual">Незакрытый остаток: +%1$.1f ммоль/л — в этом окне действовало что-то незаписанное</string>
+    <string name="label_screen_receipt_hide_calc">Скрыть расчёт</string>
+    <string name="label_screen_receipt_how_calculated">Как рассчитано?</string>
+    <string name="label_screen_receipt_forecast_prefix">Прогноз: %1$s</string>
+    <string name="label_screen_receipt_confidence_prefix">Уверенность: %1$s</string>
+    <string name="label_screen_receipt_progress">Подробная оценка эпизодов: %1$d из %2$d</string>
+    <string name="label_screen_receipt_progress_note">Досчитывается в фоне на вкладке «Сегодня» — ничего нажимать не нужно.</string>
+
+    <!-- Top bar: title, search, menu -->
+    <string name="label_screen_history_title">История</string>
+    <plurals name="label_screen_history_days">
+        <item quantity="one">%1$d день</item>
+        <item quantity="few">%1$d дня</item>
+        <item quantity="many">%1$d дней</item>
+        <item quantity="other">%1$d дня</item>
+    </plurals>
+    <string name="label_screen_now">Сейчас</string>
+    <string name="label_screen_date">Дата</string>
+    <string name="label_screen_menu_dishes_recipes">Блюда и рецепты</string>
+    <string name="label_screen_menu_estimating_macros">Оцениваю БЖУ…</string>
+    <string name="label_screen_menu_fill_macros">Заполнить БЖУ и ккал</string>
+    <string name="label_screen_menu_history_maintenance">Обслуживание истории…</string>
+    <string name="label_screen_search_label">Поиск по еде</string>
+    <string name="label_screen_search_placeholder">блины, гречка, мороженое…</string>
+    <string name="label_screen_search_found">Найдено: %1$d</string>
+    <string name="label_screen_maintenance_title">Обслуживание истории</string>
+    <string name="label_screen_maintenance_hint">Эти инструменты чинят старые записи; повседневно они не нужны.</string>
+    <string name="label_screen_maintenance_check_links">Проверить связи заметок</string>
+    <string name="label_screen_maintenance_decompose">Разобрать составные блюда</string>
+    <string name="label_screen_maintenance_llm_decompose">Разобрать свободный текст через LLM</string>
+    <string name="label_screen_close">Закрыть</string>
+    <string name="label_screen_nutrition_title">БЖУ и ккал</string>
+    <string name="label_screen_nutrition_empty">Нет записей для заполнения либо не настроен ключ LLM.</string>
+    <string name="label_screen_nutrition_summary">Один запрос · %1$d типовых порций · %2$d записей. Углеводы и состав не меняются.</string>
+    <string name="label_screen_nutrition_row">%1$s: Б %2$.0f · Ж %3$.0f · %4$.0f ккал</string>
+
+    <!-- Shared buttons -->
+    <string name="label_screen_cancel">Отмена</string>
+    <string name="label_screen_save">Сохранить</string>
+    <string name="label_screen_delete">Удалить</string>
+    <string name="label_screen_ok">Ок</string>
+
+    <!-- Meal row: timing, dose, headline -->
+    <string name="label_screen_timing_before">(за %1$d мин до)</string>
+    <string name="label_screen_timing_after">(через %1$d мин)</string>
+    <string name="label_screen_timing_with_meal">(вместе с едой)</string>
+    <string name="label_screen_bolus_units">%1$.1f ед</string>
+    <string name="label_screen_hypo_treatment">лечение гипо</string>
+    <string name="label_screen_carbs_approx">~%1$.0f г</string>
+    <string name="label_screen_not_labeled">не размечено</string>
+    <string name="label_screen_bolus_prefix">болюс %1$s</string>
+    <string name="label_screen_not_food_header">Это не еда:</string>
+    <string name="label_screen_false_detection">🗑 Ложный детект</string>
+
+    <!-- Continuation line -->
+    <string name="label_screen_continuation_line">наблюдение сенсора: продолжение +%1$s за %2$.0f мин</string>
+
+    <!-- Bolus row / editor -->
+    <string name="label_screen_at_bg">при %1$s</string>
+    <string name="label_screen_bolus_purpose_header">Назначение:</string>
+    <string name="label_screen_edit_dose">✎ доза</string>
+    <string name="label_screen_chart">📈 график</string>
+
+    <!-- Basal row / editor -->
+    <string name="label_screen_basal_units">базал %1$.0f ед</string>
+    <string name="label_screen_basal_label">Базал</string>
+    <string name="label_screen_dose_units_label">Доза, ед</string>
+
+    <!-- Note row -->
+    <string name="label_screen_note_total_carbs">итого ~%1$.0f г углев</string>
+
+    <!-- Meter row -->
+    <string name="label_screen_meter_label">глюкометр</string>
+    <string name="label_screen_meter_dialog_title">Замер глюкометра</string>
+    <string name="label_screen_minus_30m">−30м</string>
+    <string name="label_screen_plus_30m">+30м</string>
+
+    <!-- Bottom dialogs -->
+    <string name="label_screen_delete_bolus_title">Удалить укол?</string>
+    <string name="label_screen_delete_bolus_text">Запись исчезнет из аналитики насовсем — синк из xDrip её не вернёт.</string>
+    <string name="label_screen_delete_meter_title">Удалить замер глюкометра?</string>
+    <string name="label_screen_delete_basal_title">Удалить запись базала?</string>
+    <string name="label_screen_dismiss_title">Убрать этот детект?</string>
+    <string name="label_screen_dismiss_text">Для ложных срабатываний (шум сенсора, компрессия во сне): событие исчезнет из еды и аналитики насовсем. Настоящий подъём без еды лучше пометить меткой — 🌅 заря, 💪 спорт или ❓ не знаю.</string>
+    <string name="label_screen_remove">Убрать</string>
+
+    <!-- MealCard -->
+    <string name="label_screen_no_bolus">без болюса</string>
+    <string name="label_screen_current_label">сейчас: %1$s</string>
+    <string name="label_screen_bg_rise_duration">%1$s за %2$.0f мин</string>
+    <string name="label_screen_bolus_dose">болюс %1$.1f ед</string>
+    <string name="label_screen_suggested_from_note">✓ %1$s — из вашей заметки</string>
+    <string name="label_screen_log_food">🍽 Записать еду…</string>
+
+    <!-- ReconcileDialog -->
+    <string name="label_screen_reconcile_all_matched">Всё согласовано</string>
+    <string name="label_screen_reconcile_title">Пересобрать метки (%1$d)</string>
+    <string name="label_screen_reconcile_empty_text">Метки эпизодов совпадают с заметками — чинить нечего.</string>
+    <string name="label_screen_reconcile_hint">Заметку переименовали, а метка эпизода (что учит модель) осталась старой. Отметьте, что переметить:</string>
+    <string name="label_screen_reconcile_change">«%1$s» → «%2$s»</string>
+    <string name="label_screen_apply">Применить (%1$d)</string>
+
+    <!-- DecomposeDialog -->
+    <string name="label_screen_decompose_empty_title">Нечего разбирать</string>
+    <string name="label_screen_decompose_title">Разобрать на компоненты (%1$d)</string>
+    <string name="label_screen_decompose_empty_text">Составных приёмов с распознаваемым списком не осталось — атомарные (пиво, декстроза) и уже разобранные не трогаем.</string>
+    <string name="label_screen_decompose_hint">Имя не меняем — только пишем состав (метаданные модели). Компоненты можно править и удалять:</string>
+    <string name="label_screen_grams_placeholder">г</string>
+</resources>

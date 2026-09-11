@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings added while integrating the i18n chunks: cross-file text that no
+     single chunk could convert on its own. -->
+<resources>
+    <!-- AskClaude: a failed LLM call, shown to the user, never stored. -->
+    <string name="ask_claude_error">Error: %1$s</string>
+
+    <!-- StreamStallNotifier: why the stream is considered stalled. -->
+    <string name="stream_stall_notifier_reason_stopped">The sensor stream stopped</string>
+    <string name="stream_stall_notifier_reason_login_rejected">The sensor rejected the BLE login at every nearby index</string>
+
+    <!-- PhysioTuning: summary of the applied tuning and the carb-triangle field labels. -->
+    <string name="physio_tuning_as_shipped">as shipped</string>
+    <string name="physio_tuning_trust">trust %1$s</string>
+    <string name="physio_tuning_insulin">insulin %1$s·%2$s·%3$s·%4$s</string>
+    <string name="physio_tuning_kcal_per_hour">%1$s kcal/h</string>
+    <string name="physio_tuning_sieve">sieve %1$s</string>
+    <string name="physio_tuning_types">types %1$s</string>
+    <string-array name="physio_tuning_triangle_labels">
+        <item>fast·start</item>
+        <item>fast·peak</item>
+        <item>fast·end</item>
+        <item>fast·macro</item>
+        <item>medium·start</item>
+        <item>medium·peak</item>
+        <item>medium·end</item>
+        <item>medium·macro</item>
+        <item>slow·start</item>
+        <item>slow·peak</item>
+        <item>slow·end</item>
+        <item>slow·macro</item>
+    </string-array>
+
+    <!-- HybridShadow: carb kinetics line of the "How it was calculated" dialog. -->
+    <string name="hybrid_shadow_kinetics">carbs: fast %1$s%%, medium %2$s%%, slow %3$s%%; form %4$s; confidence %5$s%%; source %6$s</string>
+    <string name="hybrid_shadow_kinetics_tail">carbs: fast %1$s%%, medium %2$s%%, slow %3$s%%; form %4$s; confidence %5$s%%; source %6$s; the model\'s remaining protein/fat tail lasts to ~%7$s min (after 90%% of the response)</string>
+    <string name="hybrid_shadow_kinetics_none">no structural features recorded; neutral prior</string>
+
+    <!-- HybridRuntimeMetrics: compact kinetics line on the History card. -->
+    <string name="hybrid_readout_kinetics">fast/medium/slow %1$d/%2$d/%3$d%%; %4$s</string>
+    <string name="hybrid_readout_kinetics_tail">fast/medium/slow %1$d/%2$d/%3$d%%; %4$s; trace tail to ~%5$d min</string>
+
+    <!-- LabelScreen: what the amplitude/timing of a History card is based on. -->
+    <string name="label_screen_basis_dish_profile">dish profile</string>
+    <string name="label_screen_basis_global_cs">global CS</string>
+    <string name="label_screen_basis_macros_duration">protein/fat and meal duration</string>
+
+    <!-- FoodCalculationRegistry: the Stage 10 part of the uncertainty line. -->
+    <string name="food_calculation_uncertainty_stage10">%1$s Stage 10 side-by-side — forecast: %2$s; assigned contribution: %3$s; phases: %4$s; overlap: %5$s; split: %6$s; %7$s; %8$s; %9$s; %10$s; %11$s; confidence %12$s; %13$s. Diagnostics do not drive alerts: owner = legacy.</string>
+
+    <!-- Stage9EpisodeRuntime: the retrospective History receipt of a meal. -->
+    <string name="stage9_episode_minutes">%1$s min</string>
+    <string name="stage9_episode_none">none</string>
+    <string name="stage9_episode_no_bolus">no bolus</string>
+    <string name="stage9_episode_curve">Contribution curve %1$s: the earliest contribution on the model curve, lag included, comes after %2$s min; model peak %3$s, %4$s mmol/L; at the last covered point %5$s. Before the next meal %6$s, after it %7$s.</string>
+    <string name="stage9_episode_curve_censored">Contribution curve %1$s (covered to ~%8$s min, the window is cut after that): the earliest contribution on the model curve, lag included, comes after %2$s min; model peak %3$s, %4$s mmol/L; at the last covered point %5$s. Before the next meal %6$s, after it %7$s.</string>
+    <string name="stage9_episode_transfer_resolved">The earlier meals fall short by %1$s and the last one exceeds by %2$s mmol/L; the tail has likely carried over. After the joint recalculation, %3$s–%4$s of the recognized food contribution belongs to the earlier dishes; unassigned remainder %5$s.</string>
+    <string name="stage9_episode_transfer_possible">The earlier meals fall short by %1$s and the last one exceeds by %2$s mmol/L; the tail may have carried over, but it cannot be split reliably. Plausible share of the earlier dishes in the recognized food contribution %3$s–%4$s; unassigned remainder %5$s.</string>
+    <string name="stage9_episode_transfer_overlap">The meals overlap; their contributions cannot be split reliably. The shared remainder is left unassigned.</string>
+    <string name="stage9_episode_transfer_none">No consistent tail carry-over found.</string>
+    <string name="stage9_episode_portion">%1$s g at %2$s</string>
+    <string name="stage9_episode_forecast">%1$s mmol/L: %2$s g × global CS %3$s</string>
+    <string name="stage9_episode_allocated_resolved">The joint model assigned %1$s mmol/L to this meal; plausible %2$s–%3$s (the estimate is held within the prior\'s bounds)</string>
+    <string name="stage9_episode_allocated_overlap">The meals overlap: this dish\'s own rise was not established. Range %1$s–%2$s mmol/L (within the prior\'s bounds); the point %3$s is a technical median, not a fact.</string>
+    <string name="stage9_episode_overlap">Neighboring meals: %1$s. Unlogged food / cluster remainder: %2$s mmol/L</string>
+    <string name="stage9_episode_allocation">Best share %1$s, possible range %2$s–%3$s</string>
+    <string name="stage9_episode_resolution_resolved">the split is stable</string>
+    <string name="stage9_episode_resolution_unresolved">unresolvable: the neighboring meals cannot be split reliably</string>
+    <string name="stage9_episode_resolution_censored">this meal\'s window is cut (%1$s min); a range is shown</string>
+    <string name="stage9_episode_kernel_physio">%1$s; single CDF of the selected PHYSIO profile; hash %2$s</string>
+    <string name="stage9_episode_kernel_difference_physio">The chart\'s conditional dose removal and this deconvolution use the same retrospective CGM profile. ISF stays personal to the bolus hour; the live forecast and hypo alerts are not changed by this profile.</string>
+    <string name="stage9_episode_kernel_difference_prior">Only the slow daily ISF from past episodes moves the median. Time of day, hypo and other contexts are not promoted yet and only widen the interval.</string>
+    <string name="stage9_episode_confidence_high">high</string>
+    <string name="stage9_episode_confidence_medium">medium</string>
+    <string name="stage9_episode_confidence_low">low</string>
+    <string name="stage9_episode_caveat_carbs">carbs %1$s–%2$s g (%3$s)</string>
+    <string name="stage9_episode_caveat_portions">portions: %1$s</string>
+    <string name="stage9_episode_caveat_sensor">sensor and background remain uncertain</string>
+    <string name="stage9_episode_caveat_truncated">the cluster was limited by the compute budget</string>
+    <string name="stage9_episode_caveat_overlap">the overlap cannot be identified</string>
+    <string name="stage9_episode_caveat_cluster_timing">individual timing replaced by the shared timing of the meal cluster</string>
+    <string name="stage9_episode_caveat_locked" formatted="false">at least 90% of the early contribution finished before the next meal and was locked</string>
+    <string name="stage9_episode_caveat_mismatch">the joint model did not explain the episode: it is excluded from confident food learning</string>
+    <string name="stage9_episode_caveat_late_censored">this meal\'s late window is cut</string>
+    <string name="stage9_episode_caveat_cgm_censored">this meal\'s CGM window is cut by a gap or sparse points</string>
+    <string name="stage9_episode_caveat_input_truncated">input truncated; the split was not established</string>
+    <string name="stage9_episode_caveat_insulin">insulin uncertainty is included in the interval</string>
+    <string name="stage9_episode_caveat_residual">the shared unexplained remainder is kept</string>
+    <string name="stage9_episode_caveat_phase">phase window available, but the phase was not established</string>
+    <string name="stage9_episode_caveat_weak_grams">weak source for the carb estimate</string>
+    <string name="stage9_episode_caveat_unknown_context">unknown context widens the insulin interval</string>
+    <string name="stage9_episode_causal_provenance">Causal: frozen prior + CarbEvidence/ISF with knownAt ≤ cutoff; the current Twin kernel and the unversioned dish text are not used.</string>
+    <string name="stage9_episode_diagnostic_provenance">Retrospective post-hoc: post-meal CGM, fitted background, residual and allocation; not part of the live forecast or alerts.</string>
+    <string name="stage9_episode_compact_summary">Expected +%1$s; from the episode +%2$s (%3$s–%4$s) mmol/L</string>
+    <string name="stage9_episode_finding_completed">The early contribution finished before the next meal and was locked separately; it is included in the total carbs.</string>
+    <string name="stage9_episode_finding_series_bounded">Shared timing of the series: start ~%1$s min; the series is still active at the window edge (6 h), peak and end not established.</string>
+    <string name="stage9_episode_finding_series">Shared timing of the series: start ~%1$s min; peak ~%2$s, main phase until ~%3$s min.</string>
+    <string name="stage9_episode_finding_series_unsplit">The dishes of this series did not separate; the rise is computed from the total carbs.</string>
+    <string name="stage9_episode_finding_transfer">A likely tail carry-over between neighboring dishes was found.</string>
+    <string name="stage9_episode_finding_resolved">The dish\'s contribution was separated from neighboring events.</string>
+    <string name="stage9_episode_finding_unresolved">The meals overlap: this dish cannot be assessed on its own yet.</string>
+    <string name="stage9_episode_finding_censored">Not enough later CGM history for a full assessment.</string>
+    <string name="stage9_episode_phase_start">start</string>
+    <string name="stage9_episode_phase_level_max">peak level</string>
+    <string name="stage9_episode_phase_late">late phase</string>
+    <string name="stage9_episode_phase_plateau">plateau</string>
+    <string name="stage9_episode_phases_cluster_bounded">Individual phases are not established. Shared timing of the series (~%1$s g): start ~%2$s min; the series is still active at the window edge (6 h), peak and end not established.</string>
+    <string name="stage9_episode_phases_cluster">Individual phases are not established. Shared timing of the series (~%1$s g): start ~%2$s, peak level ~%3$s, main phase until ~%4$s min.</string>
+    <string name="stage9_episode_phases_cluster_none">Individual phases are not established. The shared timing of the cluster is not isolated yet either.</string>
+    <string name="stage9_episode_phases_completed" formatted="false">At least 90% of the early contribution finished before the next meal; its phase is locked separately and not stretched by the protein and fat of the later food.</string>
+    <string name="stage9_episode_phases_seen">Established: %1$s.</string>
+    <string name="stage9_episode_phases_missing">Window available, but not established: %1$s.</string>
+    <string name="stage9_episode_phases_no_data">Not enough data to establish the phase yet.</string>
+</resources>

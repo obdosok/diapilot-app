@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -46,10 +48,12 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import com.diapilot.core.analysis.FoodMemory
 import com.diapilot.core.analysis.normalizeFoodName
+import com.example.diapilot.R
 import com.example.diapilot.data.SqliteCollectorStore
 import com.example.diapilot.data.SqliteCollectorStore.FoodLibEntry
 import com.example.diapilot.data.SqliteCollectorStore.RecipeItem
 import com.example.diapilot.data.Stores
+import com.example.diapilot.i18n.localized
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -149,11 +153,16 @@ internal fun FoodLibraryDialog(
             val perG = median(corpus.filter { it.carbGrams > 0 }.map { it.peakRise / it.carbGrams })
             val onsets = corpus.mapNotNull { it.onsetLagMin }
             val onsetMed = if (onsets.isEmpty()) null else median(onsets)
-            "%d наблюдений из %d заметок · цензур. %d%%%s · ttp медиана %.0f мин · %.2f ммоль/г".format(
-                corpus.size, totalNotes,
-                if (corpus.isNotEmpty()) 100 * censored / corpus.size else 0,
-                onsetMed?.let { " · начало медиана %.0f мин".format(it) } ?: "",
-                ttpMed, perG,
+            val censoredPct = if (corpus.isNotEmpty()) 100 * censored / corpus.size else 0
+            val text = context.localized()
+            onsetMed?.let {
+                text.getString(
+                    R.string.food_library_deconv_stats_with_onset,
+                    corpus.size, totalNotes, censoredPct, it, ttpMed, perG,
+                )
+            } ?: text.getString(
+                R.string.food_library_deconv_stats,
+                corpus.size, totalNotes, censoredPct, ttpMed, perG,
             )
         }
     }
@@ -251,17 +260,17 @@ internal fun FoodLibraryDialog(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "📚 Библиотека еды",
+                        stringResource(R.string.food_library_title),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { addingNew = true }) { Text("＋ Продукт") }
+                    TextButton(onClick = { addingNew = true }) { Text(stringResource(R.string.food_library_add_product)) }
                     IconButton(onClick = onDismiss) { Text("✕") }
                 }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Поиск") },
+                    label = { Text(stringResource(R.string.food_library_search)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -282,14 +291,14 @@ internal fun FoodLibraryDialog(
                                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     val pct = 100 * s.withComposition / s.totalMeals.coerceAtLeast(1)
                                     Text(
-                                        "🧩 Субстрат для компонентной модели: " +
-                                            "${s.withComposition} из ${s.totalMeals} приёмов с составом ($pct%)",
+                                        pluralStringResource(
+                                            R.plurals.food_library_substrate_title, s.totalMeals,
+                                            s.withComposition, s.totalMeals, pct,
+                                        ),
                                         style = MaterialTheme.typography.titleSmall,
                                     )
                                     Text(
-                                        "Приёмы с разбором на компоненты — обучающая база под будущую " +
-                                            "модель по компонентам. Растёт по мере логирования составных " +
-                                            "блюд. Тап — словарь компонентов.",
+                                        stringResource(R.string.food_library_substrate_hint),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -297,13 +306,16 @@ internal fun FoodLibraryDialog(
                                         Divider()
                                         s.vocabulary.take(30).forEach { cs ->
                                             Text(
-                                                "%s · %d приёмов · %.0f г всего".format(cs.name, cs.meals, cs.totalGrams),
+                                                pluralStringResource(
+                                                    R.plurals.food_library_substrate_vocab_line, cs.meals,
+                                                    cs.name, cs.meals, cs.totalGrams,
+                                                ),
                                                 style = MaterialTheme.typography.bodySmall,
                                             )
                                         }
                                         if (s.vocabulary.size > 30) {
                                             Text(
-                                                "…и ещё ${s.vocabulary.size - 30}",
+                                                stringResource(R.string.food_library_and_more, s.vocabulary.size - 30),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -321,34 +333,44 @@ internal fun FoodLibraryDialog(
                             val poolsWithVariants = mapped.count { it.aliases.size > 1 }
                             OutlinedCard(onClick = { open = !open }, modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    val recordCount = mapped.sumOf { it.occurrences }
                                     Text(
-                                        "🍱 Концепты: ${mapped.size} на ${mapped.sumOf { it.occurrences }} записей" +
-                                            (gap?.let { " · ? не распознано: ${it.occurrences}" } ?: ""),
+                                        gap?.let {
+                                            pluralStringResource(
+                                                R.plurals.food_library_concepts_title_with_gap, recordCount,
+                                                mapped.size, recordCount, it.occurrences,
+                                            )
+                                        } ?: pluralStringResource(
+                                            R.plurals.food_library_concepts_title, recordCount,
+                                            mapped.size, recordCount,
+                                        ),
                                         style = MaterialTheme.typography.titleSmall,
                                     )
                                     Text(
-                                        "История сведена по concept-id, а не по названию. " +
-                                            "$poolsWithVariants концепт(ов) собрали разные имена в один пул — " +
-                                            "переименовывать вручную не нужно. Тап — раскрыть.",
+                                        pluralStringResource(
+                                            R.plurals.food_library_concepts_hint, poolsWithVariants,
+                                            poolsWithVariants,
+                                        ),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     if (open) {
                                         Divider()
                                         Text(
-                                            "Тап по имени → переназначить концепт вручную.",
+                                            stringResource(R.string.food_library_concepts_tap_hint),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                         mapped.forEach { p ->
                                             val speed = when (p.carbSpeed) {
-                                                com.diapilot.core.analysis.CarbSpeed.FAST -> "быстро"
-                                                com.diapilot.core.analysis.CarbSpeed.MED -> "средне"
-                                                com.diapilot.core.analysis.CarbSpeed.SLOW -> "медленно"
+                                                com.diapilot.core.analysis.CarbSpeed.FAST -> stringResource(R.string.food_library_speed_fast)
+                                                com.diapilot.core.analysis.CarbSpeed.MED -> stringResource(R.string.food_library_speed_medium)
+                                                com.diapilot.core.analysis.CarbSpeed.SLOW -> stringResource(R.string.food_library_speed_slow)
                                                 com.diapilot.core.analysis.CarbSpeed.NONE -> "—"
                                             }
                                             Text(
-                                                "%s · ×%d · %.0f г · %s".format(
+                                                stringResource(
+                                                    R.string.food_library_concept_summary_line,
                                                     p.label, p.occurrences, p.totalCarbs, speed,
                                                 ),
                                                 style = MaterialTheme.typography.bodySmall,
@@ -367,7 +389,7 @@ internal fun FoodLibraryDialog(
                                             }
                                             if (p.aliases.size > 8) {
                                                 Text(
-                                                    "  …и ещё ${p.aliases.size - 8}",
+                                                    "  " + stringResource(R.string.food_library_and_more, p.aliases.size - 8),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -376,7 +398,7 @@ internal fun FoodLibraryDialog(
                                         gap?.takeIf { it.aliases.isNotEmpty() }?.let { g ->
                                             Divider()
                                             Text(
-                                                "? нет концепта (${g.occurrences}) — тап, чтобы назначить:",
+                                                stringResource(R.string.food_library_no_concept_prompt, g.occurrences),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -425,7 +447,11 @@ internal fun FoodLibraryDialog(
                                         }
                                         g?.let {
                                             Text(
-                                                "${it.toInt()} г" + if (row.lib?.grams != null) " ✎" else "",
+                                                if (row.lib?.grams != null) {
+                                                    stringResource(R.string.food_library_grams_edited, it.toInt())
+                                                } else {
+                                                    stringResource(R.string.food_library_grams, it.toInt())
+                                                },
                                                 style = MaterialTheme.typography.bodyMedium,
                                             )
                                         }
@@ -440,14 +466,18 @@ internal fun FoodLibraryDialog(
                                         )
                                     }
                                     val mem = row.memory
+                                    val notEatenText = stringResource(R.string.food_library_not_eaten_yet)
+                                    val riseText = mem?.let { stringResource(R.string.food_library_rise, it.avgRise) }
+                                    val underDosedText = mem?.takeIf { it.underDosedCount > 0 }
+                                        ?.let { stringResource(R.string.food_library_underdosed_count, it.underDosedCount) }
                                     Text(
                                         buildString {
                                             if (mem != null) {
                                                 append("×${mem.episodes.size}")
-                                                append(" · подъём ~%.1f".format(mem.avgRise))
-                                                if (mem.underDosedCount > 0) append(" · ⚠ докол ×${mem.underDosedCount}")
+                                                riseText?.let { append(" · $it") }
+                                                underDosedText?.let { append(" · $it") }
                                             } else {
-                                                append("ещё не ели")
+                                                append(notEatenText)
                                             }
                                             row.lib?.comment?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
                                         },
@@ -461,8 +491,14 @@ internal fun FoodLibraryDialog(
                     if (shown.isEmpty()) {
                         item {
                             Text(
-                                if (query.isBlank()) "Пока пусто — добавьте продукт или поешьте 🙂"
-                                else "Ничего не найдено. «＋ Продукт» добавит «${query.trim()}».",
+                                if (query.isBlank()) {
+                                    stringResource(R.string.food_library_empty_no_query)
+                                } else {
+                                    stringResource(
+                                        R.string.food_library_empty_query,
+                                        stringResource(R.string.food_library_add_product), query.trim(),
+                                    )
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -545,27 +581,28 @@ fun ConceptAssignDialog(
     onDismiss: () -> Unit,
 ) {
     var q by remember { mutableStateOf("") }
+    @Composable
     fun speed(c: com.diapilot.core.analysis.FoodConcept) = when (c.carbSpeed) {
-        com.diapilot.core.analysis.CarbSpeed.FAST -> "быстро"
-        com.diapilot.core.analysis.CarbSpeed.MED -> "средне"
-        com.diapilot.core.analysis.CarbSpeed.SLOW -> "медленно"
-        com.diapilot.core.analysis.CarbSpeed.NONE -> "без углев"
+        com.diapilot.core.analysis.CarbSpeed.FAST -> stringResource(R.string.food_library_speed_fast)
+        com.diapilot.core.analysis.CarbSpeed.MED -> stringResource(R.string.food_library_speed_medium)
+        com.diapilot.core.analysis.CarbSpeed.SLOW -> stringResource(R.string.food_library_speed_slow)
+        com.diapilot.core.analysis.CarbSpeed.NONE -> stringResource(R.string.food_library_speed_none_label)
     }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Концепт для «$name»") },
+        title = { Text(stringResource(R.string.food_library_concept_for, name)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Сейчас: " + (current ?: "не распознано") +
-                        ". Выбери архетип — модель учит по concept-id, не по имени.",
+                    current?.let { stringResource(R.string.food_library_concept_current, it) }
+                        ?: stringResource(R.string.food_library_concept_current_unrecognized),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = q,
                     onValueChange = { q = it },
-                    label = { Text("Фильтр концептов") },
+                    label = { Text(stringResource(R.string.food_library_concept_filter)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -597,9 +634,9 @@ fun ConceptAssignDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onReset) { Text("Сбросить (по умолчанию)") }
+            TextButton(onClick = onReset) { Text(stringResource(R.string.food_library_reset_default)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.food_library_cancel)) } },
     )
 }
 
@@ -756,20 +793,23 @@ private fun FoodEntryEditor(
         val key = com.example.diapilot.data.AskClaude.apiKey(context) ?: return
         analyzing = true
         scope.launch(Dispatchers.IO) {
+            var failed = false
             val result = try {
                 val bytes = loadScaledJpeg(File(photosDir(context), ref))
-                    ?: error("Фото не найдено")
+                    ?: error("Photo not found")
                 com.example.diapilot.data.AskClaude.describeFood(
                     key, bytes,
                     caption = name.ifBlank { null },
+                    context = context,
                 ).text
             } catch (e: Exception) {
-                "Ошибка: ${e.message}"
+                failed = true
+                com.example.diapilot.data.AskClaude.errorText(context, e)
             }
             withContext(Dispatchers.Main) {
                 analyzing = false
                 analysis = result
-                if (!result.startsWith("Ошибка")) {
+                if (!failed) {
                     adoptComponents(result)
                     if (recipe.isEmpty()) {
                         com.diapilot.core.analysis.parseCarbsEstimate(result)?.let { gramsText = fmtG(it) }
@@ -816,7 +856,11 @@ private fun FoodEntryEditor(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (isNew) "Новый продукт" else "«${row.name}»",
+                        if (isNew) {
+                            stringResource(R.string.food_library_editor_title_new)
+                        } else {
+                            stringResource(R.string.food_library_editor_title_existing, row.name)
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
@@ -834,7 +878,7 @@ private fun FoodEntryEditor(
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it; error = null },
-                        label = { Text("Название блюда") },
+                        label = { Text(stringResource(R.string.food_library_dish_name_label)) },
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -845,8 +889,11 @@ private fun FoodEntryEditor(
                 }
                 // --- Recipe constructor -------------------------------------
                 Text(
-                    if (recipe.isEmpty()) "Состав (для составного блюда):"
-                    else "Состав — граммы за 1 шт/порцию:",
+                    if (recipe.isEmpty()) {
+                        stringResource(R.string.food_library_recipe_label_empty)
+                    } else {
+                        stringResource(R.string.food_library_recipe_label_filled)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -887,7 +934,7 @@ private fun FoodEntryEditor(
                                     recipe.mapIndexed { j, r -> if (j == i) r.copy(grams = g) else r },
                                 )
                             },
-                            label = { Text("г") },
+                            label = { Text(stringResource(R.string.food_library_grams_label)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.width(84.dp).padding(start = 4.dp),
@@ -903,7 +950,7 @@ private fun FoodEntryEditor(
                     OutlinedTextField(
                         value = newComp,
                         onValueChange = { newComp = it },
-                        label = { Text("Добавить компонент") },
+                        label = { Text(stringResource(R.string.food_library_add_component_label)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -938,7 +985,8 @@ private fun FoodEntryEditor(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "＋ $n" + (g?.let { " · ~%.0f г".format(it) } ?: ""),
+                                g?.let { stringResource(R.string.food_library_component_suggestion_with_grams, n, it) }
+                                    ?: "＋ $n",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -954,10 +1002,10 @@ private fun FoodEntryEditor(
                     label = {
                         Text(
                             when {
-                                gramsLive && recipe.isNotEmpty() -> "Углеводы, г (сумма состава — живая)"
+                                gramsLive && recipe.isNotEmpty() -> stringResource(R.string.food_library_carbs_label_live)
                                 row.lib?.grams == null && row.derivedGrams != null ->
-                                    "Углеводы, г (из истории: ${fmtG(row.derivedGrams)})"
-                                else -> "Углеводы, г"
+                                    stringResource(R.string.food_library_carbs_label_from_history, fmtG(row.derivedGrams))
+                                else -> stringResource(R.string.food_library_carbs_label)
                             },
                         )
                     },
@@ -970,13 +1018,13 @@ private fun FoodEntryEditor(
                         TextButton(
                             onClick = { gramsText = fmtG(s); gramsLive = true },
                             contentPadding = PaddingValues(0.dp),
-                        ) { Text("↺ вернуть сумму состава (${fmtG(s)} г)") }
+                        ) { Text(stringResource(R.string.food_library_restore_recipe_sum, fmtG(s))) }
                     }
                 }
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Комментарий (порция, рецепт…)") },
+                    label = { Text(stringResource(R.string.food_library_comment_label)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 // LLM: Vision when a photo is attached, text-only otherwise.
@@ -987,19 +1035,22 @@ private fun FoodEntryEditor(
                             mediaRef?.let { analyzePhoto(it); return@TextButton }
                             analyzing = true
                             scope.launch(Dispatchers.IO) {
+                                var failed = false
                                 val result = try {
                                     com.example.diapilot.data.AskClaude.estimateCarbs(
                                         com.example.diapilot.data.AskClaude.apiKey(context)!!,
                                         listOf(name, comment).filter { it.isNotBlank() }
                                             .joinToString(" — "),
+                                        context = context,
                                     )
                                 } catch (e: Exception) {
-                                    "Ошибка: ${e.message}"
+                                    failed = true
+                                    com.example.diapilot.data.AskClaude.errorText(context, e)
                                 }
                                 withContext(Dispatchers.Main) {
                                     analyzing = false
                                     analysis = result
-                                    if (!result.startsWith("Ошибка")) {
+                                    if (!failed) {
                                         adoptComponents(result)
                                         if (recipe.isEmpty()) {
                                             com.diapilot.core.analysis.parseCarbsEstimate(result)
@@ -1014,10 +1065,14 @@ private fun FoodEntryEditor(
                     ) {
                         Text(
                             when {
-                                analyzing -> "Разбираю…"
-                                mediaRef != null -> if (analysis == null) "🤖 Разобрать фото" else "🔄 Пересчитать по фото"
-                                analysis == null -> "🤖 Углеводы по описанию"
-                                else -> "🔄 Пересчитать по описанию"
+                                analyzing -> stringResource(R.string.food_library_analyzing)
+                                mediaRef != null -> if (analysis == null) {
+                                    stringResource(R.string.food_library_parse_photo)
+                                } else {
+                                    stringResource(R.string.food_library_reparse_photo)
+                                }
+                                analysis == null -> stringResource(R.string.food_library_carbs_from_description)
+                                else -> stringResource(R.string.food_library_reparse_description)
                             },
                         )
                     }
@@ -1030,7 +1085,7 @@ private fun FoodEntryEditor(
                             .padding(vertical = 4.dp),
                     ) {
                         Text(
-                            "✨ Назвать «$s» — тап, чтобы применить",
+                            stringResource(R.string.food_library_name_suggestion, s),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -1044,7 +1099,9 @@ private fun FoodEntryEditor(
                             .padding(vertical = 4.dp),
                     ) {
                         Text(
-                            "＋ Записать ${pendingProducts.size} продукт(а) в библиотеку — тап, чтобы принять",
+                            pluralStringResource(
+                                R.plurals.food_library_pending_products, pendingProducts.size, pendingProducts.size,
+                            ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -1052,7 +1109,7 @@ private fun FoodEntryEditor(
                 }
                 if (adoptedCount > 0) {
                     Text(
-                        "＋$adoptedCount компонент(а) записано в библиотеку отдельными продуктами",
+                        pluralStringResource(R.plurals.food_library_adopted_components, adoptedCount, adoptedCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1061,7 +1118,15 @@ private fun FoodEntryEditor(
                     TextButton(
                         onClick = { showAnalysis = !showAnalysis },
                         contentPadding = PaddingValues(0.dp),
-                    ) { Text(if (showAnalysis) "▾ разбор" else "▸ разбор") }
+                    ) {
+                        Text(
+                            if (showAnalysis) {
+                                stringResource(R.string.food_library_analysis_hide)
+                            } else {
+                                stringResource(R.string.food_library_analysis_show)
+                            },
+                        )
+                    }
                     if (showAnalysis) Text(a, style = MaterialTheme.typography.bodySmall)
                 }
                 error?.let {
@@ -1074,26 +1139,32 @@ private fun FoodEntryEditor(
                     Divider()
                     val eps = usedIn.mapNotNull { it.second }.flatMap { it.episodes }
                     Text(
-                        "Встречается в блюдах (${usedIn.size})" +
-                            if (eps.isNotEmpty()) {
-                                " · суммарно ×${eps.size} · подъём ~%.1f"
-                                    .format(eps.map { it.rise }.average())
-                            } else "",
+                        if (eps.isNotEmpty()) {
+                            stringResource(
+                                R.string.food_library_used_in_dishes_with_rise,
+                                usedIn.size, eps.size, eps.map { it.rise }.average(),
+                            )
+                        } else {
+                            stringResource(R.string.food_library_used_in_dishes, usedIn.size)
+                        },
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         usedIn.take(6).forEach { (dish, mem) ->
                             Text(
-                                "• $dish" + (mem?.let {
-                                    " · ×${it.episodes.size} · подъём ~%.1f".format(it.avgRise)
-                                } ?: " · ещё не ели"),
+                                mem?.let {
+                                    stringResource(
+                                        R.string.food_library_dish_row_with_episodes,
+                                        dish, it.episodes.size, it.avgRise,
+                                    )
+                                } ?: stringResource(R.string.food_library_dish_row_no_episodes, dish),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         if (usedIn.size > 6) {
                             Text(
-                                "…и ещё ${usedIn.size - 6}",
+                                stringResource(R.string.food_library_and_more, usedIn.size - 6),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1109,33 +1180,51 @@ private fun FoodEntryEditor(
                     // shown here to validate the portion model against reality.
                     mem.perGramRise?.let { perG ->
                         val portion = row.grams ?: mem.typicalGrams
+                        val shapePortionText = stringResource(R.string.food_library_shape_portion, perG)
+                        val cleanText = stringResource(R.string.food_library_clean_n, mem.perGramN)
+                        val atGramsText = portion?.let {
+                            stringResource(R.string.food_library_at_grams, it.toInt(), perG * it)
+                        }
+                        val flatAverageText = stringResource(R.string.food_library_flat_average, mem.avgRise)
                         Text(
                             buildString {
-                                append("Форма × порция: ~%.2f ммоль/г".format(perG))
-                                append(" · чистых ${mem.perGramN}")
-                                portion?.let {
-                                    append(" · при ${it.toInt()}г → +%.1f".format(perG * it))
-                                }
-                                append(" (плоское среднее +%.1f)".format(mem.avgRise))
+                                append(shapePortionText)
+                                append(" · $cleanText")
+                                atGramsText?.let { append(" · $it") }
+                                append(" $flatAverageText")
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    Text("Эпизоды (${mem.episodes.size})", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.food_library_episodes_title, mem.episodes.size),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        val backgroundContext = LocalContext.current
                         mem.episodes.take(8).forEach { e ->
+                            val riseText = stringResource(R.string.food_library_episode_rise, e.rise, e.timeToPeakMin.toInt())
+                            val gramsText = e.grams?.let { stringResource(R.string.food_library_episode_grams, it.toInt()) }
+                            val doseText = e.effectiveDose?.let { stringResource(R.string.food_library_episode_dose, it) }
+                            val lagText = e.lagMin?.let { stringResource(R.string.food_library_episode_lag, it.toInt()) }
+                            val backgroundText = e.background?.let {
+                                stringResource(
+                                    R.string.food_library_episode_background,
+                                    com.example.diapilot.i18n.FoodText.background(backgroundContext, it),
+                                )
+                            }
                             Text(
                                 buildString {
                                     append(fmt.format(Date(e.onsetMs)))
-                                    append(" · +%.1f за %d мин".format(e.rise, e.timeToPeakMin.toInt()))
-                                    e.grams?.let { append(" · %dг".format(it.toInt())) }
-                                    e.effectiveDose?.let { append(" · %.1f ед".format(it)) }
+                                    append(" · $riseText")
+                                    gramsText?.let { append(" · $it") }
+                                    doseText?.let { append(" · $it") }
                                     if (e.underDosed) append(" ⚠")
-                                    e.lagMin?.let { append(" · лаг %d мин".format(it.toInt())) }
+                                    lagText?.let { append(" · $it") }
                                     // Honesty: the rise was measured on a
                                     // background force — not the dish's pure own.
-                                    e.background?.let { append(" · фон: $it") }
+                                    backgroundText?.let { append(" · $it") }
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1143,7 +1232,7 @@ private fun FoodEntryEditor(
                         }
                         if (mem.episodes.size > 8) {
                             Text(
-                                "…и ещё ${mem.episodes.size - 8}",
+                                stringResource(R.string.food_library_and_more, mem.episodes.size - 8),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1154,10 +1243,11 @@ private fun FoodEntryEditor(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.food_library_cancel)) }
+                    val emptyNameError = stringResource(R.string.food_library_error_empty_name)
                     TextButton(onClick = {
                         val nn = name.trim()
-                        if (nn.isEmpty()) { error = "Название пустое"; return@TextButton }
+                        if (nn.isEmpty()) { error = emptyNameError; return@TextButton }
                         val entered = gramsText.replace(',', '.').toDoubleOrNull()
                         // Live sum is NOT stored as a number: grams=null keeps
                         // the dish following its components forever.
@@ -1177,10 +1267,10 @@ private fun FoodEntryEditor(
                             }
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 if (renamedOk) onDone()
-                                else error = "«$nn» уже есть — переименование слило бы две истории"
+                                else error = context.getString(R.string.food_library_error_duplicate_name, nn)
                             }
                         }.start()
-                    }) { Text("Сохранить") }
+                    }) { Text(stringResource(R.string.food_library_save)) }
                 }
             }
         }
@@ -1189,8 +1279,8 @@ private fun FoodEntryEditor(
     if (confirmDelete) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Убрать из библиотеки?") },
-            text = { Text("История приёмов не пострадает — удалится только справочная запись.") },
+            title = { Text(stringResource(R.string.food_library_remove_title)) },
+            text = { Text(stringResource(R.string.food_library_remove_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -1198,9 +1288,9 @@ private fun FoodEntryEditor(
                         store?.deleteFoodLibrary(row.name)
                         android.os.Handler(android.os.Looper.getMainLooper()).post(onDone)
                     }.start()
-                }) { Text("Убрать", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.food_library_remove), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.food_library_cancel)) } },
         )
     }
 
@@ -1236,20 +1326,18 @@ private fun MergeDishDialog(
     var target by remember { mutableStateOf<String?>(null) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Объединить «$from» →") },
+        title = { Text(stringResource(R.string.food_library_merge_title, from)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Для НАСТОЯЩИХ дублей — одно блюдо под двумя именами. " +
-                        "Истории эпизодов сольются в выбранное блюдо, «$from» исчезнет. " +
-                        "Разные порции (2 пива / пиво) объединять НЕ нужно — им лучше рецепт.",
+                    stringResource(R.string.food_library_merge_hint, from),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = q,
                     onValueChange = { q = it; target = null },
-                    label = { Text("В какое блюдо") },
+                    label = { Text(stringResource(R.string.food_library_merge_target_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1275,9 +1363,9 @@ private fun MergeDishDialog(
             TextButton(
                 enabled = target != null,
                 onClick = { target?.let(onMerge) },
-            ) { Text("Объединить", color = MaterialTheme.colorScheme.error) }
+            ) { Text(stringResource(R.string.food_library_merge_confirm), color = MaterialTheme.colorScheme.error) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.food_library_cancel)) } },
     )
 }
 

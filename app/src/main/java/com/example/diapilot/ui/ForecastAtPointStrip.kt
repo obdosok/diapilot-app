@@ -11,8 +11,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.example.diapilot.R
 import com.example.diapilot.data.ForecastLedger
 
 /**
@@ -47,57 +50,64 @@ fun ForecastAtPointStrip(
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Прогноз в ${time.format(java.util.Date(requestedTsMs))}" +
-                        (run?.let { " · сахар ${bg(it.anchorMmol)}" } ?: ""),
+                    run?.let {
+                        stringResource(
+                            R.string.forecast_at_point_strip_title_with_bg,
+                            time.format(java.util.Date(requestedTsMs)),
+                            bg(it.anchorMmol),
+                        )
+                    } ?: stringResource(
+                        R.string.forecast_at_point_strip_title,
+                        time.format(java.util.Date(requestedTsMs)),
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onDismiss) { Text("Скрыть") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.forecast_at_point_strip_hide)) }
             }
             if (run == null) {
                 Text(
-                    "Сохранённого прогноза здесь нет — только пересчёт " +
-                        "сегодняшней моделью ($replayPoints точек).",
+                    pluralStringResource(R.plurals.forecast_at_point_strip_no_saved, replayPoints, replayPoints),
                     style = MaterialTheme.typography.labelSmall,
                 )
                 return@Column
             }
             run.applied?.let {
                 Text(
-                    "тогда применялось: $it",
+                    stringResource(R.string.forecast_at_point_strip_applied, it),
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                 )
             } ?: Text(
-                "коэффициенты того прогона не записаны (старая запись)",
+                stringResource(R.string.forecast_at_point_strip_coeffs_missing),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // Errors only: the predicted and actual values are on the chart, the
             // miss is the number a line cannot show at a glance.
+            val missEntry = stringResource(R.string.forecast_at_point_strip_miss_entry)
             val misses = run.points.mapNotNull { p ->
                 p.actualMmol?.let { a ->
                     val e = a - p.predictedMmol
-                    "${p.horizonMin}м ${if (e >= 0) "+" else ""}${bg(e)}"
+                    missEntry.format(p.horizonMin, if (e >= 0) "+" else "", bg(e))
                 }
             }
             Text(
-                if (misses.isEmpty()) "факт ещё не проставлен"
-                else "промах: " + misses.joinToString(" · "),
+                if (misses.isEmpty()) stringResource(R.string.forecast_at_point_strip_no_actual)
+                else stringResource(R.string.forecast_at_point_strip_miss_prefix) + misses.joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
             )
             if (run.blindMeals > 0) {
                 Text(
-                    "в окно попал приём, записанный ПОСЛЕ этого прогноза — " +
-                        "промах здесь про задержку записи, а не про модель",
+                    stringResource(R.string.forecast_at_point_strip_late_meal_warning),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
             if (!run.algoVersion.startsWith(ForecastLedger.PHYSIO_FAMILY)) {
                 Text(
-                    "бледная линия — запасной твин, а не то, что было на экране",
+                    stringResource(R.string.forecast_at_point_strip_fallback_twin_warning),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )

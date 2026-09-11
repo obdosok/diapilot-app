@@ -25,14 +25,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.GlycemicStats
 import com.diapilot.core.analysis.glycemicStats
+import com.example.diapilot.R
 import com.example.diapilot.data.HybridModelStore
 import com.example.diapilot.data.Settings
 import com.example.diapilot.data.SqliteCollectorStore
 import com.example.diapilot.data.Stores
+import com.example.diapilot.i18n.localized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -77,7 +82,7 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
                     month = glycemicStats(readings, lo, hi),
                     model = HybridModelStore.status(context),
                     hybridEnabled = true,
-                    today = db?.let { com.example.diapilot.data.DailyDiscrepancyRuntime.view(it, now, store = store) },
+                    today = db?.let { com.example.diapilot.data.DailyDiscrepancyRuntime.view(it, now, store = store, context = context) },
                     rescueSafety=rescueSafety,
                     balance=balance,
                     balanceCarbSens=balanceCarbSens,
@@ -95,23 +100,25 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    "Анализ",
+                    stringResource(R.string.analysis_overview_screen_title),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "То, что помогает оценить здоровье и честность прогноза.",
+                    stringResource(R.string.analysis_overview_screen_subtitle),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         if (error != null) {
-            item { OverviewCard("Не удалось прочитать метрики") { Text(error!!) } }
+            item {
+                OverviewCard(stringResource(R.string.analysis_overview_screen_metrics_failed)) { Text(error!!) }
+            }
         } else if (data == null) {
             item {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
                 Text(
-                    "Считаю краткую статистику…",
+                    stringResource(R.string.analysis_overview_screen_loading),
                     modifier = Modifier.padding(top = 8.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -119,9 +126,9 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
         } else {
             val snapshot = data!!
             item {
-                OverviewCard("Глюкоза") {
-                    StatsRow("7 дней", snapshot.week)
-                    StatsRow("30 дней", snapshot.month)
+                OverviewCard(stringResource(R.string.analysis_overview_screen_glucose_card_title)) {
+                    StatsRow(stringResource(R.string.analysis_overview_screen_days_7), snapshot.week)
+                    StatsRow(stringResource(R.string.analysis_overview_screen_days_30), snapshot.month)
                 }
             }
             item {
@@ -136,8 +143,7 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
             }
             item {
                 Text(
-                    "Исследовательские бэктесты и переобучение больше не запускаются " +
-                        "при открытии этой вкладки.",
+                    stringResource(R.string.analysis_overview_screen_backtests_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,28 +182,34 @@ private data class AnalysisOverview(
     result: com.diapilot.core.physio.DailyBalanceIsfV1.Result?,
     carbSens: Double?,
 ) {
-    OverviewCard("Баланс по суткам") {
+    OverviewCard(stringResource(R.string.analysis_overview_screen_daily_balance_title)) {
         Text(
-            "углеводы × CS − единицы × ISF = изменение сахара за сутки. " +
-                "Граница суток 04:00, не полночь: в это время он спит и не ел, поэтому " +
-                "обе опорные точки берутся в покое.",
+            stringResource(R.string.analysis_overview_screen_daily_balance_intro),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (result == null) {
             Text(
-                "Пока нечего показать: нужно хотя бы " +
-                    "${com.diapilot.core.physio.DailyBalanceIsfV1.MIN_DAYS} годных суток " +
-                    "(≥${com.diapilot.core.physio.DailyBalanceIsfV1.MIN_CARBS_G.toInt()} г углеводов, " +
-                    "≥${com.diapilot.core.physio.DailyBalanceIsfV1.MIN_UNITS.toInt()} ед инсулина " +
-                    "и сахар на обеих границах).",
+                stringResource(
+                    R.string.analysis_overview_screen_daily_balance_empty,
+                    com.diapilot.core.physio.DailyBalanceIsfV1.MIN_DAYS,
+                    com.diapilot.core.physio.DailyBalanceIsfV1.MIN_CARBS_G.toInt(),
+                    com.diapilot.core.physio.DailyBalanceIsfV1.MIN_UNITS.toInt(),
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
             return@OverviewCard
         }
         val stamp = java.text.SimpleDateFormat("dd.MM", java.util.Locale.getDefault())
         Text(
-            "%-7s %6s %6s %7s %6s %6s".format("сутки", "углев", "ед", "dСахар", "г/ед", "ISF"),
+            "%-7s %6s %6s %7s %6s %6s".format(
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_day),
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_carbs),
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_units),
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_delta),
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_g_per_u),
+                stringResource(R.string.analysis_overview_screen_daily_balance_col_isf),
+            ),
             style = MaterialTheme.typography.labelSmall,
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -213,19 +225,22 @@ private data class AnalysisOverview(
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
             )
         }
+        // Numbers are pre-formatted with Locale.ROOT so the decimal point stays
+        // consistent regardless of UI language, matching the table above.
         Text(
-            "Медиана за %d суток: ISF %.2f · размах %.2f…%.2f · CS %.3f ммоль/г".format(
-                java.util.Locale.ROOT, result.days, result.isf,
-                result.spread?.first ?: Double.NaN, result.spread?.second ?: Double.NaN,
-                carbSens ?: Double.NaN,
+            stringResource(
+                R.string.analysis_overview_screen_daily_balance_median,
+                result.days,
+                "%.2f".format(java.util.Locale.ROOT, result.isf),
+                "%.2f".format(java.util.Locale.ROOT, result.spread?.first ?: Double.NaN),
+                "%.2f".format(java.util.Locale.ROOT, result.spread?.second ?: Double.NaN),
+                "%.3f".format(java.util.Locale.ROOT, carbSens ?: Double.NaN),
             ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            "Это оценка АМПЛИТУДЫ и только её: за сутки все тайминги — очередь ккал, " +
-                "сито, форма инсулина — сокращаются из уравнения. Она не говорит, КОГДА " +
-                "что-то произошло, и не заменяет прогноз.",
+            stringResource(R.string.analysis_overview_screen_daily_balance_footnote),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -234,78 +249,105 @@ private data class AnalysisOverview(
 
 @Composable private fun RescueSafetyCard(rows:List<com.diapilot.core.analysis.RescueSafetyEpisodeV1>) {
     val prevented=rows.filter{it.outcome==com.diapilot.core.analysis.RescueOutcomeV1.AVERTED_LOW_COMPATIBLE}
-    OverviewCard("Предотвращённые гипогликемии / rescue") {
-        Text("Декстроза меняет исход. Поэтому отсутствие измеренной гипогликемии после неё не считается успешным прогнозом: такой эпизод цензурируется и входит в safety-метрику «потребовалось спасение».",style=MaterialTheme.typography.bodySmall)
-        Text("За 30 дней: rescue-событий ${rows.size}; совместимы с предотвращённой гипогликемией ${prevented.size}.",fontWeight=FontWeight.SemiBold)
+    val context = LocalContext.current
+    OverviewCard(stringResource(R.string.analysis_overview_screen_rescue_safety_title)) {
+        Text(stringResource(R.string.analysis_overview_screen_rescue_safety_intro),style=MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.analysis_overview_screen_rescue_safety_summary, rows.size, prevented.size),
+            fontWeight=FontWeight.SemiBold,
+        )
         prevented.takeLast(5).asReversed().forEach{r->
-            val whenText=java.text.SimpleDateFormat("d MMM, HH:mm",java.util.Locale.getDefault()).format(java.util.Date(r.rescue.tsMs))
-            Text("$whenText · ${"%.0f".format(r.rescue.grams)} г · сахар ${r.glucoseAtRescue?.let{"%.1f".format(it)}?:"?"} · скорость ${r.preSlopeMmolPerMin?.let{"%+.2f".format(it)}?:"?"} ммоль/л/мин · bolus за 4 ч ${"%.1f".format(r.activeRecentBolusUnits)} ед. Конечный исход причинно не оценивается без rescue.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            val whenText=java.text.SimpleDateFormat(
+                "d MMM, HH:mm",
+                context.localized().resources.configuration.locales[0],
+            ).format(java.util.Date(r.rescue.tsMs))
+            Text(
+                stringResource(
+                    R.string.analysis_overview_screen_rescue_safety_row,
+                    whenText,
+                    "%.0f".format(r.rescue.grams),
+                    r.glucoseAtRescue?.let{"%.1f".format(it)}?:"?",
+                    r.preSlopeMmolPerMin?.let{"%+.2f".format(it)}?:"?",
+                    "%.1f".format(r.activeRecentBolusUnits),
+                ),
+                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Text("Это улучшает оценку безопасности и обнаруживает stacking/ошибку прогноза. Один такой смешанный эпизод не переобучает ISF или профиль отдельного укола.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary)
+        Text(
+            stringResource(R.string.analysis_overview_screen_rescue_safety_footnote),
+            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.tertiary,
+        )
     }
 }
 
 
 
+@Composable
 private fun humanEpisodeStatus(s:String)=when(s){
-    "IDENTIFIED_ISF"->"изолированная коррекция: ISF идентифицируем"
-    "EFFECTIVE_RESPONSE_ONLY"->"еда + инсулин: только совместный ответ"
-    "CARB_ERROR_CANDIDATE"->"возможна ошибка углеводов"
-    "TIMING_MISMATCH"->"итог сходится, траектория — нет"
-    "SENSOR_OR_PROCESS"->"возможен датчик/процесс"
-    "RETROSPECTIVE_CORRECTION"->"изолированная коррекция найдена ретроспективно; годится для диагностики, но не для автообучения"
-    "CENSORED"->"окно не завершено"
-    else->"не объяснено / смешано"
+    "IDENTIFIED_ISF"->stringResource(R.string.analysis_overview_screen_episode_status_identified_isf)
+    "EFFECTIVE_RESPONSE_ONLY"->stringResource(R.string.analysis_overview_screen_episode_status_effective_response_only)
+    "CARB_ERROR_CANDIDATE"->stringResource(R.string.analysis_overview_screen_episode_status_carb_error_candidate)
+    "TIMING_MISMATCH"->stringResource(R.string.analysis_overview_screen_episode_status_timing_mismatch)
+    "SENSOR_OR_PROCESS"->stringResource(R.string.analysis_overview_screen_episode_status_sensor_or_process)
+    "RETROSPECTIVE_CORRECTION"->stringResource(R.string.analysis_overview_screen_episode_status_retrospective_correction)
+    "CENSORED"->stringResource(R.string.analysis_overview_screen_episode_status_censored)
+    else->stringResource(R.string.analysis_overview_screen_episode_status_unexplained)
 }
 
 
 
 @Composable
 private fun TodayChangeCard(today: com.example.diapilot.data.TodayDiscrepancyView?) {
-    OverviewCard("Сегодня / текущее состояние") {
-        if (today == null) Text("Пока нет завершённых 60/120-минутных causal checkpoints.") else {
-            Text("Что изменилось", fontWeight = FontWeight.SemiBold); Text(today.effectiveLine); Text(today.identifiedIsfLine)
+    OverviewCard(stringResource(R.string.analysis_overview_screen_today_card_title)) {
+        if (today == null) {
+            Text(stringResource(R.string.analysis_overview_screen_today_no_checkpoints))
+        } else {
+            Text(stringResource(R.string.analysis_overview_screen_today_what_changed), fontWeight = FontWeight.SemiBold)
+            Text(today.effectiveLine); Text(today.identifiedIsfLine)
             Text(today.kineticsLine)
-            Text("Что может объяснять", fontWeight = FontWeight.SemiBold); Text(today.explainedLine)
+            Text(stringResource(R.string.analysis_overview_screen_today_what_explains), fontWeight = FontWeight.SemiBold)
+            Text(today.explainedLine)
             today.contributionRows.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Text("Что пока не объясняется", fontWeight = FontWeight.SemiBold); Text("Неаллоцированная часть остаётся unresolved/confounded.")
-            Text("Какие данные смешаны", fontWeight = FontWeight.SemiBold); Text(today.mixedDataLine)
-            Text("Хронология", fontWeight = FontWeight.SemiBold); today.timeline.forEach { Text(it) }
+            Text(stringResource(R.string.analysis_overview_screen_today_what_unexplained), fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.analysis_overview_screen_today_unallocated))
+            Text(stringResource(R.string.analysis_overview_screen_today_mixed_data), fontWeight = FontWeight.SemiBold)
+            Text(today.mixedDataLine)
+            Text(stringResource(R.string.analysis_overview_screen_today_timeline), fontWeight = FontWeight.SemiBold)
+            today.timeline.forEach { Text(it) }
         }
     }
 }
 
+
 @Composable
-
-
-
-
 private fun humanConclusion(r:com.diapilot.core.physio.FactorEvidenceV1)=when(r.status){
-    com.diapilot.core.physio.EvidenceStatus.SOURCE_MISSING->"Для этого фактора пока нет структурированных записей."
-    com.diapilot.core.physio.EvidenceStatus.NO_EXPOSURES->"Источник подключён, но подходящих событий ещё не было."
-    com.diapilot.core.physio.EvidenceStatus.NOT_IDENTIFIABLE->"Данные есть, но это влияние пока нельзя отделить от еды, инсулина или других факторов."
-    com.diapilot.core.physio.EvidenceStatus.INSUFFICIENT->"Подходящих независимых эпизодов пока недостаточно."
-    com.diapilot.core.physio.EvidenceStatus.NULL_COMPATIBLE->"Практически значимая устойчивая связь пока не обнаружена."
-    com.diapilot.core.physio.EvidenceStatus.HYPOTHESIS->"В истории есть возможный сигнал, но направление или величина ещё неустойчивы."
-    com.diapilot.core.physio.EvidenceStatus.PRELIMINARY->"Предварительная связь повторяется в доступных данных, но ещё требует будущей проверки."
-    com.diapilot.core.physio.EvidenceStatus.SUPPORTED->"Связь прошла prospective-проверку на будущих данных."
-    com.diapilot.core.physio.EvidenceStatus.CONFLICTING->"Разные части истории показывают разные направления эффекта."
+    com.diapilot.core.physio.EvidenceStatus.SOURCE_MISSING->stringResource(R.string.analysis_overview_screen_evidence_source_missing)
+    com.diapilot.core.physio.EvidenceStatus.NO_EXPOSURES->stringResource(R.string.analysis_overview_screen_evidence_no_exposures)
+    com.diapilot.core.physio.EvidenceStatus.NOT_IDENTIFIABLE->stringResource(R.string.analysis_overview_screen_evidence_not_identifiable)
+    com.diapilot.core.physio.EvidenceStatus.INSUFFICIENT->stringResource(R.string.analysis_overview_screen_evidence_insufficient)
+    com.diapilot.core.physio.EvidenceStatus.NULL_COMPATIBLE->stringResource(R.string.analysis_overview_screen_evidence_null_compatible)
+    com.diapilot.core.physio.EvidenceStatus.HYPOTHESIS->stringResource(R.string.analysis_overview_screen_evidence_hypothesis)
+    com.diapilot.core.physio.EvidenceStatus.PRELIMINARY->stringResource(R.string.analysis_overview_screen_evidence_preliminary)
+    com.diapilot.core.physio.EvidenceStatus.SUPPORTED->stringResource(R.string.analysis_overview_screen_evidence_supported)
+    com.diapilot.core.physio.EvidenceStatus.CONFLICTING->stringResource(R.string.analysis_overview_screen_evidence_conflicting)
 }
 
+@Composable
 private fun collectionHint(id:String)=when(id){
-    "protein_absorption","fat_absorption"->"Записывать Б/Ж или подтверждать разбор фото до оценки результата."
-    "duration_absorption"->"Указывать длительность приёма в уточнении еды."
-    "alcohol_background"->"Отмечать алкоголь в записи еды."
-    "cartridge_kinetics"->"Отмечать «новая ампула» при каждой замене."
-    "injection_site"->"Отмечать место укола при его изменении."
-    "cartridge_heat"->"Отмечать нагрев/жару вместе с текущей ампулой."
-    "stress_illness_background"->"Отмечать стресс или болезнь в момент события."
-    else->"Продолжать обычный сбор данных."
+    "protein_absorption","fat_absorption"->stringResource(R.string.analysis_overview_screen_hint_absorption)
+    "duration_absorption"->stringResource(R.string.analysis_overview_screen_hint_duration_absorption)
+    "alcohol_background"->stringResource(R.string.analysis_overview_screen_hint_alcohol_background)
+    "cartridge_kinetics"->stringResource(R.string.analysis_overview_screen_hint_cartridge_kinetics)
+    "injection_site"->stringResource(R.string.analysis_overview_screen_hint_injection_site)
+    "cartridge_heat"->stringResource(R.string.analysis_overview_screen_hint_cartridge_heat)
+    "stress_illness_background"->stringResource(R.string.analysis_overview_screen_hint_stress_illness_background)
+    else->stringResource(R.string.analysis_overview_screen_hint_default)
 }
 
+@Composable
 private fun measurementDescription(id:String)=when(id){
-    "activity_same_isf"->"Что считается: только чистые коррекции; сравнивается сила снижения после инсулина, если активность была до коррекции, с днями без неё. Еда и активность внутри окна исключают чистую оценку ISF."
-    "activity_same_effective"->"Что считается: законченные цепочки еды + IOB/болюса. Остаточное снижение относительно модели делится на ожидаемый вклад инсулина; активность ищется от 6 часов до начала и до конца эпизода. Это суммарный эффективный ответ (включая утилизацию глюкозы мышцами), а не доказанный чистый ISF."
+    "activity_same_isf"->stringResource(R.string.analysis_overview_screen_measurement_activity_same_isf)
+    "activity_same_effective"->stringResource(R.string.analysis_overview_screen_measurement_activity_same_effective)
     else->null
 }
 
@@ -335,21 +377,27 @@ private fun OverviewCard(
 @Composable
 private fun StatsRow(label: String, stats: GlycemicStats?) {
     if (stats == null) {
-        Text("$label · нет данных", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.analysis_overview_screen_stats_no_data, label),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         return
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Column {
             Text(label, fontWeight = FontWeight.SemiBold)
             Text(
-                "среднее %.1f ммоль/л".format(stats.mean),
+                stringResource(R.string.analysis_overview_screen_stats_mean, stats.mean),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column {
-            Text("%.0f%% в диапазоне".format(stats.inRangePct), fontWeight = FontWeight.SemiBold)
             Text(
-                "%.1f%% ниже · %.1f%% выше".format(stats.belowPct, stats.abovePct),
+                stringResource(R.string.analysis_overview_screen_stats_in_range, stats.inRangePct),
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.analysis_overview_screen_stats_below_above, stats.belowPct, stats.abovePct),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -358,14 +406,19 @@ private fun StatsRow(label: String, stats: GlycemicStats?) {
 
 @Composable
 private fun ModelCard(snapshot: AnalysisOverview) {
-    OverviewCard("Персональная модель") {
+    OverviewCard(stringResource(R.string.analysis_overview_screen_model_card_title)) {
         val model = snapshot.model
         if (model == null) {
-            Text("Модель не установлена")
+            Text(stringResource(R.string.analysis_overview_screen_model_not_installed))
         } else {
-            Text("Измеренная модель используется для прогноза")
+            Text(stringResource(R.string.analysis_overview_screen_model_in_use))
             Text(
-                "Обучена по ${model.trainingDays} дням · данные по ${model.trainedThrough ?: "—"}",
+                pluralStringResource(
+                    R.plurals.analysis_overview_screen_model_trained,
+                    model.trainingDays,
+                    model.trainingDays,
+                    model.trainedThrough ?: "—",
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(

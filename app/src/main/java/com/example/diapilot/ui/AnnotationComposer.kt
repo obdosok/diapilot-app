@@ -41,10 +41,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.diapilot.core.collector.Annotation
 import com.diapilot.core.collector.BolusPoint
+import com.example.diapilot.R
+import com.example.diapilot.i18n.TokenText
+import com.example.diapilot.i18n.localized
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -63,14 +69,9 @@ private val STARTER_TAGS = listOf(
     "новый сенсор", "новая ампула", "нагрев ампулы", "утренняя заря",
 )
 
-/** Time-offset chips: annotations are usually entered after the fact. */
-private val OFFSETS = listOf(
-    "сейчас" to 0L,
-    "−30м" to 30L * 60_000,
-    "−1ч" to 60L * 60_000,
-    "−2ч" to 120L * 60_000,
-    "−4ч" to 240L * 60_000,
-)
+/** Time-offset chips: annotations are usually entered after the fact. Labels
+ *  come from `R.array.annotation_composer_offset_labels` (same order). */
+private val OFFSET_MS = listOf(0L, 30L * 60_000, 60L * 60_000, 120L * 60_000, 240L * 60_000)
 
 private val COMMA_CONJUNCTIONS = setOf(
     "и", "а", "но", "или", "с", "со", "на", "от", "до", "без",
@@ -180,11 +181,13 @@ private fun foodPersonalContext(
         val grams = com.diapilot.core.analysis.lookupFoodGrams(carbsByFood, name)
             ?: recentFoodCarbs[name.trim().lowercase()]
         val mem = foodMemories[name]?.takeIf { it.episodes.isNotEmpty() }
+        // Sent to the LLM as prompt context, not shown to the user — English,
+        // not a resource (same treatment as AskClaude.buildContext, I18N.md §8).
         val parts = buildList {
-            grams?.let { add("~%.0f г".format(it)) }
-            mem?.let { add("подъём +${com.diapilot.core.analysis.fmtBg(it.avgRise, mgdl)} (×${it.episodes.size})") }
+            grams?.let { add("~%.0f g".format(it)) }
+            mem?.let { add("rise +${com.diapilot.core.analysis.fmtBg(it.avgRise, mgdl)} (×${it.episodes.size})") }
         }
-        if (parts.isEmpty()) null else "«$name»: ${parts.joinToString(", ")}"
+        if (parts.isEmpty()) null else "\"$name\": ${parts.joinToString(", ")}"
     }
     return lines.takeIf { it.isNotEmpty() }?.joinToString("\n")
 }
@@ -197,14 +200,35 @@ data class ParsedCommand(
     val units: Double? = null, val purpose: String? = null,
     val activity: String? = null,
 ) {
-    fun describe(mgdl: Boolean): String? = when (action) {
-        "food" -> "🍽 еда «$food»" + (grams?.let { " ~%.0f г".format(it) } ?: " (граммы уточним потом)")
-        "meter" -> "🩸 глюкометр " + (mmol?.let { com.diapilot.core.analysis.fmtBg(it, mgdl) } ?: "?")
-        "bolus" -> "💉 болюс %.1f ед".format(units ?: 0.0) + (purpose?.let { " · $it" } ?: "")
-        "basal" -> "💉 базал %.1f ед".format(units ?: 0.0)
-        "activity" -> "💪 активность «$activity»"
-        "dextrose" -> "🍬 декстроза ×1"
-        else -> null
+    // Needs a Context (translated text, and bolus purpose / activity go
+    // through TokenText); every call site is inside AnnotationComposer, which
+    // always has one.
+    fun describe(mgdl: Boolean, context: android.content.Context): String? {
+        val res = context.localized()
+        return when (action) {
+            // food/activity may still be null here: this also renders the
+            // "recognized but blocked" message before validateCommandValues
+            // runs. `?: "null"` preserves that pre-existing display quirk.
+            "food" -> grams?.let {
+                res.getString(R.string.annotation_composer_command_food_grams, food ?: "null", it)
+            } ?: res.getString(R.string.annotation_composer_command_food_no_grams, food ?: "null")
+            "meter" -> mmol?.let {
+                res.getString(R.string.annotation_composer_command_meter, com.diapilot.core.analysis.fmtBg(it, mgdl))
+            } ?: res.getString(R.string.annotation_composer_command_meter_unknown)
+            "bolus" -> {
+                val u = units ?: 0.0
+                val purposeLabel = TokenText.bolusPurpose(context, purpose)
+                purposeLabel?.let { res.getString(R.string.annotation_composer_command_bolus_with_purpose, u, it) }
+                    ?: res.getString(R.string.annotation_composer_command_bolus, u)
+            }
+            "basal" -> res.getString(R.string.annotation_composer_command_basal, units ?: 0.0)
+            "activity" -> res.getString(
+                R.string.annotation_composer_command_activity,
+                TokenText.noteTag(context, activity ?: "null"),
+            )
+            "dextrose" -> res.getString(R.string.annotation_composer_command_dextrose)
+            else -> null
+        }
     }
 }
 
@@ -337,7 +361,10 @@ fun AnnotationComposer(
     var evidenceError by remember { mutableStateOf<String?>(null) }
     var showEvidenceDetails by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(text) {
-        if (com.diapilot.core.analysis.normalizeFoodName(text).contains("пиво")) {
+        // Vocabulary match on the typed dish name (Russian input, with the
+        // trivial English synonym), not UI text.
+        val normalized = com.diapilot.core.analysis.normalizeFoodName(text)
+        if (normalized.contains("пиво") || normalized.contains("beer")) {
             showEvidenceDetails = true
         }
     }
@@ -416,6 +443,8 @@ fun AnnotationComposer(
     var photoAnalyzing by remember { mutableStateOf(false) }
     var aiRaw by remember { mutableStateOf<String?>(null) }
     var aiAnswer by remember { mutableStateOf<String?>(null) }
+    // True while aiRaw holds an error message (the LLM call failed), not an analysis.
+    var aiFailed by remember { mutableStateOf(false) }
     var aiComponents by remember { mutableStateOf<List<Pair<String, Double>>>(emptyList()) }
     // F-05 layer 2f: vision's recognition HINT — dish + portion-vs-usual.
     // Stricter than the text tier (carbonara looks like any cream pasta), so
@@ -426,8 +455,9 @@ fun AnnotationComposer(
     }
     val aiScope = androidx.compose.runtime.rememberCoroutineScope()
 
-    fun adoptAiResult(r: String, viaPhoto: Boolean) {
+    fun adoptAiResult(r: String, viaPhoto: Boolean, failed: Boolean = false) {
         aiRaw = r
+        aiFailed = failed
         aiAnswer = (if (viaPhoto) "📷 " else "") +
             r.lineSequence().filter { it.isNotBlank() }.joinToString(" · ").take(240)
         aiComponents = com.diapilot.core.analysis.parseComponentsEstimate(r)
@@ -441,7 +471,7 @@ fun AnnotationComposer(
             nutrition.kcal?.let { foodKcalText = "%.0f".format(it) }
         }
         // Vision's first line is the dish name — prefill an empty field.
-        if (viaPhoto && text.isBlank() && !r.startsWith("Ошибка")) {
+        if (viaPhoto && text.isBlank() && !failed) {
             r.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.trimEnd('.')?.let { text = it }
         }
     }
@@ -464,18 +494,21 @@ fun AnnotationComposer(
         }
         val dishesNow = knownDishes
         aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var failed = false
             val r = try {
-                val bytes = loadScaledJpeg(File(photosDir(context), ref)) ?: error("Фото не найдено")
+                val bytes = loadScaledJpeg(File(photosDir(context), ref)) ?: error("Photo not found")
                 com.example.diapilot.data.AskClaude.describeFood(
                     key, bytes, caption = caption, personalContext = pc,
                     knownDishes = forVision, knownComponents = knownComponents,
+                    context = context,
                 )
             } catch (e: Exception) {
-                com.example.diapilot.data.AskClaude.VisionResult("Ошибка: ${e.message}")
+                failed = true
+                com.example.diapilot.data.AskClaude.VisionResult(com.example.diapilot.data.AskClaude.errorText(context, e))
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 photoAnalyzing = false
-                adoptAiResult(r.text, viaPhoto = true)
+                adoptAiResult(r.text, viaPhoto = true, failed = failed)
                 visionCandidate = r.knownDishId
                     ?.let { id -> dishesNow.firstOrNull { it.proposed.id == id } }
                     ?.let { it to r.knownDishPortion }
@@ -504,14 +537,15 @@ fun AnnotationComposer(
                 val ean = code.rawValue?.trim()
                 if (ean.isNullOrEmpty()) return@addOnSuccessListener
                 scanBusy = true
-                scanStatus = "Ищу $ean в Open Food Facts…"
+                scanStatus = context.localized().getString(R.string.annotation_composer_barcode_searching, ean)
                 aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     val product = com.example.diapilot.data.OpenFoodFacts.lookup(ean)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         scanBusy = false
                         if (product == null || !product.usable) {
                             scannedProduct = null
-                            scanStatus = "Штрих-код $ean не найден в базе — заполните этикетку вручную."
+                            scanStatus = context.localized()
+                                .getString(R.string.annotation_composer_barcode_not_found, ean)
                         } else {
                             scannedProduct = product
                             scanStatus = null
@@ -532,7 +566,8 @@ fun AnnotationComposer(
                 }
             }
             .addOnFailureListener { e ->
-                scanStatus = "Сканер недоступен: ${e.message}"
+                scanStatus = context.localized()
+                    .getString(R.string.annotation_composer_scanner_unavailable, e.message)
             }
     }
 
@@ -552,7 +587,7 @@ fun AnnotationComposer(
     }
 
     // The entry timestamp every mode shares: exact minute wins over chips.
-    fun entryTs(): Long = customTs ?: (System.currentTimeMillis() - OFFSETS[offsetIdx].second)
+    fun entryTs(): Long = customTs ?: (System.currentTimeMillis() - OFFSET_MS[offsetIdx])
 
     fun enteredNutrition(): com.diapilot.core.analysis.FoodNutrition {
         fun number(value: String): Double? = value.trim().replace(',', '.')
@@ -595,7 +630,7 @@ fun AnnotationComposer(
         pendingDishWording = null
         heldPhoto = null
         photoAnalyzing = false
-        aiRaw = null; aiAnswer = null; aiComponents = emptyList()
+        aiRaw = null; aiAnswer = null; aiFailed = false; aiComponents = emptyList()
         visionCandidate = null
         expanded = alwaysOpen
         onSubmitted()
@@ -643,10 +678,10 @@ fun AnnotationComposer(
         val carbs = if (mode == 0) {
             foodCarbsText.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
         } else null
-        val analysis = aiRaw?.takeIf { mode == 0 && !it.startsWith("Ошибка") }
+        val analysis = aiRaw?.takeIf { mode == 0 && !aiFailed }
         val structured = evidenceInput()
         if (mode == 0 && evidenceMode != 0 && structured == null) {
-            evidenceError = "Заполните пересчитываемые поля этикетки/рецепта"
+            evidenceError = context.localized().getString(R.string.annotation_composer_evidence_incomplete)
             return
         }
         val metadata = buildList {
@@ -703,6 +738,9 @@ fun AnnotationComposer(
                 storedAnalysis = com.diapilot.core.analysis.FoodStructureAcceptanceV1
                     .analysisAfterAccept(d.proposed, storedAnalysis) ?: storedAnalysis
             }
+            // The fallback content below is the stored placeholder token for a
+            // photo-only entry (TokenText.NOTE_TAGS maps it to a translated
+            // label for display) — not UI text.
             if (structured != null) onAddFoodEvidence(
                 tsMs, content.trim().ifEmpty { "фото" }, photo,
                 structured.totalCarbsG, storedAnalysis, structured,
@@ -719,7 +757,9 @@ fun AnnotationComposer(
                 com.example.diapilot.data.DishDialogRuntime.Move(
                     tsMs = tsMs, noteContent = content.trim(),
                     dishId = ask.candidate.dish.proposed.id,
-                    question = com.diapilot.core.analysis.DishRecognitionV1.question(ask.candidate),
+                    question = com.example.diapilot.i18n.FoodText.dishQuestion(
+                        context, com.diapilot.core.analysis.DishRecognitionV1.question(ask.candidate),
+                    ),
                     createdMs = System.currentTimeMillis(),
                 ),
             )
@@ -817,9 +857,8 @@ fun AnnotationComposer(
         } catch (e: Exception) { /* picker failed — nothing held */ }
     }
 
-    val modes = listOf("Еда", "Запись", "💪", "Укол", "Сахар", "🗣")
-
     Card(modifier = modifier.fillMaxWidth()) {
+        val modes = stringArrayResource(R.array.annotation_composer_modes)
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!alwaysOpen) {
                 Row(
@@ -827,9 +866,14 @@ fun AnnotationComposer(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Контекст", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.annotation_composer_section_title), style = MaterialTheme.typography.titleSmall)
                     TextButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "Свернуть" else "+ Добавить")
+                        Text(
+                            stringResource(
+                                if (expanded) R.string.annotation_composer_collapse
+                                else R.string.annotation_composer_expand,
+                            ),
+                        )
                     }
                 }
             }
@@ -861,6 +905,7 @@ fun AnnotationComposer(
                 // When: "now" is the invisible default; the chips row appears
                 // only when the user actually needs to back-date.
                 var showTime by remember { mutableStateOf(false) }
+                val offsetLabels = stringArrayResource(R.array.annotation_composer_offset_labels)
                 run {
                     TextButton(
                         onClick = { showTime = !showTime },
@@ -870,7 +915,7 @@ fun AnnotationComposer(
                     ) {
                         val timeLabel = customTs?.let {
                             SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(Date(it))
-                        } ?: OFFSETS[offsetIdx].first
+                        } ?: offsetLabels.getOrElse(offsetIdx) { "" }
                         Text(
                             "🕐 $timeLabel ${if (showTime) "▴" else "▾"}",
                             style = MaterialTheme.typography.labelMedium,
@@ -879,11 +924,11 @@ fun AnnotationComposer(
                     }
                     if (showTime) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OFFSETS.forEachIndexed { i, (label, _) ->
+                            OFFSET_MS.forEachIndexed { i, _ ->
                                 FilterChip(
                                     selected = customTs == null && offsetIdx == i,
                                     onClick = { customTs = null; offsetIdx = i; showTime = false },
-                                    label = { Text(label) },
+                                    label = { Text(offsetLabels.getOrElse(i) { "" }) },
                                 )
                             }
                             // Exact minute — for reconstructing history (a hypo,
@@ -899,7 +944,7 @@ fun AnnotationComposer(
                                         showTime = false
                                     }
                                 },
-                                label = { Text("точно…") },
+                                label = { Text(stringResource(R.string.annotation_composer_time_exact)) },
                             )
                         }
                     }
@@ -938,16 +983,16 @@ fun AnnotationComposer(
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = ::capturePhoto,
                                     modifier = Modifier.weight(1f),
-                                ) { Text("📷 Снять блюдо") }
+                                ) { Text(stringResource(R.string.annotation_composer_capture_photo)) }
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = { pickFromGallery.launch("image/*") },
                                     modifier = Modifier.weight(1f),
-                                ) { Text("🖼 Из галереи") }
+                                ) { Text(stringResource(R.string.annotation_composer_pick_gallery)) }
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = ::scanBarcode,
                                     enabled = !scanBusy,
                                     modifier = Modifier.weight(1f),
-                                ) { Text("▮▯ Штрих-код") }
+                                ) { Text(stringResource(R.string.annotation_composer_scan_barcode)) }
                             }
                         }
                         scanStatus?.let {
@@ -958,20 +1003,31 @@ fun AnnotationComposer(
                             )
                         }
                         scannedProduct?.let { p ->
+                            val productName = listOfNotNull(p.name, p.brand).joinToString(" · ").ifEmpty { p.barcode }
+                            // scannedProduct is only ever set from a `usable` product (carbsPer100g != null).
+                            val carbsPer100g = p.carbsPer100g ?: 0.0
                             Text(
-                                "▮▯ ${listOfNotNull(p.name, p.brand).joinToString(" · ").ifEmpty { p.barcode }}: " +
-                                    "%.1f г угл/100 г — проверьте и введите СЪЕДЕННЫЙ вес".format(p.carbsPer100g) +
-                                    (p.servingG?.let { s -> " (порция по этикетке %.0f г)".format(s) } ?: ""),
+                                p.servingG?.let { s ->
+                                    stringResource(
+                                        R.string.annotation_composer_scanned_product_serving,
+                                        productName, carbsPer100g, s,
+                                    )
+                                } ?: stringResource(
+                                    R.string.annotation_composer_scanned_product,
+                                    productName, carbsPer100g,
+                                ),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
                         heldPhoto?.let { ref ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                PhotoThumbPublic(ref, "фото блюда", size = 56)
+                                PhotoThumbPublic(ref, stringResource(R.string.annotation_composer_photo_dish_desc), size = 56)
                                 Text(
-                                    if (photoAnalyzing) "Разбираю фото…"
-                                    else "Фото готово — проверьте и нажмите ✓",
+                                    stringResource(
+                                        if (photoAnalyzing) R.string.annotation_composer_photo_analyzing
+                                        else R.string.annotation_composer_photo_ready,
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -981,7 +1037,7 @@ fun AnnotationComposer(
                                 IconButton(onClick = {
                                     File(photosDir(context), ref).delete()
                                     heldPhoto = null
-                                    aiRaw = null; aiAnswer = null; aiComponents = emptyList()
+                                    aiRaw = null; aiAnswer = null; aiFailed = false; aiComponents = emptyList()
                                     visionCandidate = null
                                 }) { Text("✕") }
                             }
@@ -994,15 +1050,19 @@ fun AnnotationComposer(
                             Card {
                                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        "Похоже на ваше блюдо: «${kd.proposed.title}»" +
-                                            (portion?.let { " · порция ~%.0f%% от обычной".format(it * 100) } ?: ""),
+                                        portion?.let {
+                                            stringResource(
+                                                R.string.annotation_composer_vision_candidate_portion,
+                                                kd.proposed.title, it * 100,
+                                            )
+                                        } ?: stringResource(R.string.annotation_composer_vision_candidate, kd.proposed.title),
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                     pastPhoto?.let { p ->
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            PhotoThumbPublic(p, "как выглядело раньше", size = 56)
+                                            PhotoThumbPublic(p, stringResource(R.string.annotation_composer_photo_past_desc), size = 56)
                                             Text(
-                                                "У вас это блюдо выглядело так",
+                                                stringResource(R.string.annotation_composer_past_photo_caption),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.padding(start = 8.dp),
@@ -1023,8 +1083,8 @@ fun AnnotationComposer(
                                                 carbsEdited = true
                                             }
                                             visionCandidate = null
-                                        }) { Text("Да, это оно") }
-                                        TextButton(onClick = { visionCandidate = null }) { Text("Нет") }
+                                        }) { Text(stringResource(R.string.annotation_composer_confirm_yes)) }
+                                        TextButton(onClick = { visionCandidate = null }) { Text(stringResource(R.string.annotation_composer_confirm_no)) }
                                     }
                                 }
                             }
@@ -1035,7 +1095,7 @@ fun AnnotationComposer(
                             value = text,
                             onValueChange = { text = it },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Что съели?") },
+                            placeholder = { Text(stringResource(R.string.annotation_composer_food_placeholder)) },
                             minLines = 1,
                             maxLines = 4,
                         )
@@ -1095,14 +1155,16 @@ fun AnnotationComposer(
                                 ) {
                                     Text(
                                         if (recipe != null && recipe.isNotEmpty())
-                                            "＋ $name (составное)" else "＋ $name",
+                                            stringResource(R.string.annotation_composer_add_dish_composite, name)
+                                        else stringResource(R.string.annotation_composer_add_dish, name),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.weight(1f),
                                     )
                                     Text(
                                         listOfNotNull(
-                                            grams?.let { "~%.0f г".format(it) },
-                                            recipe?.takeIf { it.isNotEmpty() }?.let { "состав" },
+                                            grams?.let { stringResource(R.string.annotation_composer_approx_grams, it) },
+                                            recipe?.takeIf { it.isNotEmpty() }
+                                                ?.let { stringResource(R.string.annotation_composer_has_composition) },
                                         ).joinToString(" · "),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1116,7 +1178,7 @@ fun AnnotationComposer(
                         // and the composition metadata follow. ✕ drops a component.
                         if (composedOf.isNotEmpty()) {
                             Text(
-                                "Состав «${text.trim()}» (− порция ＋, ✕):",
+                                stringResource(R.string.annotation_composer_composition_header, text.trim()),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1148,7 +1210,10 @@ fun AnnotationComposer(
                                                     buildString {
                                                         append(n)
                                                         if (c > 1) append(" ×$c")
-                                                        g?.let { append(" · %.0f г".format(it * c)) }
+                                                    }.let { base ->
+                                                        g?.let {
+                                                            stringResource(R.string.annotation_composer_component_with_grams, base, it * c)
+                                                        } ?: base
                                                     },
                                                 )
                                                 Text(
@@ -1175,7 +1240,7 @@ fun AnnotationComposer(
                             }
                             composedCarbs()?.let {
                                 Text(
-                                    "≈ %.0f г углеводов · пишется как одно блюдо «${text.trim()}»".format(it),
+                                    stringResource(R.string.annotation_composer_composed_carbs_summary, it, text.trim()),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1209,7 +1274,7 @@ fun AnnotationComposer(
                             }
                             if (comps.isNotEmpty()) {
                                 Text(
-                                    "состав прошлого раза:",
+                                    stringResource(R.string.annotation_composer_last_composition),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1217,7 +1282,7 @@ fun AnnotationComposer(
                                     comps.forEach { c ->
                                         SuggestionChip(
                                             onClick = { parts = splitOut(parts) + (c to 1) },
-                                            label = { Text("＋ $c") },
+                                            label = { Text(stringResource(R.string.annotation_composer_add_component, c)) },
                                         )
                                     }
                                     if (comps.size >= 2) {
@@ -1227,7 +1292,7 @@ fun AnnotationComposer(
                                                 // the composite name made its point
                                                 if (typedNorm.length >= 3 && key.contains(typedNorm)) text = ""
                                             },
-                                            label = { Text("все сразу") },
+                                            label = { Text(stringResource(R.string.annotation_composer_add_all)) },
                                         )
                                     }
                                 }
@@ -1240,9 +1305,9 @@ fun AnnotationComposer(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    dish + (gramsFor(dish)?.let {
-                                        " · ~%.0f г".format(it * count)
-                                    } ?: ""),
+                                    gramsFor(dish)?.let {
+                                        stringResource(R.string.annotation_composer_dish_with_grams, dish, it * count)
+                                    } ?: dish,
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f),
                                 )
@@ -1289,7 +1354,7 @@ fun AnnotationComposer(
                             text.isBlank() && composedOf.isEmpty() && heldPhoto == null
                         ) {
                             Text(
-                                "Повторить:",
+                                stringResource(R.string.annotation_composer_repeat_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1318,9 +1383,11 @@ fun AnnotationComposer(
                                             if (kd.proposed.alcohol) alcoholPresent = true
                                         },
                                         label = {
+                                            val title = kd.proposed.title.take(22)
                                             Text(
-                                                kd.proposed.title.take(22) +
-                                                    (kd.typicalCarbsG?.let { " · %.0f г".format(it) } ?: ""),
+                                                kd.typicalCarbsG?.let {
+                                                    stringResource(R.string.annotation_composer_component_with_grams, title, it)
+                                                } ?: title,
                                             )
                                         },
                                     )
@@ -1329,8 +1396,7 @@ fun AnnotationComposer(
                         }
                         pendingDish?.let { kd ->
                             Text(
-                                "Узнано: «${kd.proposed.title}» — структура и кривая блюда " +
-                                    "пойдут в запись; граммы можно поправить.",
+                                stringResource(R.string.annotation_composer_dish_recognized, kd.proposed.title),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -1340,7 +1406,7 @@ fun AnnotationComposer(
                         val typical = typicalMeals.filter { it !in foodLabels }.take(2)
                         if (parts.isEmpty() && text.isBlank() && typical.isNotEmpty()) {
                             Text(
-                                "Обычно в это время:",
+                                stringResource(R.string.annotation_composer_typical_time),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1371,11 +1437,11 @@ fun AnnotationComposer(
                                             parts = if (sel) parts - dish else parts + (dish to 1)
                                         },
                                         label = {
-                                            Text(
-                                                dish.take(18) +
-                                                    (gramsFor(dish)?.let { " · %.0f г".format(it) } ?: "") +
-                                                    if (dish.length > 18) "…" else "",
-                                            )
+                                            val truncated = dish.take(18)
+                                            val withGrams = gramsFor(dish)?.let {
+                                                stringResource(R.string.annotation_composer_component_with_grams, truncated, it)
+                                            } ?: truncated
+                                            Text(withGrams + if (dish.length > 18) "…" else "")
                                         },
                                     )
                                 }
@@ -1393,11 +1459,28 @@ fun AnnotationComposer(
                                         com.diapilot.core.analysis.normalizeFoodName(name)
                                 }?.value
                             mem?.takeIf { it.episodes.isNotEmpty() }?.let { m ->
-                                val line = buildString {
-                                    append("🍽 «$name» раньше: пик +${com.diapilot.core.analysis.fmtBg(m.avgRise, mgdl)}")
-                                    m.avgEffectiveDose?.let { append(" · доза ~%.1f ед".format(it)) }
-                                    if (m.underDosedCount > 0) append(" · докол ${m.underDosedCount}/${m.episodes.size}")
-                                    else append(" · ×${m.episodes.size}")
+                                val peak = com.diapilot.core.analysis.fmtBg(m.avgRise, mgdl)
+                                val dose = m.avgEffectiveDose
+                                val line = if (m.underDosedCount > 0) {
+                                    dose?.let {
+                                        stringResource(
+                                            R.string.annotation_composer_food_memory_topup_dose,
+                                            name, peak, it, m.underDosedCount, m.episodes.size,
+                                        )
+                                    } ?: stringResource(
+                                        R.string.annotation_composer_food_memory_topup,
+                                        name, peak, m.underDosedCount, m.episodes.size,
+                                    )
+                                } else {
+                                    dose?.let {
+                                        stringResource(
+                                            R.string.annotation_composer_food_memory_times_dose,
+                                            name, peak, it, m.episodes.size,
+                                        )
+                                    } ?: stringResource(
+                                        R.string.annotation_composer_food_memory_times,
+                                        name, peak, m.episodes.size,
+                                    )
                                 }
                                 Text(
                                     line,
@@ -1422,11 +1505,12 @@ fun AnnotationComposer(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        "порция:",
+                                        stringResource(R.string.annotation_composer_portion_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    listOf("½" to 0.5, "обычная" to 1.0, "1½" to 1.5, "2×" to 2.0)
+                                    val usualLabel = stringResource(R.string.annotation_composer_portion_usual)
+                                    listOf("½" to 0.5, usualLabel to 1.0, "1½" to 1.5, "2×" to 2.0)
                                         .forEach { (lbl, mult) ->
                                             androidx.compose.material3.AssistChip(
                                                 onClick = {
@@ -1446,7 +1530,7 @@ fun AnnotationComposer(
                                 value = foodCarbsText,
                                 onValueChange = { foodCarbsText = it; carbsEdited = true },
                                 modifier = Modifier.width(96.dp),
-                                label = { Text("г угл.") },
+                                label = { Text(stringResource(R.string.annotation_composer_carbs_g_label)) },
                                 singleLine = true,
                                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -1461,12 +1545,14 @@ fun AnnotationComposer(
                                 text = composed(); parts = emptyMap()
                                 pickFromGallery.launch("image/*")
                             }) { Text("🖼") }
+                            val defaultMealLabel = stringResource(R.string.annotation_composer_default_meal_label)
+                            val evidenceIncompleteMsg = stringResource(R.string.annotation_composer_evidence_incomplete)
                             androidx.compose.material3.FilledTonalIconButton(onClick = evidenceSubmit@ {
                                 if (composedOf.isNotEmpty()) {
                                     // Composite: OWN NAME is the label; the split
                                     // rides as composition metadata (base for future
                                     // decomposition), grams from the portions.
-                                    val name = text.trim().ifEmpty { "приём" }
+                                    val name = text.trim().ifEmpty { defaultMealLabel }
                                     val carbs = foodCarbsText.trim().replace(',', '.')
                                         .toDoubleOrNull()?.takeIf { it > 0 } ?: composedCarbs()
                                     val enriched = withEnteredNutrition(buildList {
@@ -1477,7 +1563,7 @@ fun AnnotationComposer(
                                     }.joinToString("\n"))
                                     val evidence = evidenceInput()
                                     if (evidenceMode != 0 && evidence == null) {
-                                        evidenceError = "Заполните пересчитываемые поля этикетки/рецепта"
+                                        evidenceError = evidenceIncompleteMsg
                                         return@evidenceSubmit
                                     }
                                     if (evidence != null) onAddFoodEvidence(
@@ -1508,11 +1594,17 @@ fun AnnotationComposer(
                             }) { Text("✓") }
                         }
                         TextButton(onClick = { showEvidenceDetails = !showEvidenceDetails }) {
-                            Text(if (showEvidenceDetails) "Скрыть источник и длительность" else "＋ Уточнить источник / длительность")
+                            Text(
+                                stringResource(
+                                    if (showEvidenceDetails) R.string.annotation_composer_evidence_toggle_hide
+                                    else R.string.annotation_composer_evidence_toggle_show,
+                                ),
+                            )
                         }
                         if (showEvidenceDetails) {
+                        val evidenceModeLabels = stringArrayResource(R.array.annotation_composer_evidence_source_modes)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(0 to "Обычно", 1 to "Этикетка+вес", 2 to "Рецепт").forEach { (id, label) ->
+                            listOf(0, 1, 2).zip(evidenceModeLabels.toList()).forEach { (id, label) ->
                                 FilterChip(
                                     selected = evidenceMode == id,
                                     onClick = { evidenceMode = id; evidenceError = null },
@@ -1525,7 +1617,7 @@ fun AnnotationComposer(
                                 value = foodDurationText,
                                 onValueChange = { foodDurationText = it },
                                 modifier = Modifier.width(118.dp),
-                                label = { Text("приём, мин") },
+                                label = { Text(stringResource(R.string.annotation_composer_intake_duration_label)) },
                                 singleLine = true,
                                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
@@ -1534,23 +1626,29 @@ fun AnnotationComposer(
                             FilterChip(
                                 selected = alcoholPresent,
                                 onClick = { alcoholPresent = !alcoholPresent },
-                                label = { Text("алкоголь") },
+                                label = { Text(stringResource(R.string.annotation_composer_alcohol_label)) },
                                 modifier = Modifier.padding(start = 8.dp),
                             )
                         }
                         if (evidenceMode == 1) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Из этикетки и фактической порции", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.annotation_composer_label_evidence_hint), style = MaterialTheme.typography.labelSmall)
                                 TextButton(onClick = ::scanBarcode, enabled = !scanBusy) {
-                                    Text(if (scanBusy) "ищу…" else "▮▯ сканировать")
+                                    Text(
+                                        stringResource(
+                                            if (scanBusy) R.string.annotation_composer_scan_searching
+                                            else R.string.annotation_composer_scan_action,
+                                        ),
+                                    )
                                 }
                             }
+                            val labelFields = stringArrayResource(R.array.annotation_composer_label_weight_fields)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
-                                    Triple("угл./100 г", labelPer100Text) { v: String -> labelPer100Text = v },
-                                    Triple("вес, г", labelWeightText) { v: String -> labelWeightText = v },
-                                    Triple("угл./порцию", labelPerServingText) { v: String -> labelPerServingText = v },
-                                    Triple("порций", labelServingsText) { v: String -> labelServingsText = v },
+                                    Triple(labelFields[0], labelPer100Text) { v: String -> labelPer100Text = v },
+                                    Triple(labelFields[1], labelWeightText) { v: String -> labelWeightText = v },
+                                    Triple(labelFields[2], labelPerServingText) { v: String -> labelPerServingText = v },
+                                    Triple(labelFields[3], labelServingsText) { v: String -> labelServingsText = v },
                                 ).forEach { (label, value, set) ->
                                     OutlinedTextField(
                                         value = value, onValueChange = set, label = { Text(label) },
@@ -1563,7 +1661,7 @@ fun AnnotationComposer(
                             }
                         }
                         if (evidenceMode == 2) {
-                            Text("Версия сохранённого рецепта и текущая порция", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.annotation_composer_recipe_version_hint), style = MaterialTheme.typography.labelSmall)
                             if (text.isNotBlank()) {
                                 TextButton(onClick = {
                                     com.example.diapilot.data.Stores.get(context)
@@ -1574,15 +1672,16 @@ fun AnnotationComposer(
                                             recipeConsumedWeightText = ""
                                             recipeFractionText = ""
                                         }
-                                }) { Text("↻ Заполнить сохранённый рецепт") }
+                                }) { Text(stringResource(R.string.annotation_composer_fill_saved_recipe)) }
                             }
+                            val recipeFields = stringArrayResource(R.array.annotation_composer_recipe_fields)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
-                                    Triple("версия", recipeVersionText) { v: String -> recipeVersionText = v },
-                                    Triple("угл. всего", recipeTotalCarbsText) { v: String -> recipeTotalCarbsText = v },
-                                    Triple("вес всего", recipeTotalWeightText) { v: String -> recipeTotalWeightText = v },
-                                    Triple("съедено, г", recipeConsumedWeightText) { v: String -> recipeConsumedWeightText = v },
-                                    Triple("доля 0–1", recipeFractionText) { v: String -> recipeFractionText = v },
+                                    Triple(recipeFields[0], recipeVersionText) { v: String -> recipeVersionText = v },
+                                    Triple(recipeFields[1], recipeTotalCarbsText) { v: String -> recipeTotalCarbsText = v },
+                                    Triple(recipeFields[2], recipeTotalWeightText) { v: String -> recipeTotalWeightText = v },
+                                    Triple(recipeFields[3], recipeConsumedWeightText) { v: String -> recipeConsumedWeightText = v },
+                                    Triple(recipeFields[4], recipeFractionText) { v: String -> recipeFractionText = v },
                                 ).forEach { (label, value, set) ->
                                     OutlinedTextField(
                                         value = value, onValueChange = set, label = { Text(label) },
@@ -1597,23 +1696,24 @@ fun AnnotationComposer(
                         if (evidenceMode != 0) {
                             val computed = evidenceInput()?.totalCarbsG
                             Text(
-                                computed?.let { "Пересчитано: %.1f г · измерено количество, не физиология".format(it) }
-                                    ?: (evidenceError ?: "Заполните один полный путь пересчёта"),
+                                computed?.let { stringResource(R.string.annotation_composer_recomputed, it) }
+                                    ?: (evidenceError ?: stringResource(R.string.annotation_composer_fill_full_path)),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (computed == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                             )
                         }
                         }
                         Text(
-                            "Питательность · можно уточнить",
+                            stringResource(R.string.annotation_composer_nutrition_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        val nutritionFields = stringArrayResource(R.array.annotation_composer_nutrition_fields)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
-                                Triple("Белки, г", foodProteinText) { value: String -> foodProteinText = value },
-                                Triple("Жиры, г", foodFatText) { value: String -> foodFatText = value },
-                                Triple("ккал", foodKcalText) { value: String -> foodKcalText = value },
+                                Triple(nutritionFields[0], foodProteinText) { value: String -> foodProteinText = value },
+                                Triple(nutritionFields[1], foodFatText) { value: String -> foodFatText = value },
+                                Triple(nutritionFields[2], foodKcalText) { value: String -> foodKcalText = value },
                             ).forEach { (label, value, setter) ->
                                 OutlinedTextField(
                                     value = value,
@@ -1662,6 +1762,7 @@ fun AnnotationComposer(
                                                 listOfNotNull(photoByFood[text.trim()])
                                             ).firstOrNull()
                                         aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                            var failed = false
                                             val r = try {
                                                 val key = com.example.diapilot.data.AskClaude.apiKey(context)!!
                                                 val bytes = photoRef?.let {
@@ -1670,35 +1771,42 @@ fun AnnotationComposer(
                                                 if (bytes != null) {
                                                     com.example.diapilot.data.AskClaude.describeFood(
                                                         key, bytes, caption = desc, personalContext = pc,
+                                                        context = context,
                                                     ).text
                                                 } else {
                                                     com.example.diapilot.data.AskClaude.estimateCarbs(
                                                         key, desc, personalContext = pc,
                                                         knownComponents = knownComponents,
+                                                        context = context,
                                                     )
                                                 }
                                             } catch (e: Exception) {
-                                                "Ошибка: ${e.message}"
+                                                failed = true
+                                                com.example.diapilot.data.AskClaude.errorText(context, e)
                                             }
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                 aiBusy = false
-                                                adoptAiResult(r, viaPhoto = photoRef != null)
+                                                adoptAiResult(r, viaPhoto = photoRef != null, failed = failed)
                                             }
                                         }
                                     },
                                 ) {
                                     Text(
-                                        when {
-                                            aiBusy || photoAnalyzing -> "Считаю углеводы…"
-                                            heldPhoto != null -> "🔄 Пересчитать (учтёт текст)"
-                                            else -> "🤖 Углеводы по описанию"
-                                        },
+                                        stringResource(
+                                            when {
+                                                aiBusy || photoAnalyzing -> R.string.annotation_composer_computing_carbs
+                                                heldPhoto != null -> R.string.annotation_composer_recompute_with_text
+                                                else -> R.string.annotation_composer_carbs_from_description
+                                            },
+                                        ),
                                     )
                                 }
                                 // Composite meal → ONE history item; the split
                                 // lives in the cached analysis, and the dish
                                 // dictionary learns "bread = 12 g" from there.
                                 if (aiComponents.size >= 2) {
+                                    val evidenceNotConfirmedMsg =
+                                        stringResource(R.string.annotation_composer_evidence_not_confirmed)
                                     TextButton(onClick = aiSubmit@ {
                                         val ts = entryTs()
                                         val content = aiComponents.joinToString(", ") { it.first }
@@ -1728,7 +1836,7 @@ fun AnnotationComposer(
                                         }.joinToString("\n"))
                                         val evidence = evidenceInput()
                                         if (evidenceMode != 0 && evidence == null) {
-                                            evidenceError = "LLM не подтверждает измерение: заполните этикетку и порцию"
+                                            evidenceError = evidenceNotConfirmedMsg
                                             return@aiSubmit
                                         }
                                         if (evidence != null) onAddFoodEvidence(
@@ -1736,7 +1844,14 @@ fun AnnotationComposer(
                                         ) else onAddFoodWithAnalysis(ts, content, heldPhoto, total, enriched)
                                         parts = emptyMap()
                                         resetAll()
-                                    }) { Text("✂ Одной записью (${aiComponents.size} комп.)") }
+                                    }) {
+                                        Text(
+                                            pluralStringResource(
+                                                R.plurals.annotation_composer_one_entry_components,
+                                                aiComponents.size, aiComponents.size,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1747,22 +1862,25 @@ fun AnnotationComposer(
                         // slow the carb peak (fiber/psyllium/fat). Feeds the
                         // food kinetics, not just a passive note.
                         Text(
-                            "Замедлит усвоение следующей еды:",
+                            stringResource(R.string.annotation_composer_absorption_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val absorptionLabels = stringArrayResource(R.array.annotation_composer_absorption_modifiers)
                             listOf(
-                                "🌾 псилиум" to "псилиум",
-                                "🥗 клетчатка" to "клетчатка",
-                                "🧈 жирное" to "жирное",
+                                absorptionLabels[0] to "псилиум",
+                                absorptionLabels[1] to "клетчатка",
+                                absorptionLabels[2] to "жирное",
                             ).forEach { (disp, tag) ->
                                 SuggestionChip(onClick = { submit(tag) }, label = { Text(disp) })
                             }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             // Personal recurring context notes first, then the
-                            // full starter dictionary — always visible.
+                            // full starter dictionary — always visible. Tags are
+                            // STORED tokens (core's CONTEXT_TAGS / ACTIVITY_TAGS);
+                            // only their displayed label is translated.
                             (frequentTexts + STARTER_TAGS).distinct()
                                 .filter {
                                     // Activity notes (incl. "walk · 40 min")
@@ -1771,7 +1889,10 @@ fun AnnotationComposer(
                                         com.diapilot.core.analysis.ACTIVITY_TAGS
                                 }
                                 .forEach { tag ->
-                                    SuggestionChip(onClick = { submitChip(tag) }, label = { Text(tag) })
+                                    SuggestionChip(
+                                        onClick = { submitChip(tag) },
+                                        label = { Text(TokenText.noteTag(context, tag)) },
+                                    )
                                 }
                         }
                         val speak = rememberSpeechInput { spoken ->
@@ -1782,7 +1903,7 @@ fun AnnotationComposer(
                                 value = text,
                                 onValueChange = { text = it },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Место укола, сон, стресс…") },
+                                placeholder = { Text(stringResource(R.string.annotation_composer_note_placeholder)) },
                                 singleLine = true,
                             )
                             IconButton(onClick = speak) { Text("🎤") }
@@ -1797,7 +1918,7 @@ fun AnnotationComposer(
                         // model (acute drop + post-activity night sensitization),
                         // not just a passive note.
                         Text(
-                            "Активность (кормит модель):",
+                            stringResource(R.string.annotation_composer_activity_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1808,11 +1929,12 @@ fun AnnotationComposer(
                         var pendingActivity by remember { mutableStateOf<String?>(null) }
                         var activityMin by remember { mutableStateOf(40) }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val activityLabels = stringArrayResource(R.array.annotation_composer_activity_types)
                             listOf(
-                                "💪 тренировка" to "тренировка",
-                                "🚶 прогулка" to "прогулка",
-                                "🚴 велосипед" to "велосипед",
-                                "🏃 бег" to "бег",
+                                activityLabels[0] to "тренировка",
+                                activityLabels[1] to "прогулка",
+                                activityLabels[2] to "велосипед",
+                                activityLabels[3] to "бег",
                             ).forEach { (disp, tag) ->
                                 FilterChip(
                                     selected = pendingActivity == tag,
@@ -1832,16 +1954,29 @@ fun AnnotationComposer(
                                     FilterChip(
                                         selected = activityMin == m,
                                         onClick = { activityMin = m },
-                                        label = { Text(if (m < 60) "$m мин" else "%dч%02d".format(m / 60, m % 60)) },
+                                        label = {
+                                            Text(
+                                                if (m < 60) stringResource(R.string.annotation_composer_minutes_compact, m)
+                                                else {
+                                                    stringResource(
+                                                        R.string.annotation_composer_hours_minutes_compact,
+                                                        m / 60, m % 60,
+                                                    )
+                                                },
+                                            )
+                                        },
                                     )
                                 }
                             }
+                            // The submitted note content below is the activity
+                            // tag plus the core-parsed minute-duration suffix —
+                            // stored data, kept in Russian regardless of UI language.
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 androidx.compose.material3.FilledTonalButton(onClick = {
                                     // Starting now (or at the picked time).
                                     submit("$tag · $activityMin мин", tsMs = entryTs())
                                     pendingActivity = null
-                                }) { Text("▶ начинаю") }
+                                }) { Text(stringResource(R.string.annotation_composer_activity_start)) }
                                 androidx.compose.material3.FilledTonalButton(onClick = {
                                     // Just finished: the bout STARTED duration ago.
                                     submit(
@@ -1849,11 +1984,10 @@ fun AnnotationComposer(
                                         tsMs = entryTs() - activityMin * 60_000L,
                                     )
                                     pendingActivity = null
-                                }) { Text("✔ закончил") }
+                                }) { Text(stringResource(R.string.annotation_composer_activity_finished)) }
                             }
                             Text(
-                                "«Закончил» ставит начало на $activityMin мин назад — " +
-                                    "окно активности ложится в прошлое, как и было на самом деле.",
+                                stringResource(R.string.annotation_composer_activity_finished_hint, activityMin),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1870,18 +2004,18 @@ fun AnnotationComposer(
                             FilterChip(
                                 selected = insKind == 0,
                                 onClick = { insKind = 0 },
-                                label = { Text("болюс") },
+                                label = { Text(stringResource(R.string.annotation_composer_insulin_kind_bolus)) },
                             )
                             FilterChip(
                                 selected = insKind == 1,
                                 onClick = { insKind = 1 },
-                                label = { Text("базал") },
+                                label = { Text(stringResource(R.string.annotation_composer_insulin_kind_basal)) },
                             )
                             OutlinedTextField(
                                 value = insUnits,
                                 onValueChange = { insUnits = it },
                                 modifier = Modifier.weight(1f),
-                                label = { Text("ед") },
+                                label = { Text(stringResource(R.string.annotation_composer_units_label)) },
                                 singleLine = true,
                                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -1898,27 +2032,25 @@ fun AnnotationComposer(
                             }) { Text("✓") }
                         }
                         Text(
-                            "Ручной ввод — для уколов мимо ручки: дозы с NovoPen и из xDrip " +
-                                "приходят сами. Время — через 🕐 выше.",
+                            stringResource(R.string.annotation_composer_manual_entry_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (recentBoluses.isEmpty()) {
                             Text(
-                                "Уколов за последние 6 часов нет.",
+                                stringResource(R.string.annotation_composer_no_recent_boluses),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
                             Text(
-                                "Назначение недавних уколов — выберите укол, затем метку:",
+                                stringResource(R.string.annotation_composer_recent_boluses_hint),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 recentBoluses.takeLast(4).reversed().forEach { b ->
                                     val agoMin = (System.currentTimeMillis() - b.tsMs) / 60_000
-                                    val ago = if (agoMin >= 60) "${agoMin / 60} ч ${agoMin % 60} мин" else "$agoMin мин"
                                     FilterChip(
                                         // Compare by timestamp: the object is
                                         // recreated on every state reload.
@@ -1927,14 +2059,30 @@ fun AnnotationComposer(
                                             taggingBolus = if (taggingBolus?.tsMs == b.tsMs) null else b
                                         },
                                         label = {
+                                            val ago = if (agoMin >= 60) {
+                                                stringResource(R.string.annotation_composer_hours_minutes_ago, agoMin / 60, agoMin % 60)
+                                            } else {
+                                                stringResource(R.string.annotation_composer_minutes_ago, agoMin)
+                                            }
+                                            val bg = bgAtShot[b.tsMs]?.let {
+                                                com.diapilot.core.analysis.fmtBg(it, com.example.diapilot.data.Units.isMgdl(context))
+                                            }
+                                            val purposeLabel = TokenText.bolusPurpose(context, b.purpose)
                                             Text(
-                                                "%.1f ед · $ago назад".format(b.units) +
-                                                    (bgAtShot[b.tsMs]?.let {
-                                                        " · при " + com.diapilot.core.analysis.fmtBg(
-                                                            it, com.example.diapilot.data.Units.isMgdl(context),
-                                                        )
-                                                    } ?: "") +
-                                                    (b.purpose?.let { " · $it" } ?: ""),
+                                                when {
+                                                    bg != null && purposeLabel != null -> stringResource(
+                                                        R.string.annotation_composer_bolus_chip_bg_purpose,
+                                                        b.units, ago, bg, purposeLabel,
+                                                    )
+                                                    bg != null -> stringResource(
+                                                        R.string.annotation_composer_bolus_chip_bg, b.units, ago, bg,
+                                                    )
+                                                    purposeLabel != null -> stringResource(
+                                                        R.string.annotation_composer_bolus_chip_purpose,
+                                                        b.units, ago, purposeLabel,
+                                                    )
+                                                    else -> stringResource(R.string.annotation_composer_bolus_chip, b.units, ago)
+                                                },
                                             )
                                         },
                                     )
@@ -1951,7 +2099,7 @@ fun AnnotationComposer(
                                                 // updated "· $tag" suffix confirms.
                                                 taggingBolus = null
                                             },
-                                            label = { Text(tag) },
+                                            label = { Text(TokenText.bolusPurpose(context, tag) ?: tag) },
                                         )
                                     }
                                 }
@@ -1968,7 +2116,12 @@ fun AnnotationComposer(
                                 onValueChange = { bgText = it },
                                 modifier = Modifier.weight(1f),
                                 label = {
-                                    Text("Глюкометр, ${com.diapilot.core.analysis.unitLabel(mgdl)}")
+                                    Text(
+                                        stringResource(
+                                            R.string.annotation_composer_meter_label,
+                                            com.example.diapilot.i18n.unitLabel(mgdl),
+                                        ),
+                                    )
                                 },
                                 singleLine = true,
                                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -1989,16 +2142,13 @@ fun AnnotationComposer(
                         }
                         if (movingFast) {
                             Text(
-                                "⚠ Сахар сейчас быстро меняется — калибровка по этому замеру " +
-                                    "менее точна (кровь опережает сенсор). Точка на график " +
-                                    "попадёт, но для калибровки лучше замер на ровном сахаре.",
+                                stringResource(R.string.annotation_composer_meter_moving_fast_warning),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
                         }
                         Text(
-                            "Замер глюкометром попадает на график и в аналитику как точка " +
-                                "(источник «глюкометр»). Основа для слепых дней без сенсора.",
+                            stringResource(R.string.annotation_composer_meter_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -2007,7 +2157,7 @@ fun AnnotationComposer(
                     5 -> {
                         val hasKey = com.example.diapilot.data.AskClaude.apiKey(context) != null
                         Text(
-                            "Скажи или напиши, что произошло — приложение поймёт и добавит:",
+                            stringResource(R.string.annotation_composer_command_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -2016,7 +2166,7 @@ fun AnnotationComposer(
                                 value = cmdText,
                                 onValueChange = { cmdText = it; cmdParsed = null; cmdError = null },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("поел смузи · калибровка 7.2 · уколол 4 на еду · погулял") },
+                                placeholder = { Text(stringResource(R.string.annotation_composer_command_placeholder)) },
                                 maxLines = 2,
                             )
                             val speak = rememberSpeechInput { spoken ->
@@ -2025,6 +2175,8 @@ fun AnnotationComposer(
                             IconButton(onClick = speak) { Text("🎤") }
                         }
                         if (hasKey) {
+                            val notUnderstoodMsg = stringResource(R.string.annotation_composer_command_not_understood)
+                            val blockedTemplate = stringResource(R.string.annotation_composer_command_blocked)
                             TextButton(
                                 enabled = !cmdBusy && cmdText.isNotBlank(),
                                 onClick = {
@@ -2039,8 +2191,8 @@ fun AnnotationComposer(
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                             cmdBusy = false
                                             val mgdl2 = com.example.diapilot.data.Units.isMgdl(context)
-                                            if (r == null || r.action == "none" || r.describe(mgdl2) == null) {
-                                                cmdError = "Не понял команду — переформулируй или введи вручную."
+                                            if (r == null || r.action == "none" || r.describe(mgdl2, context) == null) {
+                                                cmdError = notUnderstoodMsg
                                             } else {
                                                 // Hard gate: LLM values never reach the DB
                                                 // unvalidated. On violation nothing is offered
@@ -2053,18 +2205,26 @@ fun AnnotationComposer(
                                                     activity = r.activity,
                                                 )
                                                 if (block != null) {
-                                                    cmdError =
-                                                        "Распознал: ${r.describe(mgdl2)} — но не записал: " +
-                                                            "$block. Проверь и введи вручную."
+                                                    cmdError = blockedTemplate.format(
+                                                        r.describe(mgdl2, context),
+                                                        com.example.diapilot.i18n.CommandText.block(context, block),
+                                                    )
                                                 } else cmdParsed = r
                                             }
                                         }
                                     }
                                 },
-                            ) { Text(if (cmdBusy) "Разбираю…" else "Разобрать") }
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (cmdBusy) R.string.annotation_composer_command_parsing
+                                        else R.string.annotation_composer_command_parse,
+                                    ),
+                                )
+                            }
                         } else {
                             Text(
-                                "Нужен API-ключ (вкладка Чат) для распознавания команд.",
+                                stringResource(R.string.annotation_composer_command_need_key),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -2084,26 +2244,30 @@ fun AnnotationComposer(
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     Text(
-                                        "Добавить: ${pc.describe(mgdl2)}",
+                                        stringResource(R.string.annotation_composer_command_add_preview, pc.describe(mgdl2, context) ?: ""),
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        val defaultFoodLabel = stringResource(R.string.annotation_composer_default_food_label)
                                         androidx.compose.material3.FilledTonalButton(onClick = {
                                             val ts = System.currentTimeMillis()
                                             when (pc.action) {
-                                                "food" -> onAdd(ts, pc.food ?: "еда", null, "food", pc.grams)
+                                                "food" -> onAdd(ts, pc.food ?: defaultFoodLabel, null, "food", pc.grams)
                                                 "meter" -> pc.mmol?.let { onAddMeter(ts, it) }
                                                 "bolus" -> pc.units?.let {
                                                     onAddBolusWithPurpose(ts, it, pc.purpose)
                                                 }
                                                 "basal" -> pc.units?.let { onAddBasal(ts, it) }
+                                                // The literals below are stored tokens (the default
+                                                // activity note tag, and the rescue-carbs prefix plus
+                                                // count) — kept exactly as the parsers and TokenText expect them.
                                                 "activity" -> onAdd(ts, pc.activity ?: "тренировка", null, "tag", null)
                                                 "dextrose" -> onAdd(ts, "декстроза ×1", null, "food", com.example.diapilot.DEXTROSE_TABLET_G)
                                             }
                                             cmdParsed = null; cmdText = ""
                                             resetAll()
-                                        }) { Text("✓ Добавить") }
-                                        TextButton(onClick = { cmdParsed = null }) { Text("Отмена") }
+                                        }) { Text(stringResource(R.string.annotation_composer_command_add)) }
+                                        TextButton(onClick = { cmdParsed = null }) { Text(stringResource(R.string.annotation_composer_cancel)) }
                                     }
                                 }
                             }
@@ -2189,9 +2353,13 @@ fun AnnotationRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        annotation.mediaRef?.let { PhotoThumb(it, annotation.content) }
+        // The stored content's HEAD may be a known token (a note tag, an
+        // activity, the rescue prefix); TokenText.noteTag translates it and
+        // passes anything else through unchanged.
+        val displayContent = TokenText.noteTag(LocalContext.current, annotation.content)
+        annotation.mediaRef?.let { PhotoThumb(it, displayContent) }
         Text(
-            "$icon ${fmt.format(Date(annotation.tsMs))} · ${annotation.content}",
+            "$icon ${fmt.format(Date(annotation.tsMs))} · $displayContent",
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
                 .weight(1f)
@@ -2266,6 +2434,8 @@ fun AnnotationEditor(
     var pendingPhoto by remember { mutableStateOf<File?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var analysis by remember(annotation.id) { mutableStateOf(annotation.analysis) }
+    // True while [analysis] holds an error message rather than an analysis.
+    var analysisFailed by remember(annotation.id) { mutableStateOf(false) }
     var analyzing by remember { mutableStateOf(false) }
     // Grams as text: "" = unknown; comma decimals accepted.
     // Which component is being taught to the dictionary (⚠ tapped).
@@ -2417,13 +2587,13 @@ fun AnnotationEditor(
                     TextButton(
                         onClick = { tsMs -= 30 * 60_000 },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
-                    ) { Text("−30м") }
+                    ) { Text(stringResource(R.string.annotation_composer_minus_30m)) }
                     TextButton(
                         onClick = {
                             tsMs = (tsMs + 30 * 60_000).coerceAtMost(System.currentTimeMillis())
                         },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
-                    ) { Text("+30м") }
+                    ) { Text(stringResource(R.string.annotation_composer_plus_30m)) }
                     IconButton(onClick = { confirmDelete = true }) { Text("🗑") }
                 }
             }
@@ -2432,17 +2602,17 @@ fun AnnotationEditor(
                     TextButton(
                         onClick = repeat,
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
-                    ) { Text("↺ Повторить сейчас") }
+                    ) { Text(stringResource(R.string.annotation_composer_repeat_now)) }
                 }
                 onScalePortion?.let { scale ->
                     TextButton(
                         onClick = { scale(0.5) },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
-                    ) { Text("½ порции") }
+                    ) { Text(stringResource(R.string.annotation_composer_half_portion)) }
                     TextButton(
                         onClick = { scale(2.0) },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
-                    ) { Text("×2 порции") }
+                    ) { Text(stringResource(R.string.annotation_composer_double_portion)) }
                 }
             }
             val speakEdit = rememberSpeechInput { spoken ->
@@ -2511,7 +2681,7 @@ fun AnnotationEditor(
                                 Text(name, modifier = Modifier.weight(1f))
                                 recentFoodCarbs[name]?.let {
                                     Text(
-                                        "~%.0f г".format(it),
+                                        stringResource(R.string.annotation_composer_approx_grams, it),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -2531,13 +2701,26 @@ fun AnnotationEditor(
                                 ?.groupValues?.get(1)?.toIntOrNull()
                             FilterChip(
                                 selected = cur == m,
+                                // The written duration suffix below is the stored,
+                                // core-parsed minute suffix — kept in Russian;
+                                // only the chip label below is translated.
                                 onClick = { text = "$head · $m мин" },
-                                label = { Text(if (m < 60) "$m мин" else "%dч%02d".format(m / 60, m % 60)) },
+                                label = {
+                                    Text(
+                                        if (m < 60) stringResource(R.string.annotation_composer_minutes_compact, m)
+                                        else {
+                                            stringResource(
+                                                R.string.annotation_composer_hours_minutes_compact,
+                                                m / 60, m % 60,
+                                            )
+                                        },
+                                    )
+                                },
                             )
                         }
                     }
                     Text(
-                        "Время заметки = начало активности.",
+                        stringResource(R.string.annotation_composer_note_time_is_start),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -2557,7 +2740,7 @@ fun AnnotationEditor(
                 // split. "add component" below stays, it is how a split starts.
                 if (compRows.isNotEmpty()) {
                     Text(
-                        "🧩 Состав · порция → углеводы, г:",
+                        stringResource(R.string.annotation_composer_component_split_header),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -2575,7 +2758,7 @@ fun AnnotationEditor(
                                 onValueChange = { comp.name = it; comp.deriveCarbs() },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
-                                placeholder = { Text("компонент") },
+                                placeholder = { Text(stringResource(R.string.annotation_composer_component_placeholder)) },
                                 textStyle = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
@@ -2617,7 +2800,7 @@ fun AnnotationEditor(
                                 textStyle = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
-                                " г  →",
+                                stringResource(R.string.annotation_composer_grams_arrow),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -2631,7 +2814,7 @@ fun AnnotationEditor(
                                 textStyle = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
-                                " г",
+                                stringResource(R.string.annotation_composer_grams_unit),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -2654,8 +2837,10 @@ fun AnnotationEditor(
                             // the food library, three screens away, and the table
                             // it writes has 0 rows after eight months.
                             Text(
-                                "⚠ «${comp.name.trim()}» не в словаре — модель не увидит эти " +
-                                    "%.0f г. Нажми, чтобы указать, что это.".format(grams * comp.count),
+                                stringResource(
+                                    R.string.annotation_composer_concept_missing_warning,
+                                    comp.name.trim(), grams * comp.count,
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier
@@ -2681,7 +2866,12 @@ fun AnnotationEditor(
                         }
                     },
                 ) {
-                    Text(if (compRows.isEmpty()) "🧩 Разложить на компоненты" else "＋ компонент")
+                    Text(
+                        stringResource(
+                            if (compRows.isEmpty()) R.string.annotation_composer_split_into_components
+                            else R.string.annotation_composer_add_component_plain,
+                        ),
+                    )
                 }
 
                 // Total carbs = SUM of the component carbs (live). The old
@@ -2697,7 +2887,7 @@ fun AnnotationEditor(
                         (it.carbsText.trim().replace(',', '.').toDoubleOrNull() ?: 0.0) * it.count
                     }
                     Text(
-                        "Итого углеводов: %.0f г".format(compCarbsSum),
+                        stringResource(R.string.annotation_composer_total_carbs, compCarbsSum),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -2711,7 +2901,8 @@ fun AnnotationEditor(
                     }
                     if (lost > 0 && compCarbsSum > 0) {
                         Text(
-                            "🔬 модель увидит %.0f из %.0f г (%.0f%% без имени)".format(
+                            stringResource(
+                                R.string.annotation_composer_model_sees_partial,
                                 compCarbsSum - lost, compCarbsSum, 100 * lost / compCarbsSum,
                             ),
                             style = MaterialTheme.typography.labelSmall,
@@ -2729,8 +2920,8 @@ fun AnnotationEditor(
                         value = carbsText,
                         onValueChange = { carbsText = it },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Углеводы, г") },
-                        placeholder = { Text("например 45") },
+                        label = { Text(stringResource(R.string.annotation_composer_carbs_g_field_label)) },
+                        placeholder = { Text(stringResource(R.string.annotation_composer_example_45)) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -2740,7 +2931,12 @@ fun AnnotationEditor(
             }
             if (annotation.kind == "food" || annotation.estCarbs != null) {
                 TextButton(onClick = { showEvidenceDetails = !showEvidenceDetails }) {
-                    Text(if (showEvidenceDetails) "Скрыть источник и длительность" else "＋ Уточнить источник / длительность")
+                    Text(
+                        stringResource(
+                            if (showEvidenceDetails) R.string.annotation_composer_evidence_toggle_hide
+                            else R.string.annotation_composer_evidence_toggle_show,
+                        ),
+                    )
                 }
                 if (showEvidenceDetails) {
                 Row(
@@ -2754,8 +2950,8 @@ fun AnnotationEditor(
                             durationText = value.filter { it.isDigit() || it == '.' || it == ',' }
                         },
                         modifier = Modifier.width(150.dp),
-                        label = { Text("Длительность, мин") },
-                        placeholder = { Text("например 30") },
+                        label = { Text(stringResource(R.string.annotation_composer_duration_min_label)) },
+                        placeholder = { Text(stringResource(R.string.annotation_composer_example_30)) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -2764,28 +2960,30 @@ fun AnnotationEditor(
                     FilterChip(
                         selected = alcoholPresent,
                         onClick = { alcoholPresent = !alcoholPresent },
-                        label = { Text("алкоголь") },
+                        label = { Text(stringResource(R.string.annotation_composer_alcohol_label)) },
                     )
                 }
+                val evidenceModeLabels2 = stringArrayResource(R.array.annotation_composer_evidence_source_modes)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(0 to "Обычно", 1 to "Этикетка+вес", 2 to "Рецепт").forEach { (id, label) ->
+                    listOf(0, 1, 2).zip(evidenceModeLabels2.toList()).forEach { (id, label) ->
                         FilterChip(selected = evidenceMode == id, onClick = { evidenceMode = id }, label = { Text(label) })
                     }
                 }
                 if (legacyExactMarker && currentEvidence == null) {
                     Text(
-                        "Старый флаг «точные»: сохранён как legacy и не считается измерением без арифметики.",
+                        stringResource(R.string.annotation_composer_legacy_exact_flag_warning),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 if (evidenceMode == 1) {
+                    val labelFields2 = stringArrayResource(R.array.annotation_composer_label_weight_fields)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
-                            Triple("угл./100 г", labelPer100Text) { v: String -> labelPer100Text = v },
-                            Triple("вес, г", labelWeightText) { v: String -> labelWeightText = v },
-                            Triple("угл./порцию", labelPerServingText) { v: String -> labelPerServingText = v },
-                            Triple("порций", labelServingsText) { v: String -> labelServingsText = v },
+                            Triple(labelFields2[0], labelPer100Text) { v: String -> labelPer100Text = v },
+                            Triple(labelFields2[1], labelWeightText) { v: String -> labelWeightText = v },
+                            Triple(labelFields2[2], labelPerServingText) { v: String -> labelPerServingText = v },
+                            Triple(labelFields2[3], labelServingsText) { v: String -> labelServingsText = v },
                         ).forEach { (label, value, set) ->
                             OutlinedTextField(value = value, onValueChange = set, label = { Text(label) },
                                 singleLine = true, modifier = Modifier.width(122.dp))
@@ -2793,13 +2991,14 @@ fun AnnotationEditor(
                     }
                 }
                 if (evidenceMode == 2) {
+                    val recipeFields2 = stringArrayResource(R.array.annotation_composer_recipe_fields)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
-                            Triple("версия", recipeVersionText) { v: String -> recipeVersionText = v },
-                            Triple("угл. всего", recipeTotalCarbsText) { v: String -> recipeTotalCarbsText = v },
-                            Triple("вес всего", recipeTotalWeightText) { v: String -> recipeTotalWeightText = v },
-                            Triple("съедено, г", recipeConsumedWeightText) { v: String -> recipeConsumedWeightText = v },
-                            Triple("доля 0–1", recipeFractionText) { v: String -> recipeFractionText = v },
+                            Triple(recipeFields2[0], recipeVersionText) { v: String -> recipeVersionText = v },
+                            Triple(recipeFields2[1], recipeTotalCarbsText) { v: String -> recipeTotalCarbsText = v },
+                            Triple(recipeFields2[2], recipeTotalWeightText) { v: String -> recipeTotalWeightText = v },
+                            Triple(recipeFields2[3], recipeConsumedWeightText) { v: String -> recipeConsumedWeightText = v },
+                            Triple(recipeFields2[4], recipeFractionText) { v: String -> recipeFractionText = v },
                         ).forEach { (label, value, set) ->
                             OutlinedTextField(value = value, onValueChange = set, label = { Text(label) },
                                 singleLine = true, modifier = Modifier.width(122.dp))
@@ -2814,15 +3013,15 @@ fun AnnotationEditor(
                         FilterChip(
                             selected = durationText.replace(',', '.').toDoubleOrNull() == minutes.toDouble(),
                             onClick = { durationText = minutes.toString() },
-                            label = { Text("$minutes м") },
+                            label = { Text(stringResource(R.string.annotation_composer_minutes_short, minutes)) },
                         )
                     }
                     if (durationText.isNotBlank()) {
-                        TextButton(onClick = { durationText = "" }) { Text("сразу") }
+                        TextButton(onClick = { durationText = "" }) { Text(stringResource(R.string.annotation_composer_immediately)) }
                     }
                 }
                 Text(
-                    "Количество и длительность — разные свидетельства; измеренные граммы не означают точную физиологию.",
+                    stringResource(R.string.annotation_composer_amount_duration_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2830,15 +3029,16 @@ fun AnnotationEditor(
             }
             if (annotation.kind == "food" || annotation.estCarbs != null) {
                 Text(
-                    "Питательность · оценка, можно поправить",
+                    stringResource(R.string.annotation_composer_nutrition_estimate_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val nutritionFields2 = stringArrayResource(R.array.annotation_composer_nutrition_fields)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
-                        Triple("Белки, г", proteinText) { v: String -> proteinText = v },
-                        Triple("Жиры, г", fatText) { v: String -> fatText = v },
-                        Triple("ккал", kcalText) { v: String -> kcalText = v },
+                        Triple(nutritionFields2[0], proteinText) { v: String -> proteinText = v },
+                        Triple(nutritionFields2[1], fatText) { v: String -> fatText = v },
+                        Triple(nutritionFields2[2], kcalText) { v: String -> kcalText = v },
                     ).forEach { (label, value, set) ->
                         OutlinedTextField(
                             value = value,
@@ -2863,22 +3063,30 @@ fun AnnotationEditor(
             ) {
                 analysis?.let { a ->
                     TextButton(onClick = { showAnalysis = !showAnalysis }) {
-                        Text(if (showAnalysis) "▾ разбор" else "▸ разбор")
+                        Text(
+                            stringResource(
+                                if (showAnalysis) R.string.annotation_composer_analysis_expanded
+                                else R.string.annotation_composer_analysis_collapsed,
+                            ),
+                        )
                     }
                     if (showAnalysis) Text(a, style = MaterialTheme.typography.bodySmall)
                 }
                 TextButton(enabled = !analyzing && text.isNotBlank(), onClick = {
                     analyzing = true
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        var failed = false
                         val result = try {
                             com.example.diapilot.data.AskClaude.estimateCarbs(
                                 com.example.diapilot.data.AskClaude.apiKey(context)!!, text,
+                                context = context,
                             )
                         } catch (e: Exception) {
-                            "Ошибка: ${e.message}"
+                            failed = true
+                            com.example.diapilot.data.AskClaude.errorText(context, e)
                         }
                         var grams: Double? = null
-                        if (!result.startsWith("Ошибка")) {
+                        if (!failed) {
                             val store = com.example.diapilot.data.Stores.get(context)
                             store.setAnnotationAnalysis(annotation.id, result)
                             grams = com.diapilot.core.analysis.parseCarbsEstimate(result)
@@ -2886,6 +3094,7 @@ fun AnnotationEditor(
                         }
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                             analysis = result
+                            analysisFailed = failed
                             analyzing = false
                             applyNutrition(result)
                             grams?.let {
@@ -2895,11 +3104,13 @@ fun AnnotationEditor(
                     }
                 }) {
                     Text(
-                        when {
-                            analyzing -> "Считаю углеводы…"
-                            analysis == null -> "🤖 Углеводы по описанию"
-                            else -> "🔄 Пересчитать по описанию"
-                        },
+                        stringResource(
+                            when {
+                                analyzing -> R.string.annotation_composer_computing_carbs
+                                analysis == null -> R.string.annotation_composer_carbs_from_description
+                                else -> R.string.annotation_composer_recompute_from_description
+                            },
+                        ),
                     )
                 }
             }
@@ -2909,19 +3120,22 @@ fun AnnotationEditor(
                 fun analyze() {
                     analyzing = true
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        var failed = false
                         val result = try {
                             val bytes = loadScaledJpeg(File(photosDir(context), mediaRef!!))
-                                ?: error("Фото не найдено")
+                                ?: error("Photo not found")
                             com.example.diapilot.data.AskClaude.describeFood(
                                 com.example.diapilot.data.AskClaude.apiKey(context)!!, bytes,
                                 caption = text,
+                                context = context,
                             ).text
                         } catch (e: Exception) {
-                            "Ошибка: ${e.message}"
+                            failed = true
+                            com.example.diapilot.data.AskClaude.errorText(context, e)
                         }
                         // Paid for once — cache on the annotation itself.
                         var parsedFromVision: Double? = null
-                        if (!result.startsWith("Ошибка")) {
+                        if (!failed) {
                             val store = com.example.diapilot.data.Stores.get(context)
                             store.setAnnotationAnalysis(annotation.id, result)
                             parsedFromVision =
@@ -2930,6 +3144,7 @@ fun AnnotationEditor(
                         }
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                             analysis = result
+                            analysisFailed = failed
                             analyzing = false
                             applyNutrition(result)
                             parsedFromVision?.let {
@@ -2942,21 +3157,28 @@ fun AnnotationEditor(
                     val dishName = a.lineSequence().firstOrNull()?.trim()?.trimEnd('.')
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showAnalysis = !showAnalysis }) {
-                            Text(if (showAnalysis) "▾ разбор" else "▸ разбор")
+                            Text(
+                                stringResource(
+                                    if (showAnalysis) R.string.annotation_composer_analysis_expanded
+                                    else R.string.annotation_composer_analysis_collapsed,
+                                ),
+                            )
                         }
-                        if (!dishName.isNullOrBlank() && !a.startsWith("Ошибка") && dishName != text) {
-                            TextButton(onClick = { text = dishName }) { Text("→ в название") }
+                        if (!dishName.isNullOrBlank() && !analysisFailed && dishName != text) {
+                            TextButton(onClick = { text = dishName }) { Text(stringResource(R.string.annotation_composer_use_as_name)) }
                         }
                     }
                     if (showAnalysis) Text(a, style = MaterialTheme.typography.bodySmall)
                 }
                 TextButton(enabled = !analyzing, onClick = ::analyze) {
                     Text(
-                        when {
-                            analyzing -> "Разбираю фото…"
-                            analysis == null -> "🔍 Что на фото?"
-                            else -> "🔄 Перегенерить"
-                        },
+                        stringResource(
+                            when {
+                                analyzing -> R.string.annotation_composer_photo_analyzing
+                                analysis == null -> R.string.annotation_composer_whats_in_photo
+                                else -> R.string.annotation_composer_regenerate
+                            },
+                        ),
                     )
                 }
             }
@@ -2993,7 +3215,9 @@ fun AnnotationEditor(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = onCancel) { Text("Отмена") }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.annotation_composer_cancel)) }
+                val fillFullPathMsg = stringResource(R.string.annotation_composer_fill_recomputable_path)
+                val newRecipeVersionMsg = stringResource(R.string.annotation_composer_new_recipe_version_needed)
                 TextButton(onClick = saveAnnotation@ {
                     if (text.isNotBlank() || mediaRef != null) {
                         val store = com.example.diapilot.data.Stores.get(context)
@@ -3006,13 +3230,13 @@ fun AnnotationEditor(
                         } else parsedCarbs()
                         val structured = editorEvidenceInput(total)
                         if (evidenceMode != 0 && structured == null) {
-                            evidenceError = "Заполните один полный пересчитываемый путь"
+                            evidenceError = fillFullPathMsg
                             return@saveAnnotation
                         }
                         if (structured != null && runCatching {
                             com.diapilot.core.collector.validateRecipeRevisionV1(currentEvidence?.input, structured)
                         }.isFailure) {
-                            evidenceError = "Изменённому рецепту нужна новая версия"
+                            evidenceError = newRecipeVersionMsg
                             return@saveAnnotation
                         }
                         if (structured != null) {
@@ -3069,9 +3293,12 @@ fun AnnotationEditor(
                         val newAnalysis = listOf(prose, sostav, nutrition, metadata)
                             .filter { it.isNotBlank() }.joinToString("\n")
                         store.setAnnotationAnalysis(annotation.id, newAnalysis)
+                        // The fallback content below is the stored placeholder
+                        // token (matches TokenText.NOTE_TAGS / submit()'s own
+                        // default), not UI text.
                         onSave(tsMs, text.trim().ifEmpty { "фото" }, mediaRef)
                     }
-                }) { Text("Сохранить") }
+                }) { Text(stringResource(R.string.annotation_composer_save)) }
             }
         }
     }
@@ -3079,15 +3306,23 @@ fun AnnotationEditor(
     if (confirmDelete) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Удалить заметку?") },
-            text = { Text("«${annotation.content}» — ${fmt.format(Date(annotation.tsMs))}") },
+            title = { Text(stringResource(R.string.annotation_composer_delete_note_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.annotation_composer_delete_note_confirm,
+                        TokenText.noteTag(LocalContext.current, annotation.content),
+                        fmt.format(Date(annotation.tsMs)),
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDelete() }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.annotation_composer_delete_button), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Отмена") }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.annotation_composer_cancel)) }
             },
         )
     }

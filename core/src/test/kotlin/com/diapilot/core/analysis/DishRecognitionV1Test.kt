@@ -60,9 +60,9 @@ class DishRecognitionV1Test {
     fun `the question carries the two facts that make the answer informed`() {
         val c = assertNotNull2(DishRecognitionV1.candidate("обычный смузи", all))
         val q = DishRecognitionV1.question(c)
-        assertTrue("missing the repeat count: $q", "28 раз" in q)
-        assertTrue("missing the usual grams: $q", "22 г" in q)
-        assertTrue("a question, not a statement: $q", "?" in q)
+        assertEquals("missing the repeat count: $q", 28, q.intakes)
+        assertEquals("missing the usual grams: $q", 22.0, q.typicalCarbsG!!, 0.5)
+        assertEquals("asks about the dish itself: $q", c.dish.proposed.title, q.title)
     }
 
     @Test

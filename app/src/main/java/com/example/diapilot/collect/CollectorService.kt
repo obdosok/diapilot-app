@@ -19,6 +19,8 @@ import androidx.core.content.ContextCompat
 import com.diapilot.core.collector.ACTION_BG
 import com.diapilot.core.collector.Reading
 import com.example.diapilot.MainActivity
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -56,7 +58,10 @@ class CollectorService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
-        startForeground(NOTIF_ID, notification("Сбор данных активен · ожидаю xDrip"))
+        startForeground(
+            NOTIF_ID,
+            notification(localized().getString(R.string.collector_service_starting)),
+        )
         receiver = XdripBgReceiver(onReading = ::onReading).also {
             ContextCompat.registerReceiver(
                 this, it, IntentFilter(ACTION_BG), ContextCompat.RECEIVER_EXPORTED,
@@ -359,11 +364,13 @@ class CollectorService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         // Retire the old LOW channel so its locked importance doesn't win.
         try { nm.deleteNotificationChannel("collector") } catch (_: Exception) {}
+        val text = localized()
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_ID, "Текущий сахар", NotificationManager.IMPORTANCE_DEFAULT,
+                CHANNEL_ID, text.getString(R.string.collector_service_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "Постоянная карточка с текущим сахаром на экране блокировки"
+                description = text.getString(R.string.collector_service_channel_description)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setSound(null, null)          // silent — updates every minute
                 enableVibration(false)

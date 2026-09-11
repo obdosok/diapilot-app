@@ -1,5 +1,7 @@
 package com.example.diapilot.data
 
+import com.example.diapilot.i18n.localized
+import com.example.diapilot.R
 import android.content.Context
 import com.diapilot.core.hybrid.HybridPersonModel
 import com.diapilot.core.physio.InsulinShapeLandmarksV1
@@ -128,12 +130,6 @@ object PhysioTuning {
                 it.slowDelayMin, it.slowPeakMin, it.slowEndMin, it.slowMacroShare,
             )
         }
-
-    val TRIANGLE_LABELS = listOf(
-        "быстрые·старт", "быстрые·пик", "быстрые·конец", "быстрые·макро",
-        "средние·старт", "средние·пик", "средние·конец", "средние·макро",
-        "медленные·старт", "медленные·пик", "медленные·конец", "медленные·макро",
-    )
 
     /**
      * Delay < peak < end within each type, or the shape is not a triangle.
@@ -310,15 +306,19 @@ object PhysioTuning {
     ).joinToString("|") { it?.toString() ?: "-" } +
         "|tri=" + (v.carbTriangles?.joinToString(",") { "%.4f".format(it) } ?: "-")
 
-    fun summary(v: Values): String {
-        if (!v.touched) return "как отгружено"
+    /** What the tuning card shows as applied, in the UI language. Cache keys
+     *  and logs use [identity], which does not change with the language. */
+    fun summary(v: Values, context: Context): String {
+        val text = context.localized()
+        if (!v.touched) return text.getString(R.string.physio_tuning_as_shipped)
         val parts = buildList {
-            if (v.trustRamp != 1.0) add("доверие %.2f".format(v.trustRamp))
+            if (v.trustRamp != 1.0) add(text.getString(R.string.physio_tuning_trust, "%.2f".format(v.trustRamp)))
             if (v.onsetMin != null || v.fullSpeedMin != null ||
                 v.phaseMin != null || v.tailMin != null
             ) {
                 add(
-                    "инсулин %s·%s·%s·%s".format(
+                    text.getString(
+                        R.string.physio_tuning_insulin,
                         v.onsetMin?.let { "%.0f".format(it) } ?: "—",
                         v.fullSpeedMin?.let { "%.0f".format(it) } ?: "—",
                         v.phaseMin?.let { "%.0f".format(it) } ?: "—",
@@ -327,9 +327,9 @@ object PhysioTuning {
                 )
             }
             v.isfMmol?.let { add("ISF %.2f".format(it)) }
-            v.emptyingKcalPerHour?.let { add("%.0f ккал/ч".format(it)) }
-            v.carbSieving?.let { add("сито %.2f".format(it)) }
-            v.carbSpread?.let { add("типы %.2f".format(it)) }
+            v.emptyingKcalPerHour?.let { add(text.getString(R.string.physio_tuning_kcal_per_hour, "%.0f".format(it))) }
+            v.carbSieving?.let { add(text.getString(R.string.physio_tuning_sieve, "%.2f".format(it))) }
+            v.carbSpread?.let { add(text.getString(R.string.physio_tuning_types, "%.2f".format(it))) }
         }
         return parts.joinToString(" · ")
     }

@@ -33,30 +33,30 @@ class FoodPromptDecouplingTest {
     @Test fun `carb speed is explicitly decoupled from fat and protein`() {
         assertTrue(
             "the speed field must say it is the carbohydrate's own speed",
-            src.contains("Скорость усвоения САМОГО углевода компонента"),
+            src.contains("Absorption speed of the component's OWN carbohydrate"),
         )
         assertTrue(
             "and must name the double count, or the rule reads as a preference",
-            src.contains("двойной счёт"),
+            src.contains("double count"),
         )
         assertTrue(
             "fatty sweets must be listed as FAST — that is the measured failure",
-            src.contains("сладкая паста") && src.contains("глазурь"),
+            src.contains("sweet paste") && src.contains("icing"),
         )
     }
 
     @Test fun `physical form has a deterministic ladder, not just examples`() {
         assertTrue(
             "the form must be decided by an explicit ordered rule",
-            src.contains("Определяй по шагам") && src.contains("наибольшими carbs_g"),
+            src.contains("Decide step by step") && src.contains("largest carbs_g"),
         )
         assertTrue(
             "toppings must be declared not to move the form",
-            src.contains("Соусы, начинки, гарнир и добавки форму не меняют"),
+            src.contains("Sauces, fillings, side dishes and toppings do not change the form"),
         )
         assertTrue(
             "MIXED must be a numeric exception, not a judgement call",
-            src.contains("меньше 10% от суммы"),
+            src.contains("less than 10% of the total"),
         )
     }
 

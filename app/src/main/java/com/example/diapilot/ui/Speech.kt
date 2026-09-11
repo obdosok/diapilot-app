@@ -6,6 +6,8 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.example.diapilot.R
 import java.util.Locale
 
 /**
@@ -15,6 +17,7 @@ import java.util.Locale
  */
 @Composable
 fun rememberSpeechInput(onResult: (String) -> Unit): () -> Unit {
+    val prompt = stringResource(R.string.speech_prompt)
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -35,7 +38,7 @@ fun rememberSpeechInput(onResult: (String) -> Unit): () -> Unit {
                         RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
                     )
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Говорите…")
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
                 },
             )
         } catch (_: Exception) {

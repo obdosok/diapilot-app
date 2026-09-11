@@ -33,68 +33,110 @@ data class StatusInput(
     val cobGrams: Double? = null,
 )
 
-/** Deterministic "8,2" regardless of the JVM locale. */
-private fun fmt1(x: Double): String =
-    String.format(java.util.Locale.ROOT, "%.1f", x).replace('.', ',')
+/** One fragment of the "what is acting now" line. */
+sealed interface StatusActing {
+    /**
+     * The latest food and its age. [cobGrams] is set when the model says at
+     * least 3 g are still to come; [eatenGrams] only when the model cannot say
+     * what is left at all. Both null: name the dish and its age, and stop.
+     */
+    data class Food(
+        val label: String,
+        val ageMin: Long,
+        val cobGrams: Double?,
+        val eatenGrams: Double?,
+    ) : StatusActing
 
-private fun fmt0(x: Double): String =
-    String.format(java.util.Locale.ROOT, "%.0f", x)
+    /** Insulin on board, with the last injection's age while it is recent. */
+    data class Iob(val units: Double, val lastBolusAgeMin: Long?) : StatusActing
 
-private fun fmtAge(min: Long): String = when {
-    min < 60 -> "${min}м"
-    else -> "%dч%02dм".format(min / 60, min % 60)
+    /** No IOB figure to show: the last dose and its age. */
+    data class LastBolus(val units: Double, val ageMin: Long) : StatusActing
+}
+
+/** Where the forecast line goes, as the header words it. Values in mmol/L. */
+data class StatusForecast(
+    val kind: Kind,
+    val mmol: Double,
+    val loMmol: Double?,
+    val hiMmol: Double?,
+    /** Minutes to the settle point; null for [Kind.IN_AN_HOUR]. */
+    val settleMin: Long?,
+    val mgdl: Boolean,
+) {
+    enum class Kind {
+        /** Legacy callers without a settle point: "in an hour ~X". */
+        IN_AN_HOUR,
+        /** Still moving at the horizon: "in 3h ~X, still moving". */
+        STILL_MOVING,
+        /** Already flat (settles within 10 min): "steady from here: ~X". */
+        FLAT,
+        /** "Levels off at ~X in 1h35m". */
+        SETTLES,
+    }
+}
+
+/**
+ * The summary as data; the app renders it in the UI language
+ * (`com.example.diapilot.i18n.StatusText`). [acting] is the first line's
+ * fragments, [forecast] the second line.
+ */
+data class StatusSummary(val acting: List<StatusActing>, val forecast: StatusForecast?) {
+    val isEmpty: Boolean get() = acting.isEmpty() && forecast == null
 }
 
 /**
  * Compose 1–2 short lines. First line: what is acting now (food absorbing +
  * insulin at work — the BG number and trend already live in the hero).
  * Second line: where the model thinks it goes / how reality sits against
- * the corridor. Empty list when there is nothing to say.
+ * the corridor. [StatusSummary.isEmpty] when there is nothing to say.
  */
-fun statusSummary(s: StatusInput): List<String> {
-    val lines = mutableListOf<String>()
-
+fun statusSummary(s: StatusInput): StatusSummary {
     // Compact by design: the header competes with the chart for pixels.
-    val parts = mutableListOf<String>()
+    val parts = mutableListOf<StatusActing>()
     if (s.foodLabel != null && s.foodAgeMin != null) {
         // COB answers the question this line is FOR — "what is acting now" —
         // where the eaten total answers "what happened". Once the model can say
         // what is LEFT, the total is history and belongs in the diary, not here.
         // Below 3 g there is nothing left to mention (IOB hides under 0.1 U the
         // same way); we then say the dish and its age, and stop.
-        val carbs = when {
-            s.cobGrams != null -> s.cobGrams.takeIf { it >= 3.0 }?.let { " · COB ~${fmt0(it)} г" } ?: ""
-            else -> s.foodCarbs?.let { " ~${fmt0(it)}г" } ?: ""
-        }
-        parts += "«${s.foodLabel}» ${fmtAge(s.foodAgeMin)}$carbs"
+        val cob = s.cobGrams
+        parts += StatusActing.Food(
+            label = s.foodLabel,
+            ageMin = s.foodAgeMin,
+            cobGrams = cob?.takeIf { it >= 3.0 },
+            eatenGrams = if (cob == null) s.foodCarbs else null,
+        )
     }
     val doseCutoff = com.diapilot.core.PersonalParams.DEFAULT.lastDoseShowMin
     if (s.iobUnits != null && s.iobUnits > 0.1) {
-        parts += "IOB ${fmt1(s.iobUnits)}" +
-            (s.lastBolusAgeMin?.takeIf { it <= doseCutoff }
-                ?.let { " · укол ${fmtAge(it)}" } ?: "")
+        parts += StatusActing.Iob(s.iobUnits, s.lastBolusAgeMin?.takeIf { it <= doseCutoff })
     } else if (s.lastBolusUnits != null && s.lastBolusAgeMin != null &&
         s.lastBolusAgeMin <= doseCutoff
     ) {
-        parts += "${fmt1(s.lastBolusUnits)} ед · ${fmtAge(s.lastBolusAgeMin)}"
+        parts += StatusActing.LastBolus(s.lastBolusUnits, s.lastBolusAgeMin)
     }
-    if (parts.isNotEmpty()) lines += parts.joinToString(" · ")
 
     // Deviations are NOT mentioned here — the red deviation card owns that
     // story with actual numbers; duplicating it in words reads as two alerts.
-    if (s.predMmolIn60 != null) {
-        val corridor = if (s.predLoIn60 != null && s.predHiIn60 != null) {
-            " (${fmtBg(s.predLoIn60, s.mgdl)}–${fmtBg(s.predHiIn60, s.mgdl)})"
-        } else ""
-        val v = "~${fmtBg(s.predMmolIn60, s.mgdl)}$corridor"
-        lines += when {
-            s.predSettleMin == null -> "Через час $v"          // legacy callers
-            !s.predSettled -> "Через ${fmtAge(s.predSettleMin)} $v, ещё в движении"
-            s.predSettleMin <= 10 -> "Дальше ровно: $v"
-            else -> "Выровняется на $v через ${fmtAge(s.predSettleMin)}"
-        }
+    val forecast = s.predMmolIn60?.let { mmol ->
+        val corridor = s.predLoIn60 != null && s.predHiIn60 != null
+        val settle = s.predSettleMin
+        StatusForecast(
+            kind = when {
+                settle == null -> StatusForecast.Kind.IN_AN_HOUR          // legacy callers
+                !s.predSettled -> StatusForecast.Kind.STILL_MOVING
+                settle <= 10 -> StatusForecast.Kind.FLAT
+                else -> StatusForecast.Kind.SETTLES
+            },
+            mmol = mmol,
+            loMmol = s.predLoIn60.takeIf { corridor },
+            hiMmol = s.predHiIn60.takeIf { corridor },
+            settleMin = settle,
+            mgdl = s.mgdl,
+        )
     }
-    return lines
+    return StatusSummary(parts, forecast)
 }
 
 /**

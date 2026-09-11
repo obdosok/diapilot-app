@@ -1,0 +1,56 @@
+<resources>
+    <!-- AskScreen.kt -->
+    <string name="ask_screen_setup_title">Спросить свои данные</string>
+    <string name="ask_screen_intro">Задавайте вопросы своим данным обычным языком: «почему ночью был высокий сахар?», «как на меня действует пиво?». Ответы строит Claude по сводке ваших данных.\n\nНужен ваш API-ключ Anthropic (console.anthropic.com → API Keys). Ключ хранится только на этом устройстве. Сводка данных отправляется в API только в момент вопроса.</string>
+    <string name="ask_screen_save">Сохранить</string>
+    <string name="ask_screen_chat_title">Спросить</string>
+    <string name="ask_screen_digest_button">📋 Дайджест</string>
+    <string name="ask_screen_clear">Очистить</string>
+    <string name="ask_screen_disclaimer">Ответы — объяснения ваших данных, не медицинские рекомендации. Дозы и настройки — только с врачом.</string>
+    <string name="ask_screen_thinking">Думаю…</string>
+    <string name="ask_screen_quick_explain_day">Объясни мой день</string>
+    <string name="ask_screen_quick_why_spike">Почему был скачок?</string>
+    <string name="ask_screen_quick_walk_effect">Как на меня влияет прогулка?</string>
+    <string name="ask_screen_quick_late_tail">Что стабильно даёт поздний хвост?</string>
+    <string name="ask_screen_quick_inject_earlier">Когда мне лучше колоть — раньше?</string>
+    <string name="ask_screen_input_placeholder">Почему ночью был высокий сахар?</string>
+
+    <!-- ForecastAtPointStrip.kt -->
+    <string name="forecast_at_point_strip_title">Прогноз в %1$s</string>
+    <string name="forecast_at_point_strip_title_with_bg">Прогноз в %1$s · сахар %2$s</string>
+    <string name="forecast_at_point_strip_hide">Скрыть</string>
+    <plurals name="forecast_at_point_strip_no_saved">
+        <item quantity="one">Сохранённого прогноза здесь нет — только пересчёт сегодняшней моделью (%1$d точка).</item>
+        <item quantity="few">Сохранённого прогноза здесь нет — только пересчёт сегодняшней моделью (%1$d точки).</item>
+        <item quantity="many">Сохранённого прогноза здесь нет — только пересчёт сегодняшней моделью (%1$d точек).</item>
+        <item quantity="other">Сохранённого прогноза здесь нет — только пересчёт сегодняшней моделью (%1$d точки).</item>
+    </plurals>
+    <string name="forecast_at_point_strip_applied">тогда применялось: %1$s</string>
+    <string name="forecast_at_point_strip_coeffs_missing">коэффициенты того прогона не записаны (старая запись)</string>
+    <string name="forecast_at_point_strip_miss_entry">%1$dм %2$s%3$s</string>
+    <string name="forecast_at_point_strip_no_actual">факт ещё не проставлен</string>
+    <string name="forecast_at_point_strip_miss_prefix">промах: </string>
+    <string name="forecast_at_point_strip_late_meal_warning">в окно попал приём, записанный ПОСЛЕ этого прогноза — промах здесь про задержку записи, а не про модель</string>
+    <string name="forecast_at_point_strip_fallback_twin_warning">бледная линия — запасной твин, а не то, что было на экране</string>
+
+    <!-- PhysioAutoFitController.kt -->
+    <string name="physio_auto_fit_controller_no_model">модель не установлена</string>
+    <plurals name="physio_auto_fit_controller_too_few_episodes">
+        <item quantity="one">%1$d эпизод — мало для медианы</item>
+        <item quantity="few">%1$d эпизода — мало для медианы</item>
+        <item quantity="many">%1$d эпизодов — мало для медианы</item>
+        <item quantity="other">%1$d эпизода — мало для медианы</item>
+    </plurals>
+    <string name="physio_auto_fit_controller_corridor_unmeasured">тайминги ещё не измерены — коридор широкий</string>
+    <string name="physio_auto_fit_controller_no_episode_scored">ни один эпизод не посчитался</string>
+
+    <!-- DailyDiscrepancyRuntime.kt -->
+    <string name="daily_discrepancy_runtime_effective_line">Наблюдаемый совместный ответ еды и инсулина: %1$+.0f%% [%2$.0f…%3$.0f] к предыдущему/инерционному состоянию; P(рост)=%4$.0f%%, против rolling baseline %5$.0f%%; practical threshold: %6$s</string>
+    <string name="daily_discrepancy_runtime_threshold_crossed">пересечён</string>
+    <string name="daily_discrepancy_runtime_threshold_not_crossed">не пересечён</string>
+    <string name="daily_discrepancy_runtime_isf_unclear">Чистый ISF пока невозможно отделить</string>
+    <string name="daily_discrepancy_runtime_residual_line">Residual: наблюдалось %1$+.2f, ожидалось %2$+.2f ммоль/л; provenance: %3$s</string>
+
+    <!-- AskClaude.kt -->
+    <string name="ask_claude_digest_display">📋 Дайджест недели</string>
+</resources>

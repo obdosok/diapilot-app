@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainActivity.kt: Libre NFC scan toasts -->
+    <string name="main_activity_libre_scan_failed">Libre: скан не удался — подержите телефон у сенсора</string>
+    <string name="main_activity_libre_oop2_no_response">Libre %1$s: OOP2 не ответил — расшифровка недоступна</string>
+    <string name="main_activity_libre_data_corrupt">Libre %1$s: данные повреждены (CRC), повторите скан</string>
+    <string name="main_activity_libre_parse_failed">Libre %1$s: не удалось разобрать данные</string>
+    <string name="main_activity_libre_prefix">Libre %1$s:</string>
+    <string name="main_activity_libre_mgdl">%1$.0f мг/дл</string>
+    <string name="main_activity_libre_status_day">%1$s, день %2$.1f</string>
+    <string name="main_activity_libre_stream">поток %1$d</string>
+    <string name="main_activity_libre_backfill">в историю +%1$d</string>
+    <string name="main_activity_libre_backfill_with_skipped">в историю +%1$d (уже было %2$d)</string>
+    <string name="main_activity_libre_no_calibration">история: нет калибровки</string>
+    <string name="main_activity_libre_new_sensor_flag">НОВЫЙ СЕНСОР</string>
+    <string name="main_activity_ble_no_keys">BLE: OOP2 не выдал ключи</string>
+    <string name="main_activity_ble_rejected">BLE: сенсор не принял команду — повторите скан</string>
+    <string name="main_activity_ble_streaming">BLE: стриминг наш, MAC %1$s</string>
+
+    <!-- MainActivity.kt: pen NFC scan toasts -->
+    <string name="main_activity_pen_scan_failed">Ручка: скан не удался — поднесите ещё раз и держите</string>
+    <string name="main_activity_pen_scan_incomplete">скан неполный, приложите ещё раз</string>
+    <string name="main_activity_pen_result">Ручка %1$s: %2$s</string>
+    <string name="main_activity_pen_no_new_doses">Ручка %1$s: новых доз нет</string>
+    <plurals name="main_activity_pen_new_doses">
+        <item quantity="one">новая доза — %1$d</item>
+        <item quantity="few">новые дозы — %1$d</item>
+        <item quantity="many">новых доз — %1$d</item>
+        <item quantity="other">новых доз — %1$d</item>
+    </plurals>
+    <plurals name="main_activity_pen_primes">
+        <item quantity="one">прайм — %1$d</item>
+        <item quantity="few">прайма — %1$d</item>
+        <item quantity="many">праймов — %1$d</item>
+        <item quantity="other">праймов — %1$d</item>
+    </plurals>
+
+    <!-- MainActivity.kt: bottom nav tabs -->
+    <string name="main_activity_tab_today">Сегодня</string>
+    <string name="main_activity_tab_history">История</string>
+    <string name="main_activity_tab_analysis">Анализ</string>
+    <string name="main_activity_tab_chat">Чат</string>
+    <string name="main_activity_tab_more">Ещё</string>
+    <string name="main_activity_add_event">Добавить событие</string>
+
+    <!-- TodayScreen.kt: header -->
+    <string name="today_screen_reading_age">%1$d мин назад</string>
+    <string name="today_screen_isf_now">ISF сейчас %1$.2f ммоль/ед · %2$s</string>
+
+    <!-- TodayScreen.kt: correction candidate chip -->
+    <string name="today_screen_confirm_correction">✓ Подтвердить чистую коррекцию %1$.1f ед</string>
+    <string name="today_screen_correction_candidate_hint">Еды, другого болюса, активности и гипо рядом не найдено.</string>
+
+    <!-- TodayScreen.kt: dish-recognition dialog moves -->
+    <string name="today_screen_dish_assumption_head">🍽 «%1$s»: разбор угадал — %2$s</string>
+    <string name="today_screen_dish_assumption_note_with_id">Один уточняющий вопрос: ответ допишется к записи и в библиотеку («%1$s»), больше не спросится.</string>
+    <string name="today_screen_dish_assumption_note">Один уточняющий вопрос: ответ допишется к записи и в библиотеку.</string>
+    <string name="today_screen_dish_assumption_placeholder">например: цельнозерновой</string>
+    <string name="today_screen_dish_assumption_save">Сохранить</string>
+    <string name="today_screen_dish_confirm_head">🍽 «%1$s» — %2$s</string>
+    <string name="today_screen_dish_confirm_note">Запись уже сохранена; «Да» добавит структуру блюда и запомнит формулировку. Граммы записи не меняются.</string>
+    <string name="today_screen_dish_confirm_yes">Да, это оно</string>
+    <string name="today_screen_dish_confirm_no">Нет</string>
+
+    <!-- TodayScreen.kt: food suggestion badge -->
+    <string name="today_screen_food_suggestions_badge">🍽 Похоже, была еда: %1$d ▸</string>
+
+    <!-- TodayScreen.kt: rare-clean-moment calibration card -->
+    <string name="today_screen_calibration_need_isf">фактора чувствительности (ISF)</string>
+    <string name="today_screen_calibration_need_carb_ratio">углеводного коэффициента</string>
+    <string name="today_screen_calibration_need_both">ISF и углеводного коэффициента</string>
+    <string name="today_screen_calibration_title">🧪 Редкий чистый момент для данных</string>
+    <string name="today_screen_calibration_hint">Сахар ровный, без активной еды и инсулина. Если по своему обычному решению поешь или уколешь — запиши точно (граммы или тег «%1$s»): такие записи дают модели максимум. Сейчас ей не хватает %2$s.</string>
+
+    <!-- TodayScreen.kt: 24h summary line -->
+    <string name="today_screen_mean_bg">%1$s средн</string>
+    <string name="today_screen_insulin_carbs_summary">%1$.0f ед · %2$.0f г</string>
+    <string name="today_screen_kcal">~%1$.0f ккал</string>
+    <string name="today_screen_protein">Б %1$.0f г</string>
+    <string name="today_screen_fat">Ж %1$.0f г</string>
+    <plurals name="today_screen_nutrition_meals">
+        <item quantity="one">оценено %1$d блюдо</item>
+        <item quantity="few">оценено %1$d блюда</item>
+        <item quantity="many">оценено %1$d блюд</item>
+        <item quantity="other">оценено %1$d блюд</item>
+    </plurals>
+    <string name="today_screen_no_data_hint">Данных пока нет. В xDrip включите Inter-app settings → Broadcast locally и xDrip Web Service — дальше всё соберётся само.</string>
+
+    <!-- TodayScreen.kt: basal reminder / dextrose -->
+    <string name="today_screen_basal_due">🕐 Время базала? Обычно ~%1$s</string>
+    <string name="today_screen_log_basal_button">Записать %1$.0f ед</string>
+    <string name="today_screen_dextrose_first">🍬 +1 таблетка декстрозы (%1$.0f г)</string>
+    <string name="today_screen_dextrose_more">🍬 Ещё таблетку · уже %1$d (%2$.0f г)</string>
+
+    <!-- TodayScreen.kt: Health Connect prompts -->
+    <string name="today_screen_connect_health_connect">Подключить пульс и сон (Health Connect)</string>
+    <string name="today_screen_allow_steps">Разрешить шаги (открыть Health Connect) →</string>
+
+    <!-- TodayScreen.kt: What-if trajectory summary -->
+    <string name="today_screen_after_minutes">через %1$dм</string>
+    <string name="today_screen_after_hours_minutes">через %1$dч%2$dм</string>
+    <string name="today_screen_whatif_risk_floored">⚠ линия упёрлась в границу модели — минимум неизвестен</string>
+    <string name="today_screen_whatif_risk_center_below">⚠ центральная линия ниже диапазона: %1$s %2$s</string>
+    <string name="today_screen_whatif_risk_lower_below">⚠ нижняя граница ниже диапазона: %1$s %2$s</string>
+    <string name="today_screen_whatif_below_model_boundary">ниже границы модели</string>
+
+    <!-- TodayScreen.kt: "How it was calculated" dialog -->
+    <string name="today_screen_calc_title">Как рассчитано · %1$s</string>
+    <string name="today_screen_calc_model">Модель: %1$s</string>
+    <string name="today_screen_calc_carbs">Углеводы: %1$.1f г · %2$s</string>
+    <string name="today_screen_calc_unknown">неизвестно</string>
+    <string name="today_screen_calc_macros">Б/Ж: %1$s / %2$s г · длительность %3$.0f мин</string>
+    <string name="today_screen_calc_global_cs">Global CS: %1$.3f [%2$.3f…%3$.3f] ммоль/л/г. Это широкий development prior/posterior, не отдельный CS блюда.</string>
+    <string name="today_screen_calc_causal_evidence">Causal online evidence: n=%1$d, дней=%2$d. %3$s. Ретроспективные sensitivity-строки Stage 8 не считаются online evidence и сами не могут продвинуть параметр.</string>
+    <string name="today_screen_calc_food_amplitude">Полная food-амплитуда: %1$.2f ммоль/л; вклад той же линии от текущего anchor: +60 %2$+.2f, +180 %3$+.2f.</string>
+    <string name="today_screen_calc_timing">Тайминг: %1$s (%2$s); onset %3$.0f, половина пришла %4$.0f, конец роста %5$.0f мин; неопределённость ±%6$.0f мин.</string>
+    <string name="today_screen_calc_curve_choice">Как выбрана кривая: %1$s. Название блюда в тайминге не участвует.</string>
+    <string name="today_screen_calc_insulin_isf">Инсулин +60: %1$+.2f ммоль/л; ISF %2$.2f [%3$.2f…%4$.2f].</string>
+    <string name="today_screen_calc_background">Фон/базал/тренд +60: %1$+.2f ммоль/л.</string>
+    <string name="today_screen_calc_uncertainty">Неопределённость: %1$s. Наблюдательные связи не интерпретируются как причины.</string>
+    <string name="today_screen_close">Закрыть</string>
+
+    <!-- InlineWhatIfPanel -->
+    <string name="today_screen_whatif_add_units">Добавить\n%1$.1f ед</string>
+    <string name="today_screen_whatif_second_dose">2-й ＋</string>
+    <string name="today_screen_whatif_more_units">Ещё\n%1$.1f ед</string>
+    <string name="today_screen_whatif_after_label">через</string>
+    <string name="today_screen_whatif_walk_label">прогулка</string>
+    <string name="today_screen_whatif_activity_minutes">%1$d мин</string>
+    <string name="today_screen_whatif_now_label">сейчас</string>
+    <string name="today_screen_whatif_intensity_light">легко</string>
+    <string name="today_screen_whatif_intensity_normal">обычно</string>
+    <string name="today_screen_whatif_intensity_fast">быстро</string>
+    <string name="today_screen_whatif_on_top_iob">поверх IOB %1$.1f ед</string>
+    <string name="today_screen_whatif_summary">через 1ч: %1$s · минимум %2$s · к 3ч: %3$s · сценарий, не доза</string>
+    <string name="today_screen_whatif_model_limited">⚠ модель ограничена</string>
+
+    <!-- FoodSuggestDialog -->
+    <string name="today_screen_food_suggest_title">Похоже, была еда</string>
+    <string name="today_screen_food_suggest_units">%1$.1f ед</string>
+    <string name="today_screen_food_suggest_what_label">Что ели</string>
+    <string name="today_screen_food_suggest_carbs_label">Углеводы, г</string>
+    <string name="today_screen_food_suggest_save">✓ Сохранить</string>
+    <string name="today_screen_food_suggest_cancel">Отмена</string>
+    <string name="today_screen_food_suggest_grams">~%1$.0f г</string>
+    <string name="today_screen_food_suggest_unknown_dish">что это было?</string>
+    <string name="today_screen_food_suggest_accept">✓ Принять</string>
+    <string name="today_screen_food_suggest_edit">Изменить</string>
+</resources>

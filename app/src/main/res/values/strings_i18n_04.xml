@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CollectorService.kt -->
+    <string name="collector_service_starting">Collecting · waiting for xDrip</string>
+    <string name="collector_service_channel_name">Current glucose</string>
+    <string name="collector_service_channel_description">Ongoing card showing current glucose on the lock screen</string>
+
+    <!-- StreamStallNotifier.kt -->
+    <string name="stream_stall_notifier_channel_name">Data stream stopped</string>
+    <string name="stream_stall_notifier_channel_description">The sensor stopped sending data — an NFC scan is needed</string>
+    <string name="stream_stall_notifier_title_no_age">📡 No data from the sensor</string>
+    <string name="stream_stall_notifier_title_with_age">📡 No data from the sensor for %1$d min</string>
+    <string name="stream_stall_notifier_body">%1$s. Bring the phone close to the sensor (NFC) — a scan will restore the connection and recover the gap from the sensor\'s memory.</string>
+
+    <!-- BackupRestore.kt -->
+    <string name="backup_restore_file_unavailable">file not readable</string>
+    <string name="backup_restore_no_readings">no glucose readings in the file — is this a DiaPilot copy?</string>
+    <string name="backup_restore_success">Restored: %1$d readings, %2$d doses. Restarting…</string>
+    <string name="backup_restore_cloud_create_failed">could not create the file in the cloud folder</string>
+
+    <!-- InsulinProfileRuntime.kt -->
+    <string name="insulin_profile_runtime_measured">measured from %1$d doses, %2$d days · onset %3$.0f · peak %4$.0f · active until %5$.0f · end %6$.0f min</string>
+    <string name="insulin_profile_runtime_arm_food_free"> · from doses with no food active</string>
+    <string name="insulin_profile_runtime_arm_mixed"> · from all doses (too few clean ones yet)</string>
+    <string name="insulin_profile_runtime_coerced"> · coerced to the model bounds: %1$s</string>
+    <string name="insulin_profile_runtime_no_curve">curve not built: %1$s</string>
+    <string name="insulin_profile_runtime_missing_landmarks">not enough landmarks: %1$s</string>
+    <string name="insulin_profile_runtime_onset_present">onset %1$d</string>
+    <string name="insulin_profile_runtime_onset_missing">no onset</string>
+    <string name="insulin_profile_runtime_peak_present">peak %1$d</string>
+    <string name="insulin_profile_runtime_peak_missing">no peak</string>
+    <string name="insulin_profile_runtime_tail_present">end %1$d</string>
+    <string name="insulin_profile_runtime_tail_missing">no end</string>
+    <string name="insulin_profile_runtime_prior_only">prior only: no dose produced a landmark, out of %1$d</string>
+
+    <!-- Speech.kt -->
+    <string name="speech_prompt">Speak…</string>
+
+    <!-- PhysioTuningSection.kt -->
+    <string name="physio_tuning_section_title">Model parameters (Physio)</string>
+    <string name="physio_tuning_section_intro_hint">Empty = as shipped. Nothing changes until you tap “Apply”. These numbers also reach the hypo alert.</string>
+    <string name="physio_tuning_section_currently_applied">Currently applied: %1$s · %2$s</string>
+    <string name="physio_tuning_section_applied_shape">insulin %1$.0f·%2$.0f·%3$.0f · ISF %4$.3f</string>
+    <string name="physio_tuning_section_no_model">model not installed</string>
+    <string name="physio_tuning_section_curve_hint">Insulin curve: the fields below are the same override as “Set manually”. Empty — computed from injection segments. ISF goes its own way and is pinned separately.</string>
+    <string name="physio_tuning_section_carb_shape_title">Carb shape from the bench</string>
+    <string name="physio_tuning_section_carb_shape_hint">Paste the sandbox export here (the “Export all” button). Only the twelve triangle numbers are taken; “type difference” then becomes 1.00, because it expresses the same thing.</string>
+    <string name="physio_tuning_section_triangles_custom">now: your own set</string>
+    <string name="physio_tuning_section_triangles_shipped">now: shipped</string>
+    <string name="physio_tuning_section_status_not_all_fields">not all twelve fields — a number didn\'t parse</string>
+    <string name="physio_tuning_section_status_applied_reordered">applied, order corrected</string>
+    <string name="physio_tuning_section_status_applied">applied</string>
+    <string name="physio_tuning_section_status_reverted_shipped">reverted to shipped</string>
+    <string name="physio_tuning_section_status_parse_failed">didn\'t parse — all twelve numbers are needed</string>
+    <string name="physio_tuning_section_status_applied_from_export">applied from the export</string>
+    <string name="physio_tuning_section_apply_fields_button">Apply fields</string>
+    <string name="physio_tuning_section_reset_button">Reset</string>
+    <string name="physio_tuning_section_paste_json_label">or paste the export JSON</string>
+    <string name="physio_tuning_section_apply_set_button">Apply set</string>
+    <string name="physio_tuning_section_reach_title">Where these knobs reach</string>
+    <string name="physio_tuning_section_reach_forecast">forecast line and What-if</string>
+    <string name="physio_tuning_section_reach_hypo_alert">hypo alert</string>
+    <string name="physio_tuning_section_reach_watch_widget">watch and widget</string>
+    <string name="physio_tuning_section_reach_insulin_timing">insulin timing</string>
+    <string name="physio_tuning_section_reach_isf">ISF</string>
+    <string name="physio_tuning_section_reach_yes">yes</string>
+    <string name="physio_tuning_section_reach_timing_verdict">ONLY while there\'s no measured curve</string>
+    <string name="physio_tuning_section_reach_isf_verdict">as a BASE — the learner scales it</string>
+    <string name="physio_tuning_section_reach_row">· %1$s — %2$s</string>
+    <string name="physio_tuning_section_reach_log_hint">What actually got applied — in the startup log under the tag “PhysioTuning: APPLIED to the model”. If it doesn\'t match what you entered — that\'s by design, see the list above.</string>
+    <string name="physio_tuning_section_reach_model_note">There is one model, so ISF, the insulin curve and the trust ramp reach it. But kcal/h, sieve and type difference, like the learned dish curves, are read only by the physio arm — there they don\'t work.</string>
+    <string name="physio_tuning_section_trust_ramp_label">Trust ramp: %1$.2f</string>
+    <string name="physio_tuning_section_ramp_full">1.00 — as in the shipped model: at the hour mark, half the food and half the insulin comes through</string>
+    <string name="physio_tuning_section_ramp_zero">0.00 — no shrinkage, physiology comes through in full</string>
+    <string name="physio_tuning_section_ramp_partial">at the hour mark, %1$.0f%% comes through</string>
+    <string name="physio_tuning_section_label_onset">onset, min</string>
+    <string name="physio_tuning_section_label_full_speed">full speed</string>
+    <string name="physio_tuning_section_label_phase">phase, min</string>
+    <string name="physio_tuning_section_label_tail">tail, min</string>
+    <string name="physio_tuning_section_curve_shape_explainer">The curve ramps up from “onset” to “full speed”, holds the maximum for the whole “phase”, then decays to “tail”. The tail carries exactly a fifth of the dose. On the bench\'s own episodes it comes out 28 · 40 · 30 · 165.</string>
+    <string name="physio_tuning_section_label_isf">ISF, mmol/L per U</string>
+    <string name="physio_tuning_section_label_kcal">kcal/h</string>
+    <string name="physio_tuning_section_adaptive_pending">Adaptive: not yet computed (needs ≥%1$d good days out of %2$d)</string>
+    <string name="physio_tuning_section_adaptive_ready">Adaptive: %1$.2f mmol/L per U · %2$d days out of %3$d</string>
+    <string name="physio_tuning_section_isf_source_adaptive_note">Using ADAPTIVE (daily balance). Compare it with your own number: if two independent measures agree, the choice barely matters. It does not fix a systematic ISF forecast bias.</string>
+    <string name="physio_tuning_section_isf_source_manual_note">Using YOUR number from the field above.</string>
+    <string name="physio_tuning_section_isf_applied">Applied to the model: %1$.3f mmol/L per U</string>
+    <string name="physio_tuning_section_isf_alternative">Alternative — measured/adaptive: %1$.3f (%2$d episodes). Your number is pinned and the learner does not touch it. Check it against your own history before switching: the learned number may give a worse shape and more false alarms.</string>
+    <string name="physio_tuning_section_switch_to_adaptive_button">Switch to adaptive</string>
+    <string name="physio_tuning_section_pin_value_button">Pin its value</string>
+    <string name="physio_tuning_section_label_sieve">sieve</string>
+    <string name="physio_tuning_section_label_spread">type difference</string>
+    <string name="physio_tuning_section_apply_button">Apply</string>
+    <string name="physio_tuning_section_revert_shipped_button">Revert to shipped</string>
+    <string name="physio_tuning_section_autofit_title">Auto-fit from the last 10 episodes</string>
+    <string name="physio_tuning_section_autofit_explainer" formatted="false">Insulin timings are fit ONLY within a ±20% corridor around the measured profile — read from the per-segment analysis of your own injections — and cannot be swapped for a number that merely fits the chart better. Carb queue and type ratios move within physiological bounds. ISF is free: it really does drift, and catching that drift is part of the app\'s job.</string>
+    <string name="physio_tuning_section_autofit_lock_hint">Lock = don\'t touch during fitting. A locked knob stays at what\'s applied now, not at the factory value.</string>
+    <string name="physio_tuning_section_axis_isf">ISF</string>
+    <string name="physio_tuning_section_axis_onset">onset</string>
+    <string name="physio_tuning_section_axis_full_speed">full speed</string>
+    <string name="physio_tuning_section_axis_phase">phase</string>
+    <string name="physio_tuning_section_axis_tail">tail</string>
+    <string name="physio_tuning_section_axis_kcal">kcal/h</string>
+    <string name="physio_tuning_section_axis_sieve">sieve</string>
+    <string name="physio_tuning_section_axis_spread">types</string>
+    <string name="physio_tuning_section_axis_ramp">trust</string>
+    <string name="physio_tuning_section_axis_fast_shift">fast shift</string>
+    <string name="physio_tuning_section_metric_shape">shape</string>
+    <string name="physio_tuning_section_metric_balance">balance</string>
+    <string name="physio_tuning_section_running_indicator">calculating…</string>
+    <string name="physio_tuning_section_running_collecting">Fitting “%1$s”: collecting episodes…</string>
+    <string name="physio_tuning_section_running_progress">Fitting “%1$s”: episode %2$d of %3$d</string>
+    <string name="physio_tuning_section_running_hint">You can leave the tab — the calculation continues. Each episode is about two hundred model runs, so ten takes a minute or two.</string>
+    <string name="physio_tuning_section_describe_no_episodes">not a single episode could be scored</string>
+    <string name="physio_tuning_section_describe_episodes_metric">%1$d episodes · %2$s</string>
+    <string name="physio_tuning_section_describe_isf">ISF %1$.2f  (%2$s)</string>
+    <string name="physio_tuning_section_describe_insulin">insulin %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+    <string name="physio_tuning_section_describe_full_speed_spread">full speed across episodes %1$s</string>
+    <string name="physio_tuning_section_describe_totals">%1$.0f kcal/h · sieve %2$.2f · types %3$.2f · trust %4$.2f</string>
+    <string name="physio_tuning_section_done_against_applied">Against what\'s applied now, on the same %1$d episodes:</string>
+    <string name="physio_tuning_section_done_shape_bias">shape %1$.2f -&gt; %2$.2f (%3$+.2f)   bias %4$.2f -&gt; %5$.2f (%6$+.2f)</string>
+    <string name="physio_tuning_section_outcome_both_better">Better on both — that\'s rare.</string>
+    <string name="physio_tuning_section_outcome_shape_better">Shape better, bias worse: the line tracks turns more closely, but sits farther from the actual value.</string>
+    <string name="physio_tuning_section_outcome_bias_better">Bias better, shape worse: the average level is corrected, the line\'s turns are not.</string>
+    <string name="physio_tuning_section_outcome_noise">The difference is within noise. No reason to apply.</string>
+    <string name="physio_tuning_section_episodes_header">What it was fit on — tap to open the chart at that point</string>
+    <string name="physio_tuning_section_load_into_fields_button">Load into fields</string>
+    <string name="physio_tuning_section_clear_button">Clear</string>
+    <string name="physio_tuning_section_offered_hint">The numbers are loaded into the fields above, but NOT applied. The spread in parentheses is disagreement between episodes, not error: when it\'s wide, the median doesn\'t describe every day equally.</string>
+    <string name="physio_tuning_section_measured_note">WHAT WAS MEASURED: the ramp (“trust”) holds back half the food and insulin at the hour mark, and because of it a late peak buys extra insulin effect for free — that is, timing leaks into amount. With the ramp off, fitting its 22 episodes gives a 40–42 min peak in 13 cases.</string>
+    <string name="physio_tuning_section_not_measured_note">WHAT WAS NOT MEASURED: what happens to hypo alerts. The direction is earlier, i.e. toward safety, but how much earlier is not checked. Model review hasn\'t happened yet. And fitting by “balance” pulls ISF down, eating into a food shortfall: look at the “shape” arm if you want sensitivity specifically.</string>
+    <string name="physio_tuning_section_episode_food">food %1$.0f g</string>
+    <string name="physio_tuning_section_episode_units">%1$.1f U</string>
+    <string name="physio_tuning_section_episode_offset">+%1$d %2$s</string>
+    <string name="physio_tuning_section_episode_summary">%1$s · %2$.0f h · %3$.0f g · %4$.1f U</string>
+    <string name="physio_tuning_section_episode_wants">this episode wants: ISF %1$.2f · peak %2$.0f · shape %3$.2f</string>
+</resources>

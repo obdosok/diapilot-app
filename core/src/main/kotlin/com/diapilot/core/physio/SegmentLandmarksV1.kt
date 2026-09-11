@@ -132,17 +132,16 @@ data class SegmentLandmarksV1(
      * by the doses where compensation FAILED without anyone being able to see
      * it. A refusal that names itself is a refusal that can be counted.
      */
-    val refusal: String? = null,
+    val refusal: LandmarkRefusal? = null,
 ) {
     val any: Boolean get() = onset != null || visibleFall != null ||
         peakRate != null || slowdown != null || tailEnd != null
 
     companion object {
-        const val WINDOW_TOO_SHORT = "окно короче горизонта старта"
-        const val LINE_UNREADABLE = "линия не читается (мало точек до/после)"
+        val WINDOW_TOO_SHORT: LandmarkRefusal = LandmarkRefusal.WindowTooShort
+        val LINE_UNREADABLE: LandmarkRefusal = LandmarkRefusal.LineUnreadable
         /** THE compensated-meal case: nothing ever departed from the inertia. */
-        const val NO_BREAK = "линия не ломается — компенсировано или доза не подействовала"
-        const val ALL_LANDMARKS_REJECTED = "лендмарки прочитаны, но ни один не прошёл проверки"
+        val NO_BREAK: LandmarkRefusal = LandmarkRefusal.NoBreak
     }
 }
 
@@ -219,7 +218,7 @@ data class AssembledProfileV1(
     val slowdown: LandmarkMedianV1?,
     val tailEnd: LandmarkMedianV1?,
     /** Set when the per-landmark medians do not form an increasing sequence. */
-    val orderingConflict: String? = null,
+    val orderingConflict: OrderingConflict? = null,
     /** The single arm every landmark above was read from. */
     val arm: ProfileArmV1 = ProfileArmV1.POOLED,
     /** Measured for the record only — see the note in `assemble`. */
@@ -510,26 +509,26 @@ object SegmentLandmarkReaderV1 {
         // very different things: the first is a trace that does not look like
         // insulin, the second is a window that ended too early.
         val why = buildList {
-            fun note(name: String, minute: Double?, ok: Boolean, horizon: Double) {
+            fun note(name: InsulinLandmark, minute: Double?, ok: Boolean, horizon: Double) {
                 if (minute == null) return
-                if (!ok) add("$name вне порядка/границ")
-                else if (!observed(minute, horizon)) add("$name за горизонтом наблюдения")
+                if (!ok) add(LandmarkRejection(name, LandmarkRejection.Kind.OUT_OF_ORDER))
+                else if (!observed(minute, horizon)) add(LandmarkRejection(name, LandmarkRejection.Kind.BEYOND_HORIZON))
             }
             // The onset is split because its `ok` merges TWO conditions — its
             // own range, and a span against the peak. Only the first is a
             // statement about the onset; the second imports the peak's verdict.
             if (onsetMin != null && !onsetOk) {
-                if (onsetMin !in bounds.insulinOnsetMinRange) add("старт вне своего диапазона")
-                else add("старт снят ИЗ-ЗА ПИКА (не разнесён на 10 мин)")
-            } else note("старт", onsetMin, onsetOk, ONSET_HORIZON_MIN)
-            note("пик", peak, peakOk, PEAK_HORIZON_MIN)
-            note("замедление", slowdownMin, slowdownOk, SLOWDOWN_HORIZON_MIN)
-            note("конец", tailMin, tailOk, TAIL_HORIZON_MIN)
+                if (onsetMin !in bounds.insulinOnsetMinRange) {
+                    add(LandmarkRejection(InsulinLandmark.ONSET, LandmarkRejection.Kind.ONSET_OUT_OF_RANGE))
+                } else {
+                    add(LandmarkRejection(InsulinLandmark.ONSET, LandmarkRejection.Kind.ONSET_DROPPED_FOR_PEAK))
+                }
+            } else note(InsulinLandmark.ONSET, onsetMin, onsetOk, ONSET_HORIZON_MIN)
+            note(InsulinLandmark.PEAK, peak, peakOk, PEAK_HORIZON_MIN)
+            note(InsulinLandmark.SLOWDOWN, slowdownMin, slowdownOk, SLOWDOWN_HORIZON_MIN)
+            note(InsulinLandmark.TAIL_END, tailMin, tailOk, TAIL_HORIZON_MIN)
         }
-        return result.copy(
-            refusal = if (why.isEmpty()) SegmentLandmarksV1.ALL_LANDMARKS_REJECTED
-            else SegmentLandmarksV1.ALL_LANDMARKS_REJECTED + ": " + why.joinToString(", "),
-        )
+        return result.copy(refusal = LandmarkRefusal.AllRejected(why))
     }
 
     // Per-landmark weighted medians, then one ordering check on the result.
@@ -638,18 +637,15 @@ object SegmentLandmarkReaderV1 {
         val arm = if (onset.flatArmReady && peak.flatArmReady && visible.flatArmReady)
             ProfileArmV1.FOOD_FREE else ProfileArmV1.POOLED
         val ordered = listOfNotNull(
-            onset.on(arm)?.minute?.let { Triple("старт действия", it, false) },
-            visible.on(arm)?.minute?.let { Triple("видимое падение", it, true) },
-            peak.on(arm)?.minute?.let { Triple("пик", it, false) },
-            slowdown?.minute?.let { Triple("замедление", it, false) },
-            tail?.minute?.let { Triple("конец", it, false) },
+            onset.on(arm)?.minute?.let { Triple(InsulinLandmark.ONSET, it, false) },
+            visible.on(arm)?.minute?.let { Triple(InsulinLandmark.VISIBLE_FALL, it, true) },
+            peak.on(arm)?.minute?.let { Triple(InsulinLandmark.PEAK, it, false) },
+            slowdown?.minute?.let { Triple(InsulinLandmark.SLOWDOWN, it, false) },
+            tail?.minute?.let { Triple(InsulinLandmark.TAIL_END, it, false) },
         )
         val conflict = ordered.zipWithNext()
             .firstOrNull { (a, b) -> if (b.third) b.second < a.second else b.second <= a.second }
-            ?.let { (a, b) ->
-                "%s %.0f мин не позже %s %.0f мин — медианы пришли с разных уколов"
-                    .format(b.first, b.second, a.first, a.second)
-            }
+            ?.let { (a, b) -> OrderingConflict(b.first, b.second, a.first, a.second) }
         // PAIRED, on the doses that reported both — see [cancellingRiseMin].
         val gaps = samples.mapNotNull { s ->
             val a = s.onset ?: return@mapNotNull null

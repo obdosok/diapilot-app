@@ -8,6 +8,7 @@ import com.diapilot.core.hybrid.HybridBolusEvent
 import com.diapilot.core.hybrid.hybridFoodEventFromNote
 import com.diapilot.core.physio.FitEpisodeBuilderV1
 import com.diapilot.core.physio.PhysioAutoFitV1
+import com.example.diapilot.i18n.localized
 
 /**
  * THE AUTO-FIT, ON THE DEVICE — episode selection and one call into the fitter.
@@ -163,7 +164,8 @@ object PhysioAutoFitRuntime {
                 .curve?.landmarks
         }.getOrNull() ?: return null
         val timing = PhysioAutoFitV1.boundsAround(measured)
-        val label = "коридор ±20%% вокруг измеренного %.0f · %.0f · %.0f · %.0f".format(
+        val label = context.localized().getString(
+            com.example.diapilot.R.string.physio_auto_fit_runtime_safety_label,
             measured.onsetMin,
             measured.peakMin,
             (measured.plateauEndMin ?: (measured.peakMin + 30.0)) - measured.peakMin,

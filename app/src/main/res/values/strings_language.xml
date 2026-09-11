@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">Language</string>
+    <string name="language_system">System</string>
+    <!-- Each language is named in itself, whatever the current language. -->
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_russian" translatable="false">Русский</string>
+    <string name="language_hint">Changes the app text only. Your notes and food names stay as you typed them.</string>
+</resources>

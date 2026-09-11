@@ -26,11 +26,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.MGDL_PER_MMOL_F
+import com.example.diapilot.R
 import com.example.diapilot.data.FoodEraSettings
 import com.example.diapilot.data.Settings
 import com.example.diapilot.data.Units
+import com.example.diapilot.i18n.unitLabel
 import kotlinx.coroutines.launch
 
 /**
@@ -71,7 +75,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Настройки", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.settings_screen_title), style = MaterialTheme.typography.titleLarge)
 
         // The `no auto-teach` gate lives here rather than in a tab of its own:
         // it is a one-time confirmation flow, not something the user works with daily.
@@ -87,7 +91,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "Персональная модель",
+                    stringResource(R.string.settings_screen_personal_model_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 var modelStatus by remember {
@@ -103,13 +107,15 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     ) { uri ->
                         if (uri != null) {
                             modelScope.launch {
-                                modelMessage = "Проверяю модель…"
+                                modelMessage = context.getString(R.string.settings_screen_model_checking)
                                 try {
                                     val installed = kotlinx.coroutines.withContext(
                                         kotlinx.coroutines.Dispatchers.IO,
                                     ) {
                                         context.contentResolver.openInputStream(uri).use { input ->
-                                            requireNotNull(input) { "файл недоступен" }
+                                            requireNotNull(input) {
+                                                context.getString(R.string.settings_screen_file_unavailable)
+                                            }
                                             com.example.diapilot.data.HybridModelStore.install(
                                                 context,
                                                 input,
@@ -118,29 +124,31 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                         }
                                     }
                                     modelStatus = installed
-                                    modelMessage = "Модель установлена атомарно"
+                                    modelMessage = context.getString(R.string.settings_screen_model_installed)
                                 } catch (error: Exception) {
-                                    modelMessage = "Модель отклонена: ${error.message}"
+                                    modelMessage =
+                                        context.getString(R.string.settings_screen_model_rejected, error.message)
                                 }
                             }
                         }
                     }
                 modelStatus?.let { status ->
                     Text(
-                        buildString {
-                            append("${status.modelVersion} · ")
-                            append("${status.trainingDays} дн. · ")
-                            append("до ${status.trainedThrough ?: "—"}\n")
-                            append("данные с ${status.eligibleFrom} ")
-                            append("(${status.eligibleTimezone})\n")
-                            append("SHA ${status.activeSha256.take(12)}… · ")
-                            append(status.source)
-                        },
+                        stringResource(
+                            R.string.settings_screen_model_status_line,
+                            status.modelVersion,
+                            status.trainingDays,
+                            status.trainedThrough ?: "—",
+                            status.eligibleFrom,
+                            status.eligibleTimezone,
+                            status.activeSha256.take(12),
+                            status.source,
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } ?: Text(
-                    "Модель ещё не инициализирована",
+                    stringResource(R.string.settings_screen_model_not_initialized),
                     style = MaterialTheme.typography.labelSmall,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,7 +157,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             arrayOf("application/json", "text/json", "*/*"),
                         )
                     }) {
-                        Text("Импортировать JSON")
+                        Text(stringResource(R.string.settings_screen_import_json))
                     }
                     TextButton(
                         enabled = modelStatus?.previousSha256 != null,
@@ -161,21 +169,21 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                     com.example.diapilot.data.HybridModelStore.rollback(context)
                                 }
                                 if (restored == null) {
-                                    modelMessage = "Нет предыдущего поколения"
+                                    modelMessage =
+                                        context.getString(R.string.settings_screen_no_previous_generation)
                                 } else {
                                     modelStatus = restored
-                                    modelMessage = "Выполнен rollback модели"
+                                    modelMessage =
+                                        context.getString(R.string.settings_screen_model_rollback_done)
                                 }
                             }
                         },
                     ) {
-                        Text("Откатить")
+                        Text(stringResource(R.string.settings_screen_rollback))
                     }
                 }
                 Text(
-                    "Принимается только модель этого человека, обученная на данных " +
-                        "не раньше $foodEraLabel. Ошибка импорта не влияет " +
-                        "на текущий прогноз.",
+                    stringResource(R.string.settings_screen_model_accept_note, foodEraLabel),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -189,24 +197,25 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
             }
         }
 
+        com.example.diapilot.i18n.LanguageCard(modifier = Modifier.fillMaxWidth())
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Единицы глюкозы", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_units_title), style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = !mgdl,
                         onClick = { Units.setMgdl(context, false); mgdl = false },
-                        label = { Text("ммоль/л") },
+                        label = { Text(unitLabel(mgdl = false)) },
                     )
                     FilterChip(
                         selected = mgdl,
                         onClick = { Units.setMgdl(context, true); mgdl = true },
-                        label = { Text("мг/дл") },
+                        label = { Text(unitLabel(mgdl = true)) },
                     )
                 }
                 Text(
-                    "Только отображение: данные и аналитика хранятся в ммоль/л, " +
-                        "переключение мгновенное и безопасное.",
+                    stringResource(R.string.settings_screen_units_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -215,14 +224,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Тело", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_body_title), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = weightText,
                     onValueChange = { t ->
                         weightText = t
                         Settings.setWeightKg(context, t.replace(',', '.').trim().toDoubleOrNull())
                     },
-                    label = { Text("Вес, кг") },
+                    label = { Text(stringResource(R.string.settings_screen_weight_label)) },
                     supportingText = {
                         // The number is shown because a prior the user cannot
                         // see is a prior the user cannot disagree with — and the
@@ -230,11 +239,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         // eventually replace it.
                         val cs = com.diapilot.core.analysis.CarbSensitivityPriorV1
                             .fromWeight(Settings.weightKg(context))
-                        Text(
-                            "Стартовая оценка углеводов: %.3f ммоль/л на грамм. ".format(cs) +
-                                "Грамм распределяется в объёме, пропорциональном массе тела, " +
-                                "поэтому оценка обратна весу. Измерения по вашим данным её заменят.",
-                        )
+                        Text(stringResource(R.string.settings_screen_weight_supporting, cs))
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -244,16 +249,16 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Цель и диапазон", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_target_range_title), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = targetText,
                     onValueChange = { t ->
                         targetText = t
                         parse(t)?.let { Settings.setTargetMmol(context, it) }
                     },
-                    label = { Text("Идеальный сахар (${com.diapilot.core.analysis.unitLabel(mgdl)})") },
+                    label = { Text(stringResource(R.string.settings_screen_target_label, unitLabel(mgdl))) },
                     supportingText = {
-                        Text("Подсказки «High +X» считают превышение относительно него")
+                        Text(stringResource(R.string.settings_screen_target_supporting))
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -265,7 +270,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             loText = t
                             parse(t)?.let { Settings.setRangeLoMmol(context, it) }
                         },
-                        label = { Text("Диапазон: низ") },
+                        label = { Text(stringResource(R.string.settings_screen_range_lo_label)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -275,14 +280,13 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             hiText = t
                             parse(t)?.let { Settings.setRangeHiMmol(context, it) }
                         },
-                        label = { Text("Диапазон: верх") },
+                        label = { Text(stringResource(R.string.settings_screen_range_hi_label)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                 }
                 Text(
-                    "Диапазон — зелёная зона: TIR, полоса на графике и порог, " +
-                        "после которого подсказка вообще подаёт голос.",
+                    stringResource(R.string.settings_screen_range_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -291,7 +295,10 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Инсулин · измеренная кривая", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.settings_screen_insulin_curve_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 // This card describes the model the forecast actually runs. It
                 // used to read the bundled artifact unconditionally, so it
                 // showed the shipped ISF and timing even when the
@@ -323,7 +330,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         val deviations = emptyList<String>()
                         InsulinCardView(
                             model, artifact, profileState?.curve, deviations,
-                            profileState?.let { com.example.diapilot.data.InsulinProfileRuntime.explain(it) },
+                            profileState?.let { com.example.diapilot.data.InsulinProfileRuntime.explain(it, context) },
                             profileState?.refusals.orEmpty(),
                         )
                     }
@@ -339,8 +346,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 val insulinScope = androidx.compose.runtime.rememberCoroutineScope()
                 var rescanTick by remember { mutableStateOf(0) }
                 Text(
-                    "Один движок на всё: линия, What-if, часы и гипо-тревога считают по измеренной " +
-                        "кривой — старт 11 · пик ~60 · хвост 120, ISF из ваших коррекций. Разошедшихся рук больше нет.",
+                    stringResource(R.string.settings_screen_insulin_engine_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -362,31 +368,28 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     // peak of 66 (see the `peakmeaning` test bench).
                     // The numbers were never in disagreement — the labels were.
                     Text(
-                        "ISF %.1f %s/ед · начало %.0f мин · вершина скорости %.0f мин"
-                            .format(
-                                java.util.Locale.ROOT,
-                                isf,
-                                com.diapilot.core.analysis.unitLabel(mgdl),
-                                insulinLandmarks.onsetMin,
-                                insulinLandmarks.ratePeakMin,
-                            ),
+                        String.format(
+                            java.util.Locale.ROOT,
+                            stringResource(R.string.settings_screen_isf_line),
+                            isf,
+                            unitLabel(mgdl),
+                            insulinLandmarks.onsetMin,
+                            insulinLandmarks.ratePeakMin,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        "Это ТА ЖЕ кривая, что измерена ниже, прочитанная другой линейкой: " +
-                            "«вершина скорости» — верхушка горба, «пик» в измерении — минута " +
-                            "выхода на полную скорость. Расходятся примерно на 15 минут по " +
-                            "построению, а не по ошибке.",
+                        stringResource(R.string.settings_screen_isf_explain),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Основная кривая %.0f мин · дозозависимый хвост до %.0f мин"
-                            .format(
-                                java.util.Locale.ROOT,
-                                insulinModel.insulin.shortDurationMin,
-                                insulinLandmarks.effectEndMin,
-                            ),
+                        String.format(
+                            java.util.Locale.ROOT,
+                            stringResource(R.string.settings_screen_main_curve_line),
+                            insulinModel.insulin.shortDurationMin,
+                            insulinLandmarks.effectEndMin,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     // Drawn by SAMPLING THE ENGINE, not by re-deriving a curve
@@ -414,8 +417,8 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     // no number.
                     val measuredShape = insulinModel.insulin.actionCdfKnots.isNotEmpty()
                     Text(
-                        if (measuredShape) "⏱ Форма измерена по вашим уколам"
-                        else "⏱ Форма — популяционный приор, это НЕ ваши данные",
+                        if (measuredShape) stringResource(R.string.settings_screen_shape_measured)
+                        else stringResource(R.string.settings_screen_shape_prior),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (measuredShape) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.error,
@@ -434,14 +437,18 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     insulinView?.refusals.orEmpty().entries.sortedByDescending { it.value }
                         .take(3).forEach { (reason, n) ->
                             Text(
-                                "не дали ориентиров: $reason — $n",
+                                stringResource(
+                                    R.string.settings_screen_refusal_line,
+                                    com.example.diapilot.i18n.PhysioText.landmarkRefusal(context, reason),
+                                    n,
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     if (measuredCurve != null && !measuredShape) {
                         Text(
-                            "кривая построена, но НЕ применена к прогнозу — см. расхождения артефакта",
+                            stringResource(R.string.settings_screen_curve_not_applied),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -472,11 +479,9 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     }
                     var manualNote by remember { mutableStateOf<String?>(null) }
                     HorizontalDivider()
-                    Text("Задать вручную", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.settings_screen_manual_set_title), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Минуты от укола: начало действия · активная фаза с и до · полный конец. " +
-                            "Пустое поле — считаем сами. Заполненное имеет приоритет над измеренным, " +
-                            "и мы сможем только сказать, что у нас вышло иначе.",
+                        stringResource(R.string.settings_screen_manual_set_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -486,10 +491,10 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         // and a single peak forces the rate to turn over the
                         // moment it arrives, which is the triangle again.
                         listOf(
-                            Triple("начало", onsetIn, { v: String -> onsetIn = v }),
-                            Triple("активно с", peakIn, { v: String -> peakIn = v }),
-                            Triple("активно до", plateauIn, { v: String -> plateauIn = v }),
-                            Triple("конец", tailIn, { v: String -> tailIn = v }),
+                            Triple(stringResource(R.string.settings_screen_onset_label), onsetIn, { v: String -> onsetIn = v }),
+                            Triple(stringResource(R.string.settings_screen_active_from_label), peakIn, { v: String -> peakIn = v }),
+                            Triple(stringResource(R.string.settings_screen_active_to_label), plateauIn, { v: String -> plateauIn = v }),
+                            Triple(stringResource(R.string.settings_screen_end_label), tailIn, { v: String -> tailIn = v }),
                         ).forEach { (label, value, set) ->
                             OutlinedTextField(
                                 value = value, onValueChange = set,
@@ -502,7 +507,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     OutlinedTextField(
                         value = isfIn, onValueChange = { isfIn = it },
                         label = { Text("ISF") },
-                        suffix = { Text("${com.diapilot.core.analysis.unitLabel(mgdl)}/ед") },
+                        suffix = { Text(stringResource(R.string.settings_screen_isf_unit_suffix, unitLabel(mgdl))) },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     )
@@ -520,15 +525,19 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             )
                             com.example.diapilot.data.ManualInsulinRuntime.setParams(context, entered)
                             manualTick++
-                            manualNote = if (entered.any) "Сохранено — пересчитываю прогноз" else "Очищено"
-                        }) { Text("Применить") }
+                            manualNote = if (entered.any) {
+                                context.getString(R.string.settings_screen_saved_recalculating)
+                            } else {
+                                context.getString(R.string.settings_screen_cleared)
+                            }
+                        }) { Text(stringResource(R.string.settings_screen_apply)) }
                         androidx.compose.material3.TextButton(onClick = {
                             com.example.diapilot.data.ManualInsulinRuntime.setParams(
                                 context, com.diapilot.core.physio.ManualInsulinParamsV1.EMPTY,
                             )
                             manualTick++
-                            manualNote = "Очищено — вернулись к измеренному"
-                        }) { Text("Сбросить") }
+                            manualNote = context.getString(R.string.settings_screen_cleared_reverted)
+                        }) { Text(stringResource(R.string.settings_screen_reset)) }
                     }
                     // The rejection is shown, never a silent clamp: a value
                     // quietly moved into range would teach the user that the
@@ -544,10 +553,10 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         Text(
                             when (it) {
                                 com.diapilot.core.physio.InsulinParameterResolverV1.SHAPE_OUT_OF_DOMAIN ->
-                                    "⚠ Форма не принята: начало < пик < конец, и каждое в физиологических границах"
+                                    stringResource(R.string.settings_screen_shape_rejected)
                                 com.diapilot.core.physio.InsulinParameterResolverV1.ISF_OUT_OF_DOMAIN ->
-                                    "⚠ ISF не принят: вне физиологических границ"
-                                else -> "⚠ Не удалось построить кривую по этим числам"
+                                    stringResource(R.string.settings_screen_isf_rejected)
+                                else -> stringResource(R.string.settings_screen_curve_build_failed)
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
@@ -556,19 +565,27 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     // The only channel left open once P1 is in force.
                     manualResolution?.divergences?.forEach { d ->
                         val unit = if (d.field == com.diapilot.core.physio.ManualInsulinParamsV1.ISF)
-                            "${com.diapilot.core.analysis.unitLabel(mgdl)}/ед" else "мин"
+                            stringResource(R.string.settings_screen_isf_unit_suffix, unitLabel(mgdl))
+                        else stringResource(R.string.settings_screen_unit_min)
                         val k = if (d.field == com.diapilot.core.physio.ManualInsulinParamsV1.ISF && mgdl)
                             MGDL_PER_MMOL_F else 1.0
                         val name = when (d.field) {
-                            com.diapilot.core.physio.ManualInsulinParamsV1.ONSET -> "начало"
-                            com.diapilot.core.physio.ManualInsulinParamsV1.PEAK -> "начало активной фазы"
-                            com.diapilot.core.physio.ManualInsulinParamsV1.PLATEAU_END -> "конец активной фазы"
-                            com.diapilot.core.physio.ManualInsulinParamsV1.TAIL -> "конец"
+                            com.diapilot.core.physio.ManualInsulinParamsV1.ONSET ->
+                                stringResource(R.string.settings_screen_onset_label)
+                            com.diapilot.core.physio.ManualInsulinParamsV1.PEAK ->
+                                stringResource(R.string.settings_screen_active_phase_start_name)
+                            com.diapilot.core.physio.ManualInsulinParamsV1.PLATEAU_END ->
+                                stringResource(R.string.settings_screen_active_phase_end_name)
+                            com.diapilot.core.physio.ManualInsulinParamsV1.TAIL ->
+                                stringResource(R.string.settings_screen_end_label)
                             else -> "ISF"
                         }
                         Text(
-                            "≠ По вашим данным %s %.2f %s, у вас задано %.2f — используем ваше"
-                                .format(java.util.Locale.ROOT, name, d.measured * k, unit, d.manual * k),
+                            String.format(
+                                java.util.Locale.ROOT,
+                                stringResource(R.string.settings_screen_divergence_line),
+                                name, d.measured * k, unit, d.manual * k,
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
@@ -596,29 +613,28 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     val isfEpisodes = physioArtifact?.globalIsf?.identifyingEpisodes ?: 0
                     Text(
                         if (isfEpisodes > 0) {
-                            "💉 ISF измерен по закрытым коррекциям · эпизодов $isfEpisodes"
+                            stringResource(R.string.settings_screen_isf_measured, isfEpisodes)
                         } else {
-                            "💉 ISF — приор артефакта, своих закрытых коррекций пока нет"
+                            stringResource(R.string.settings_screen_isf_prior)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isfEpisodes > 0) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Один движок на всё: линия, What-if, часы и гипо-тревога читают одну модель. " +
-                            "Запасной твин включается, только если физио-артефакт не построился.",
+                        stringResource(R.string.settings_screen_engine_backup_note),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Text(
-                        "Персональная модель недоступна. До её восстановления работает резервный DiaPilot.",
+                        stringResource(R.string.settings_screen_model_unavailable),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 Text(
-                    "Старые ручные значения сохранены только для аварийного отката и в обычной работе не участвуют.",
+                    stringResource(R.string.settings_screen_manual_values_note),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -627,14 +643,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Алерты", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_alerts_title), style = MaterialTheme.typography.titleMedium)
                 var hypoAlert by remember { mutableStateOf(Settings.hypoAlertEnabled(context)) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Прогноз гипогликемии (за ~45 мин)")
+                    Text(stringResource(R.string.settings_screen_hypo_forecast_label))
                     Switch(
                         checked = hypoAlert,
                         onCheckedChange = {
@@ -644,9 +660,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     )
                 }
                 Text(
-                    "Модель смотрит на 45 минут вперёд каждую минуту данных. " +
-                        "Качество правила — в Анализе, карточка «Гипо-алерт»: " +
-                        "точность, ловля, ложные в день.",
+                    stringResource(R.string.settings_screen_hypo_forecast_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -659,7 +673,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Звук алерта (слышно на «без звука»)")
+                        Text(stringResource(R.string.settings_screen_alert_sound_label))
                         Switch(
                             checked = hypoSound,
                             onCheckedChange = { hypoSound = it; Settings.setHypoAlertSound(context, it) },
@@ -671,17 +685,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Ночью мягко, потом громче")
+                        Text(stringResource(R.string.settings_screen_night_gentle_label))
                         Switch(
                             checked = nightGentle,
                             onCheckedChange = { nightGentle = it; Settings.setHypoNightGentle(context, it) },
                         )
                     }
                     Text(
-                        "Звук играет на АЛАРМ-канале — слышно, даже когда телефон на «без звука» " +
-                            "(но громкость будильника должна быть поднята, и DiaPilot добавлен в " +
-                            "исключения «Не беспокоить», если он включён ночью). " +
-                            "Ночью (0-7ч) сначала тихая вибрация, через 5 мин без реакции — полный будильник.",
+                        stringResource(R.string.settings_screen_alert_sound_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -692,10 +703,11 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         )
                         android.widget.Toast.makeText(
                             context,
-                            if (hasVib) "Сигнал отправлен (вибро есть)" else "⚠ Вибромотор недоступен",
+                            if (hasVib) context.getString(R.string.settings_screen_signal_sent)
+                            else context.getString(R.string.settings_screen_vibrator_unavailable),
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
-                    }) { Text("🔔 Проверить сигнал") }
+                    }) { Text(stringResource(R.string.settings_screen_check_signal)) }
 
                     var dexSnooze by remember { mutableStateOf(Settings.hypoDextroseSnooze(context)) }
                     Row(
@@ -703,33 +715,38 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Пауза алертов после декстрозы")
+                        Text(stringResource(R.string.settings_screen_dextrose_snooze_label))
                         Switch(
                             checked = dexSnooze,
                             onCheckedChange = { dexSnooze = it; Settings.setHypoDextroseSnooze(context, it) },
                         )
                     }
+                    val minUnit = stringResource(R.string.settings_screen_unit_min)
                     if (dexSnooze) {
                         var snoozeMin by remember { mutableStateOf(Settings.hypoSnoozeMin(context)) }
-                        StepperRow("Окно всасывания декстрозы", snoozeMin, "мин", 5, 45, 5) {
+                        StepperRow(
+                            stringResource(R.string.settings_screen_dextrose_window_label),
+                            snoozeMin, minUnit, 5, 45, 5,
+                        ) {
                             snoozeMin = it; Settings.setHypoSnoozeMin(context, it)
                         }
                     }
                     var lowRefire by remember { mutableStateOf(Settings.hypoLowRefireMin(context)) }
-                    StepperRow("Повтор при низком каждые", lowRefire, "мин", 3, 30, 1) {
+                    StepperRow(
+                        stringResource(R.string.settings_screen_low_refire_label),
+                        lowRefire, minUnit, 3, 30, 1,
+                    ) {
                         lowRefire = it; Settings.setHypoLowRefireMin(context, it)
                     }
                     var persistMin by remember { mutableStateOf(Settings.hypoPersistMin(context)) }
-                    StepperRow("Затяжная гипа → громче через", persistMin, "мин", 10, 60, 5) {
+                    StepperRow(
+                        stringResource(R.string.settings_screen_persist_label),
+                        persistMin, minUnit, 10, 60, 5,
+                    ) {
                         persistMin = it; Settings.setHypoPersistMin(context, it)
                     }
                     Text(
-                        "Съел декстрозу — алерты молчат на окно всасывания; если через него сахар " +
-                            "всё ещё низкий, алерт вернётся (лечение не помогло). Если гипа длится " +
-                            "дольше «затяжной» — полный будильник и повтор каждые 10 мин, даже в " +
-                            "мягком ночном режиме. Замер глюкометром в норме — гасит алерты. " +
-                            "Неправдоподобно низкие значения (артефакт сенсора) → «проверьте сахар», " +
-                            "не полный алярм.",
+                        stringResource(R.string.settings_screen_hypo_alert_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -740,7 +757,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Прогноз выхода вверх (за ~40 мин)")
+                    Text(stringResource(R.string.settings_screen_hyper_forecast_label))
                     Switch(
                         checked = hyperAlert,
                         onCheckedChange = {
@@ -750,9 +767,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     )
                 }
                 Text(
-                    "Экспериментально: предупреждение до пересечения верхней " +
-                        "границы — меньше взлётов к 300 начинается с 40 минут форы. " +
-                        "Ночью гипо-алерт чувствительнее (нижний край коридора).",
+                    stringResource(R.string.settings_screen_hyper_forecast_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -764,13 +779,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         Settings.setHypoProtocol(context, it)
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Мой план при гипо (согласуйте с врачом)") },
-                    placeholder = { Text("например: 10 г сока, проверка через 15 мин") },
+                    label = { Text(stringResource(R.string.settings_screen_hypo_plan_label)) },
+                    placeholder = { Text(stringResource(R.string.settings_screen_hypo_plan_placeholder)) },
                     singleLine = true,
                 )
                 Text(
-                    "Алерт напоминает ВАШ план дословно — приложение не вычисляет " +
-                        "лечение. Пусто — алерт просто попросит проверить сахар.",
+                    stringResource(R.string.settings_screen_hypo_plan_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -779,7 +793,10 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Libre 2 — свой приём (эксперимент)", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.settings_screen_libre_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 var ownBle by remember { mutableStateOf(Settings.ownBleEnabled(context)) }
                 val btPermission = androidx.activity.compose.rememberLauncherForActivityResult(
                     androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
@@ -794,7 +811,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("DiaPilot сам держит BLE-связь с сенсором")
+                    Text(stringResource(R.string.settings_screen_own_ble_label))
                     Switch(
                         checked = ownBle,
                         onCheckedChange = { on ->
@@ -815,19 +832,18 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 }
                 Text(
                     if (bleState != null) {
-                        "Сенсор ${bleState.serial} · MAC ${bleState.mac} · " +
-                            "соединение №${bleState.connectionIndex} · " +
-                            "ключей: ${bleState.unlockArray.size}"
+                        stringResource(
+                            R.string.settings_screen_libre_state_info,
+                            bleState.serial, bleState.mac, bleState.connectionIndex, bleState.unlockArray.size,
+                        )
                     } else {
-                        "Ключей нет. Включите тумблер и отсканируйте сенсор (NFC) — " +
-                            "скан включит стриминг на DiaPilot."
+                        stringResource(R.string.settings_screen_libre_no_keys)
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "⚠ Сенсор держит одно BLE-соединение: включение забирает поток у xDrip. " +
-                        "Вернуть xDrip — пересканировать сенсор в нём. Расшифровка — через OOP2.",
+                    stringResource(R.string.settings_screen_libre_warning),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -842,7 +858,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Диагностика", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.settings_screen_diagnostics_title), style = MaterialTheme.typography.titleMedium)
                     androidx.compose.material3.TextButton(onClick = { diagTick++ }) { Text("🔄") }
                 }
                 var diag by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -851,37 +867,67 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         val now = System.currentTimeMillis()
                         val store = com.example.diapilot.data.Stores.get(context)
                         fun age(ts: Long): String =
-                            if (ts <= 0) "—" else "${(now - ts) / 60_000} мин назад"
+                            if (ts <= 0) "—" else context.getString(R.string.settings_screen_age_minutes_ago, (now - ts) / 60_000)
                         val d = com.example.diapilot.collect.DiagState
                         val lastMain = store.lastReading()
                         val lastMinute = store.lastMinuteReading()
                         val cal = com.example.diapilot.data.MinuteCalCache.get(store, context)
                         buildList {
-                            add("BLE: ${d.bleStatus} · пакет ${age(d.bleLastPacketMs)}")
                             add(
-                                "Основные показания: ${age(lastMain?.tsMs ?: 0)} " +
-                                    "(${lastMain?.source ?: "—"})",
+                                context.getString(
+                                    R.string.settings_screen_ble_line,
+                                    d.bleStatus.ifBlank { context.getString(R.string.libre_ble_client_status_off) },
+                                    age(d.bleLastPacketMs),
+                                ),
                             )
-                            add("Минутный поток: ${age(lastMinute?.tsMs ?: 0)}")
+                            add(
+                                context.getString(
+                                    R.string.settings_screen_main_reading_line,
+                                    age(lastMain?.tsMs ?: 0),
+                                    lastMain?.source ?: "—",
+                                ),
+                            )
+                            add(context.getString(R.string.settings_screen_minute_stream_line, age(lastMinute?.tsMs ?: 0)))
                             add(
                                 cal?.let {
-                                    "Калибровка мин→осн: ×%.2f %+.1f (n=%d)".format(
+                                    context.getString(
+                                        R.string.settings_screen_calibration_line,
                                         it.slope, it.intercept, it.n,
                                     )
-                                } ?: "Калибровка мин→осн: нет",
+                                } ?: context.getString(R.string.settings_screen_calibration_none),
                             )
                             add(
-                                "Сенсор: ${com.example.diapilot.data.Settings.libreSensorSerial(context) ?: "—"}" +
-                                    (com.example.diapilot.data.Settings.libreSensorStartMs(context)
-                                        .takeIf { it > 0 }
-                                        ?.let { " · день %.1f".format((now - it) / 86_400_000.0) } ?: ""),
+                                com.example.diapilot.data.Settings.libreSensorStartMs(context)
+                                    .takeIf { it > 0 }
+                                    ?.let {
+                                        context.getString(
+                                            R.string.settings_screen_sensor_line_with_day,
+                                            com.example.diapilot.data.Settings.libreSensorSerial(context) ?: "—",
+                                            (now - it) / 86_400_000.0,
+                                        )
+                                    }
+                                    ?: context.getString(
+                                        R.string.settings_screen_sensor_line,
+                                        com.example.diapilot.data.Settings.libreSensorSerial(context) ?: "—",
+                                    ),
                             )
-                            add("Сервис запущен: ${age(d.serviceStartedMs)}")
-                            add("Сервер часов: ${if (d.watchServerUp) "работает" else "выключен"}")
-                            add("xDrip-бродкаст: ${age(d.lastXdripBroadcastMs)}")
+                            add(context.getString(R.string.settings_screen_service_started_line, age(d.serviceStartedMs)))
                             add(
-                                "Пары для этапа 4: " +
+                                context.getString(
+                                    R.string.settings_screen_watch_server_status_line,
+                                    if (d.watchServerUp) {
+                                        context.getString(R.string.settings_screen_watch_server_running)
+                                    } else {
+                                        context.getString(R.string.settings_screen_watch_server_off)
+                                    },
+                                ),
+                            )
+                            add(context.getString(R.string.settings_screen_xdrip_broadcast_line, age(d.lastXdripBroadcastMs)))
+                            add(
+                                context.getString(
+                                    R.string.settings_screen_pairs_stage4_line,
                                     com.example.diapilot.collect.Libre2PairLog.stats(context),
+                                ),
                             )
                         }
                     }
@@ -898,11 +944,11 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Данные", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_data_title), style = MaterialTheme.typography.titleMedium)
                 var exportStatus by remember { mutableStateOf<String?>(null) }
                 val exportScope = androidx.compose.runtime.rememberCoroutineScope()
                 androidx.compose.material3.TextButton(onClick = {
-                    exportStatus = "Экспортирую…"
+                    exportStatus = context.getString(R.string.settings_screen_exporting)
                     exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         exportStatus = try {
                             val name = "diapilot-backup-" +
@@ -920,23 +966,23 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 }
                                 val uri = context.contentResolver.insert(
                                     android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values,
-                                ) ?: error("не удалось создать файл")
+                                ) ?: error(context.getString(R.string.settings_screen_export_create_failed))
                                 context.contentResolver.openOutputStream(uri)!!.use {
                                     store.exportSnapshot(it)
                                 }
-                                "Сохранено в Загрузки: $name"
+                                context.getString(R.string.settings_screen_export_saved_downloads, name)
                             } else {
                                 val f = java.io.File(
                                     context.getExternalFilesDir(null), name,
                                 )
                                 f.outputStream().use { store.exportSnapshot(it) }
-                                "Сохранено: ${f.path}"
+                                context.getString(R.string.settings_screen_export_saved_path, f.path)
                             }
                         } catch (e: Exception) {
-                            "Ошибка экспорта: ${e.message}"
+                            context.getString(R.string.settings_screen_export_error, e.message)
                         }
                     }
-                }) { Text("💾 Экспорт базы (.sqlite)") }
+                }) { Text(stringResource(R.string.settings_screen_export_database)) }
                 exportStatus?.let {
                     Text(
                         it,
@@ -952,8 +998,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 var purgeStatus by remember { mutableStateOf<String?>(null) }
                 var purging by remember { mutableStateOf(false) }
                 Text(
-                    "Начало периода обучения: $foodEraLabel. Данные до этой даты " +
-                        "хранятся и видны в истории, но модель на них не учится.",
+                    stringResource(R.string.settings_screen_era_start_hint, foodEraLabel),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -975,7 +1020,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                         purgePreview = null
                                         purgeStatus = null
                                     } catch (e: IllegalArgumentException) {
-                                        purgeStatus = "Дата не может быть в будущем"
+                                        purgeStatus = context.getString(R.string.settings_screen_era_date_future_error)
                                     }
                                 }
                             },
@@ -987,7 +1032,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 .plusDays(1).toInstant().toEpochMilli() - 1
                         }.show()
                     },
-                ) { Text("📅 Изменить начало периода") }
+                ) { Text(stringResource(R.string.settings_screen_change_era_start)) }
                 // --- Purge everything recorded before the CHOSEN era start.
                 // Offered only after the user has moved the start (a first-run
                 // default never makes history deletable), and deliberately
@@ -1005,7 +1050,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             purgePreview = com.example.diapilot.data.PreEraPurge.preview(store, boundary)
                         }
                     },
-                ) { Text("🧹 Удалить данные до $foodEraLabel") }
+                ) { Text(stringResource(R.string.settings_screen_purge_before_era, foodEraLabel)) }
                 purgeStatus?.let {
                     Text(
                         it,
@@ -1016,14 +1061,13 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 purgePreview?.let { preview ->
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { purgePreview = null },
-                        title = { Text("Удалить ${preview.total} строк?") },
+                        title = {
+                            Text(pluralStringResource(R.plurals.settings_screen_purge_rows_title, preview.total, preview.total))
+                        },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    "Всё, записанное до $foodEraLabel, " +
-                                        "будет удалено безвозвратно. Эти записи сделаны до " +
-                                        "выбранного начала периода обучения, и модель на них " +
-                                        "уже не учится.",
+                                    stringResource(R.string.settings_screen_purge_confirm_text, foodEraLabel),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 preview.tables.forEach {
@@ -1033,7 +1077,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                     )
                                 }
                                 Text(
-                                    "Сначала сделайте «Экспорт базы» — восстановить будет неоткуда.",
+                                    stringResource(R.string.settings_screen_purge_export_first),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error,
                                 )
@@ -1043,26 +1087,28 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             TextButton(onClick = {
                                 purgePreview = null
                                 purging = true
-                                purgeStatus = "Удаляю и сжимаю базу…"
+                                purgeStatus = context.getString(R.string.settings_screen_purging)
                                 exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     purgeStatus = try {
                                         val store = com.example.diapilot.data.Stores.get(context)
                                             as com.example.diapilot.data.SqliteCollectorStore
                                         val boundary = requireNotNull(
                                             com.example.diapilot.data.PreEraPurge.boundary(context),
-                                        ) { "начало периода не выбрано" }
+                                        ) { context.getString(R.string.settings_screen_purge_era_not_selected) }
                                         val r = com.example.diapilot.data.PreEraPurge.purge(store, boundary)
-                                        "Удалено ${r.total} строк, освобождено " +
-                                            "${r.freedBytes / 1_048_576} МБ"
+                                        context.resources.getQuantityString(
+                                            R.plurals.settings_screen_purge_result,
+                                            r.total, r.total, r.freedBytes / 1_048_576,
+                                        )
                                     } catch (e: Exception) {
-                                        "Ошибка очистки: ${e.message}"
+                                        context.getString(R.string.settings_screen_purge_error, e.message)
                                     }
                                     purging = false
                                 }
-                            }) { Text("Удалить") }
+                            }) { Text(stringResource(R.string.settings_screen_delete)) }
                         },
                         dismissButton = {
-                            TextButton(onClick = { purgePreview = null }) { Text("Отмена") }
+                            TextButton(onClick = { purgePreview = null }) { Text(stringResource(R.string.settings_screen_cancel)) }
                         },
                     )
                 }
@@ -1077,7 +1123,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 ) { uri -> if (uri != null) restoreUri = uri }
                 androidx.compose.material3.TextButton(onClick = {
                     restoreLauncher.launch(arrayOf("application/octet-stream", "application/x-sqlite3", "*/*"))
-                }) { Text("♻️ Восстановить из копии (.sqlite)") }
+                }) { Text(stringResource(R.string.settings_screen_restore_backup)) }
                 restoreStatus?.let {
                     Text(
                         it,
@@ -1088,18 +1134,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 restoreUri?.let { uri ->
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { restoreUri = null },
-                        title = { Text("Заменить все данные?") },
+                        title = { Text(stringResource(R.string.settings_screen_replace_all_data_title)) },
                         text = {
-                            Text(
-                                "Текущая база будет полностью заменена выбранной копией. " +
-                                    "Приложение перезапустится. Действие необратимо — " +
-                                    "если сомневаешься, сначала сделай экспорт текущей базы.",
-                            )
+                            Text(stringResource(R.string.settings_screen_replace_all_data_text))
                         },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
                                 restoreUri = null
-                                restoreStatus = "Восстанавливаю…"
+                                restoreStatus = context.getString(R.string.settings_screen_restoring)
                                 exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     try {
                                         restoreStatus = com.example.diapilot.data.BackupRestore
@@ -1107,15 +1149,15 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                         kotlinx.coroutines.delay(1500)   // let the text render
                                         android.os.Process.killProcess(android.os.Process.myPid())
                                     } catch (e: Exception) {
-                                        restoreStatus = "Ошибка восстановления: ${e.message}"
+                                        restoreStatus = context.getString(R.string.settings_screen_restore_error, e.message)
                                     }
                                 }
-                            }) { Text("Заменить") }
+                            }) { Text(stringResource(R.string.settings_screen_replace)) }
                         },
                         dismissButton = {
                             androidx.compose.material3.TextButton(
                                 onClick = { restoreUri = null },
-                            ) { Text("Отмена") }
+                            ) { Text(stringResource(R.string.settings_screen_cancel)) }
                         },
                     )
                 }
@@ -1132,7 +1174,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         compUrl = it
                         com.example.diapilot.data.Settings.setCompanionUrl(context, it)
                     },
-                    label = { Text("Компаньон-сервер (URL)") },
+                    label = { Text(stringResource(R.string.settings_screen_companion_url_label)) },
                     placeholder = { Text("http://host:8787") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1143,14 +1185,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         compToken = it
                         com.example.diapilot.data.Settings.setCompanionToken(context, it)
                     },
-                    label = { Text("Токен компаньона") },
+                    label = { Text(stringResource(R.string.settings_screen_companion_token_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    "Личный дашборд в браузере: сахар, тренд, прогноз, события — " +
-                        "обновляется каждую минуту; туда же уезжает суточная копия базы. " +
-                        "Сервер — server/ в репозитории. Пусто = выключено.",
+                    stringResource(R.string.settings_screen_companion_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1171,23 +1211,25 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 }
                 androidx.compose.material3.TextButton(onClick = { cloudLauncher.launch(null) }) {
                     Text(
-                        if (cloudUri == null) "☁️ Папка облачной копии — выбрать"
-                        else "☁️ Облачная копия: ${cloudUri?.lastPathSegment ?: "настроена"} · сменить",
+                        if (cloudUri == null) {
+                            stringResource(R.string.settings_screen_cloud_folder_choose)
+                        } else {
+                            stringResource(
+                                R.string.settings_screen_cloud_folder_configured,
+                                cloudUri?.lastPathSegment
+                                    ?: stringResource(R.string.settings_screen_cloud_configured_fallback),
+                            )
+                        },
                     )
                 }
                 if (cloudUri != null) {
                     androidx.compose.material3.TextButton(onClick = {
                         com.example.diapilot.data.BackupRestore.setCloudFolder(context, null)
                         cloudUri = null
-                    }) { Text("Отключить облачную копию") }
+                    }) { Text(stringResource(R.string.settings_screen_disable_cloud_copy)) }
                 }
                 Text(
-                    "Полная копия всех данных (глюкоза, инсулин, еда, разметка) — " +
-                        "в папку Загрузки. Плюс автокопия раз в сутки (7 файлов по дням " +
-                        "недели, diapilot-auto-backup-N) — и в облачную папку, если " +
-                        "выбрана (укажи папку Google Диска — синхронизирует сам Диск, " +
-                        "данные не уходят никуда, кроме твоего облака). " +
-                        "Восстановление — путь переезда на новый телефон.",
+                    stringResource(R.string.settings_screen_backup_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1196,13 +1238,13 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Часы", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_watch_title), style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Сервер для циферблата (порт 29863)")
+                    Text(stringResource(R.string.settings_screen_watch_server_label))
                     Switch(
                         checked = watchServer,
                         onCheckedChange = {
@@ -1212,8 +1254,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     )
                 }
                 Text(
-                    "WatchDrip-совместимый локальный сервер для Zepp OS. " +
-                        "Изменение применяется после перезапуска приложения.",
+                    stringResource(R.string.settings_screen_watch_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1222,28 +1263,29 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         com.example.diapilot.collect.HypoAlertNotifier.postWatchTest(context)
                         android.widget.Toast.makeText(
                             context,
-                            "Тест на часы (флаг «низко» на 3 мин) — вибрация в течение ~1-2 мин",
+                            context.getString(R.string.settings_screen_watch_test_toast),
                             android.widget.Toast.LENGTH_LONG,
                         ).show()
-                    }) { Text("⌚ Тест вибро на часах") }
+                    }) { Text(stringResource(R.string.settings_screen_watch_test_vibro)) }
                     Text(
-                        "Проверяет ОБА пути: флаг «низко» серверу циферблата (45с) и " +
-                            "зеркалируемое уведомление (как реальный алерт). Часы завибрируют, " +
-                            "если включён либо low-alarm циферблата, либо зеркалирование " +
-                            "уведомлений Zepp с вибрацией.",
+                        stringResource(R.string.settings_screen_watch_test_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
                 Text(
-                    "Ночной тусклый AOD на часах",
+                    stringResource(R.string.settings_screen_watch_dim_title),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = 6.dp),
                 )
                 var dimMode by remember { mutableStateOf(Settings.watchNightDimMode(context)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("Выкл", "По времени", "Вкл сейчас").forEachIndexed { i, label ->
+                    listOf(
+                        stringResource(R.string.settings_screen_dim_mode_off),
+                        stringResource(R.string.settings_screen_dim_mode_scheduled),
+                        stringResource(R.string.settings_screen_dim_mode_on_now),
+                    ).forEachIndexed { i, label ->
                         androidx.compose.material3.FilterChip(
                             selected = dimMode == i,
                             onClick = { dimMode = i; Settings.setWatchNightDimMode(context, i) },
@@ -1251,16 +1293,19 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         )
                     }
                 }
+                val hourUnit = stringResource(R.string.settings_screen_unit_hour)
                 if (dimMode == 1) {
                     var startH by remember { mutableStateOf(Settings.watchNightStartH(context)) }
-                    StepperRow("С", startH, "ч", 0, 23, 1) { startH = it; Settings.setWatchNightStartH(context, it) }
+                    StepperRow(stringResource(R.string.settings_screen_dim_start_label), startH, hourUnit, 0, 23, 1) {
+                        startH = it; Settings.setWatchNightStartH(context, it)
+                    }
                     var endH by remember { mutableStateOf(Settings.watchNightEndH(context)) }
-                    StepperRow("До", endH, "ч", 0, 23, 1) { endH = it; Settings.setWatchNightEndH(context, it) }
+                    StepperRow(stringResource(R.string.settings_screen_dim_end_label), endH, hourUnit, 0, 23, 1) {
+                        endH = it; Settings.setWatchNightEndH(context, it)
+                    }
                 }
                 Text(
-                    "Ночью циферблат почти гаснет (тусклые часы + сахар, красное при низком), " +
-                        "график и остальное скрыты — можно держать AOD ночью, не слепя. " +
-                        "Флаг едет на часы с данными (~минута задержки).",
+                    stringResource(R.string.settings_screen_watch_dim_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1269,14 +1314,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Экран блокировки", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_lock_screen_title), style = MaterialTheme.typography.titleMedium)
                 var overlay by remember { mutableStateOf(Settings.overlayEnabled(context)) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Показывать сахар поверх экрана блокировки")
+                    Text(stringResource(R.string.settings_screen_overlay_label))
                     Switch(
                         checked = overlay,
                         onCheckedChange = {
@@ -1289,7 +1334,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 val canDraw = com.example.diapilot.collect.LockScreenOverlay.canDraw(context)
                 if (overlay && !canDraw) {
                     Text(
-                        "⚠ Нужно разрешение «Поверх других приложений».",
+                        stringResource(R.string.settings_screen_overlay_permission_needed),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -1300,12 +1345,10 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 android.net.Uri.parse("package:${context.packageName}"),
                             ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
-                    }) { Text("Выдать разрешение") }
+                    }) { Text(stringResource(R.string.settings_screen_grant_permission)) }
                 }
                 Text(
-                    "Плавающая плашка с сахаром/стрелкой — как у xDrip, видна не разблокируя. " +
-                        "На MIUI дополнительно включите «Отображение всплывающих окон» и показ " +
-                        "на экране блокировки в разрешениях DiaPilot.",
+                    stringResource(R.string.settings_screen_overlay_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1326,7 +1369,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
         // in its original form — "behind a toggle".
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Экспериментальное", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_screen_experimental_title), style = MaterialTheme.typography.titleMedium)
 
                 var plausibility by remember { mutableStateOf(Settings.plausibilityGate(context)) }
                 Row(
@@ -1334,17 +1377,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Не доверять неправдоподобному якорю")
+                    Text(stringResource(R.string.settings_screen_plausibility_label))
                     Switch(
                         checked = plausibility,
                         onCheckedChange = { plausibility = it; Settings.setPlausibilityGate(context, it) },
                     )
                 }
                 Text(
-                    "Показание ниже пола 2.0, всплывшее из разрыва или входящее в " +
-                        "артефактный выброс, перестаёт считаться надёжной опорой: прогноз " +
-                        "теряет статус TRUSTED и называет причину. Правдоподобные якоря не " +
-                        "трогает. Читает путь гипо-тревоги — включайте, наблюдая.",
+                    stringResource(R.string.settings_screen_plausibility_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1355,18 +1395,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Ночью судить по нижней границе коридора")
+                    Text(stringResource(R.string.settings_screen_night_low_label))
                     Switch(
                         checked = nightLow,
                         onCheckedChange = { nightLow = it; Settings.setNightCorridorLow(context, it) },
                     )
                 }
                 Text(
-                    "Ночная гипо-тревога срабатывает по НИЖНЕЙ границе прогноза, а не по " +
-                        "центральной линии — раньше и чаще. На проверенной истории это давало " +
-                        "много поводов без настоящих ночных низких, поэтому по умолчанию " +
-                        "выключено. Включать, когда появится настоящий низкий, на котором " +
-                        "видно полноту.",
+                    stringResource(R.string.settings_screen_night_low_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1377,15 +1413,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Отметки еды учат модель")
+                    Text(stringResource(R.string.settings_screen_marks_teach_label))
                     Switch(
                         checked = marksTeach,
                         onCheckedChange = { marksTeach = it; Settings.setMarksTeachModel(context, it) },
                     )
                 }
                 Text(
-                    "Выключение любой из трёх меняет то, что модель учит, и вступает в " +
-                        "силу после пересчёта корпуса.",
+                    stringResource(R.string.settings_screen_experimental_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1446,5 +1481,5 @@ data class InsulinCardView(
     val profileLine: String? = null,
     /** Doses that gave no landmark at all, by named reason — a "perfectly
      * compensated meal" is one of them and must be visible. */
-    val refusals: Map<String, Int> = emptyMap(),
+    val refusals: Map<com.diapilot.core.physio.LandmarkRefusal, Int> = emptyMap(),
 )

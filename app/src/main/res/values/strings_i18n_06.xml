@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CompanionSync.kt -->
+    <string name="companion_sync_minutes_compact">%1$dm</string>
+    <string name="companion_sync_hours_minutes_compact">%1$dh%2$dm</string>
+    <string name="companion_sync_insulin_line">injection %1$.1f U · %2$s</string>
+    <string name="companion_sync_event_note">📝 %1$s %2$s</string>
+    <string name="companion_sync_event_note_with_carbs">📝 %1$s %2$s · ~%3$.0f g</string>
+    <string name="companion_sync_event_bolus">💉 %1$s %2$.1f U</string>
+    <string name="companion_sync_event_bolus_with_purpose">💉 %1$s %2$.1f U · %3$s</string>
+
+    <!-- LibreBleClient.kt (status text, no Context wrapper — read via context.localized()) -->
+    <string name="libre_ble_client_status_off">off</string>
+    <string name="libre_ble_client_status_stream_stalled">stream stalled — reconnecting</string>
+    <string name="libre_ble_client_status_no_mac">no MAC — scan the sensor</string>
+    <string name="libre_ble_client_status_bluetooth_off">Bluetooth off</string>
+    <string name="libre_ble_client_status_listening">sensor silent — listening</string>
+    <string name="libre_ble_client_status_connecting">connecting to %1$s</string>
+    <string name="libre_ble_client_status_discovering">connected, discovering services</string>
+    <string name="libre_ble_client_status_reconnecting">disconnected, reconnecting…</string>
+    <string name="libre_ble_client_status_subscribing">subscribing to data…</string>
+    <string name="libre_ble_client_status_unlock_exhausted">out of unlock buffers — rescan the sensor</string>
+    <string name="libre_ble_client_status_login_sent">login sent (nonce %1$d)</string>
+    <string name="libre_ble_client_status_subscribe_failed">subscribe failed (status=%1$d)</string>
+    <string name="libre_ble_client_status_waiting_stream">waiting for stream…</string>
+    <string name="libre_ble_client_status_streaming">stream is up (packet %1$s)</string>
+
+    <!-- FoodLibrary.kt -->
+    <string name="food_library_deconv_stats">%1$d observations of %2$d notes · censored %3$d%% · ttp median %4$.0f min · %5$.2f mmol/g</string>
+    <string name="food_library_deconv_stats_with_onset">%1$d observations of %2$d notes · censored %3$d%% · onset median %4$.0f min · ttp median %5$.0f min · %6$.2f mmol/g</string>
+    <string name="food_library_title">📚 Food library</string>
+    <string name="food_library_add_product">＋ Product</string>
+    <string name="food_library_search">Search</string>
+    <plurals name="food_library_substrate_title">
+        <item quantity="one">🧩 Substrate for the component model: %1$d of %2$d meal with composition (%3$d%%)</item>
+        <item quantity="other">🧩 Substrate for the component model: %1$d of %2$d meals with composition (%3$d%%)</item>
+    </plurals>
+    <string name="food_library_substrate_hint">Meals broken into components — a training base for a future component-level model. Grows as composite dishes get logged. Tap for the component vocabulary.</string>
+    <plurals name="food_library_substrate_vocab_line">
+        <item quantity="one">%1$s · %2$d meal · %3$.0f g total</item>
+        <item quantity="other">%1$s · %2$d meals · %3$.0f g total</item>
+    </plurals>
+    <string name="food_library_and_more">…and %1$d more</string>
+    <plurals name="food_library_concepts_title">
+        <item quantity="one">🍱 Concepts: %1$d across %2$d record</item>
+        <item quantity="other">🍱 Concepts: %1$d across %2$d records</item>
+    </plurals>
+    <plurals name="food_library_concepts_title_with_gap">
+        <item quantity="one">🍱 Concepts: %1$d across %2$d record · ? unrecognized: %3$d</item>
+        <item quantity="other">🍱 Concepts: %1$d across %2$d records · ? unrecognized: %3$d</item>
+    </plurals>
+    <plurals name="food_library_concepts_hint">
+        <item quantity="one">History is pooled by concept-id, not by name. %1$d concept collected different names into one pool — no need to rename by hand. Tap to expand.</item>
+        <item quantity="other">History is pooled by concept-id, not by name. %1$d concepts collected different names into one pool — no need to rename by hand. Tap to expand.</item>
+    </plurals>
+    <string name="food_library_concepts_tap_hint">Tap a name → reassign the concept by hand.</string>
+    <string name="food_library_concept_summary_line">%1$s · ×%2$d · %3$.0f g · %4$s</string>
+    <string name="food_library_no_concept_prompt">? no concept (%1$d) — tap to assign:</string>
+    <string name="food_library_grams">%1$d g</string>
+    <string name="food_library_grams_edited">%1$d g ✎</string>
+    <string name="food_library_rise">rise ~%1$.1f</string>
+    <string name="food_library_underdosed_count">⚠ top-up ×%1$d</string>
+    <string name="food_library_not_eaten_yet">not eaten yet</string>
+    <string name="food_library_empty_no_query">Nothing here yet — add a product or log a meal 🙂</string>
+    <string name="food_library_empty_query">Nothing found. “%1$s” adds “%2$s”.</string>
+    <string name="food_library_speed_fast">fast</string>
+    <string name="food_library_speed_medium">medium</string>
+    <string name="food_library_speed_slow">slow</string>
+    <string name="food_library_speed_none_label">no carbs</string>
+    <string name="food_library_concept_for">Concept for “%1$s”</string>
+    <string name="food_library_concept_current">Currently: %1$s. Pick an archetype — matching learns by concept-id, not by name.</string>
+    <string name="food_library_concept_current_unrecognized">Currently: not recognized. Pick an archetype — matching learns by concept-id, not by name.</string>
+    <string name="food_library_concept_filter">Filter concepts</string>
+    <string name="food_library_reset_default">Reset (default)</string>
+    <string name="food_library_cancel">Cancel</string>
+    <string name="food_library_editor_title_new">New product</string>
+    <string name="food_library_editor_title_existing">“%1$s”</string>
+    <string name="food_library_dish_name_label">Dish name</string>
+    <string name="food_library_recipe_label_empty">Composition (for a composite dish):</string>
+    <string name="food_library_recipe_label_filled">Composition — grams per unit/portion:</string>
+    <string name="food_library_grams_label">g</string>
+    <string name="food_library_add_component_label">Add component</string>
+    <string name="food_library_component_suggestion_with_grams">＋ %1$s · ~%2$.0f g</string>
+    <string name="food_library_carbs_label">Carbs, g</string>
+    <string name="food_library_carbs_label_live">Carbs, g (recipe sum — live)</string>
+    <string name="food_library_carbs_label_from_history">Carbs, g (from history: %1$s)</string>
+    <string name="food_library_restore_recipe_sum">↺ restore recipe sum (%1$s g)</string>
+    <string name="food_library_comment_label">Comment (portion, recipe…)</string>
+    <string name="food_library_analyzing">Analyzing…</string>
+    <string name="food_library_parse_photo">🤖 Parse photo</string>
+    <string name="food_library_reparse_photo">🔄 Recompute from photo</string>
+    <string name="food_library_carbs_from_description">🤖 Carbs from description</string>
+    <string name="food_library_reparse_description">🔄 Recompute from description</string>
+    <string name="food_library_name_suggestion">✨ Name it “%1$s” — tap to apply</string>
+    <plurals name="food_library_pending_products">
+        <item quantity="one">＋ Add %1$d product to the library — tap to accept</item>
+        <item quantity="other">＋ Add %1$d products to the library — tap to accept</item>
+    </plurals>
+    <plurals name="food_library_adopted_components">
+        <item quantity="one">＋%1$d component recorded in the library as a separate product</item>
+        <item quantity="other">＋%1$d components recorded in the library as separate products</item>
+    </plurals>
+    <string name="food_library_analysis_hide">▾ breakdown</string>
+    <string name="food_library_analysis_show">▸ breakdown</string>
+    <string name="food_library_used_in_dishes">Appears in dishes (%1$d)</string>
+    <string name="food_library_used_in_dishes_with_rise">Appears in dishes (%1$d) · total ×%2$d · rise ~%3$.1f</string>
+    <string name="food_library_dish_row_with_episodes">• %1$s · ×%2$d · rise ~%3$.1f</string>
+    <string name="food_library_dish_row_no_episodes">• %1$s · not eaten yet</string>
+    <string name="food_library_shape_portion">Shape × portion: ~%1$.2f mmol/g</string>
+    <string name="food_library_clean_n">clean %1$d</string>
+    <string name="food_library_at_grams">at %1$dg → +%2$.1f</string>
+    <string name="food_library_flat_average">(flat average +%1$.1f)</string>
+    <string name="food_library_episodes_title">Episodes (%1$d)</string>
+    <string name="food_library_episode_rise">+%1$.1f over %2$d min</string>
+    <string name="food_library_episode_grams">%1$dg</string>
+    <string name="food_library_episode_dose">%1$.1f U</string>
+    <string name="food_library_episode_lag">lag %1$d min</string>
+    <string name="food_library_episode_background">background: %1$s</string>
+    <string name="food_library_error_empty_name">Name is empty</string>
+    <string name="food_library_error_duplicate_name">“%1$s” already exists — renaming would merge two histories</string>
+    <string name="food_library_save">Save</string>
+    <string name="food_library_remove_title">Remove from the library?</string>
+    <string name="food_library_remove_text">The meal history stays intact — only the reference entry is deleted.</string>
+    <string name="food_library_remove">Remove</string>
+    <string name="food_library_merge_title">Merge “%1$s” →</string>
+    <string name="food_library_merge_hint">For TRUE duplicates only — one dish under two names. Episode histories merge into the chosen dish, and “%1$s” disappears. Different portions (2 beers / beer) should NOT be merged — a recipe suits them better.</string>
+    <string name="food_library_merge_target_label">Into which dish</string>
+    <string name="food_library_merge_confirm">Merge</string>
+
+    <!-- FoodStructureAcceptance.kt -->
+    <string name="food_structure_acceptance_intro">A recognized dish tells the model WHAT you ate — grams and macros. SPEED is computed from that composition and the calorie queue, the same way for every dish.</string>
+    <string name="food_structure_acceptance_title">Structure of repeating dishes</string>
+    <string name="food_structure_acceptance_hide">hide</string>
+    <string name="food_structure_acceptance_show">open</string>
+    <string name="food_structure_acceptance_collapsed_hint">Shape and carb speed for dishes that repeat. Nothing is applied without your confirmation.</string>
+    <string name="food_structure_acceptance_append_note">Accepting ADDS to the record rather than rewriting it: the earlier text stays, and the moment of acceptance is stamped, so past calculations stay reproducible.</string>
+    <string name="food_structure_acceptance_speed_line">fast %1$s · medium %2$s · slow %3$s · %4$s</string>
+    <string name="food_structure_acceptance_speed_line_alcohol">fast %1$s · medium %2$s · slow %3$s · %4$s · alcohol</string>
+    <string name="food_structure_acceptance_preview_line">start/peak/90%%: now %1$s → becomes %2$s min</string>
+    <string name="food_structure_acceptance_blind_warning">⚠ this estimate was made with the dish\'s observed median already known — it does not take part in the confirmatory test</string>
+    <string name="food_structure_acceptance_pending">Records to change: %1$d of %2$d</string>
+    <plurals name="food_structure_acceptance_already_accepted">
+        <item quantity="one">already accepted (%1$d record)</item>
+        <item quantity="other">already accepted (%1$d records)</item>
+    </plurals>
+    <string name="food_structure_acceptance_apply">Apply</string>
+    <string name="food_structure_acceptance_note_update">“%1$s”: %2$d records changed</string>
+    <string name="food_structure_acceptance_no_rows">The proposal did not load.</string>
+</resources>

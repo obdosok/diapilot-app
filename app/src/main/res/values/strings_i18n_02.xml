@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_screen_title">Settings</string>
+
+    <!-- Personal model card -->
+    <string name="settings_screen_personal_model_title">Personal model</string>
+    <string name="settings_screen_model_checking">Checking the model…</string>
+    <string name="settings_screen_file_unavailable">file unavailable</string>
+    <string name="settings_screen_model_installed">Model installed atomically</string>
+    <string name="settings_screen_model_rejected">Model rejected: %1$s</string>
+    <string name="settings_screen_model_status_line">%1$s · %2$d d · to %3$s\ndata from %4$s (%5$s)\nSHA %6$s… · %7$s</string>
+    <string name="settings_screen_model_not_initialized">Model not initialized yet</string>
+    <string name="settings_screen_import_json">Import JSON</string>
+    <string name="settings_screen_no_previous_generation">No previous generation</string>
+    <string name="settings_screen_model_rollback_done">Model rolled back</string>
+    <string name="settings_screen_rollback">Roll back</string>
+    <string name="settings_screen_model_accept_note">Only a model for this person, trained on data no earlier than %1$s, is accepted. An import error does not affect the current forecast.</string>
+
+    <!-- Glucose units card -->
+    <string name="settings_screen_units_title">Glucose units</string>
+    <string name="settings_screen_units_hint">Display only: data and analytics are stored in mmol/L, so switching is instant and safe.</string>
+
+    <!-- Body card -->
+    <string name="settings_screen_body_title">Body</string>
+    <string name="settings_screen_weight_label">Weight, kg</string>
+    <string name="settings_screen_weight_supporting">Starting carb estimate: %1$.3f mmol/L per gram. A gram is spread through a volume proportional to body weight, so the estimate is inverse to weight. Measurements from your own data will replace it.</string>
+
+    <!-- Target and range card -->
+    <string name="settings_screen_target_range_title">Target and range</string>
+    <string name="settings_screen_target_label">Ideal glucose (%1$s)</string>
+    <string name="settings_screen_target_supporting">“High +X” hints measure the excess relative to it</string>
+    <string name="settings_screen_range_lo_label">Range: low</string>
+    <string name="settings_screen_range_hi_label">Range: high</string>
+    <string name="settings_screen_range_hint">The range is the green zone: TIR, the band on the chart, and the threshold below which a hint speaks up at all.</string>
+
+    <!-- Insulin · measured curve card -->
+    <string name="settings_screen_insulin_curve_title">Insulin · measured curve</string>
+    <string name="settings_screen_insulin_engine_note">One engine for everything: the line, What-if, the watch and the hypo alert all run on the measured curve — onset 11 · peak ~60 · tail 120, ISF from your corrections. No more diverging hands.</string>
+    <string name="settings_screen_isf_line">ISF %1$.1f %2$s · onset %3$.0f min · rate peak %4$.0f min</string>
+    <string name="settings_screen_isf_explain">This is the SAME curve measured below, read with a different ruler: “rate peak” is the top of the hump, the measured “peak” is the minute the curve reaches full speed. They differ by about 15 minutes by construction, not by error.</string>
+    <string name="settings_screen_main_curve_line">Main curve %1$.0f min · dose-dependent tail to %2$.0f min</string>
+    <string name="settings_screen_shape_measured">⏱ Shape measured from your injections</string>
+    <string name="settings_screen_shape_prior">⏱ Shape is a population prior, NOT your data</string>
+    <string name="settings_screen_refusal_line">gave no landmark: %1$s — %2$d</string>
+    <string name="settings_screen_curve_not_applied">curve built, but NOT applied to the forecast — see the artifact’s divergences</string>
+    <string name="settings_screen_manual_set_title">Set manually</string>
+    <string name="settings_screen_manual_set_hint">Minutes from the injection: onset · active phase from and to · full end. An empty field means we compute it ourselves. A filled one takes priority over the measured curve, and we can only report where ours came out differently.</string>
+    <string name="settings_screen_onset_label">onset</string>
+    <string name="settings_screen_active_from_label">active from</string>
+    <string name="settings_screen_active_to_label">active to</string>
+    <string name="settings_screen_end_label">end</string>
+    <string name="settings_screen_isf_unit_suffix">%1$s/U</string>
+    <string name="settings_screen_saved_recalculating">Saved — recalculating the forecast</string>
+    <string name="settings_screen_cleared">Cleared</string>
+    <string name="settings_screen_apply">Apply</string>
+    <string name="settings_screen_cleared_reverted">Cleared — reverted to the measured curve</string>
+    <string name="settings_screen_reset">Reset</string>
+    <string name="settings_screen_shape_rejected">⚠ Shape rejected: onset &lt; peak &lt; end, each within physiological bounds</string>
+    <string name="settings_screen_isf_rejected">⚠ ISF rejected: outside physiological bounds</string>
+    <string name="settings_screen_curve_build_failed">⚠ Could not build a curve from these numbers</string>
+    <string name="settings_screen_unit_min">min</string>
+    <string name="settings_screen_active_phase_start_name">start of the active phase</string>
+    <string name="settings_screen_active_phase_end_name">end of the active phase</string>
+    <string name="settings_screen_divergence_line">≠ Your data says %1$s %2$.2f %3$s, you entered %4$.2f — using yours</string>
+    <string name="settings_screen_isf_measured">💉 ISF measured from closed corrections · episodes %1$d</string>
+    <string name="settings_screen_isf_prior">💉 ISF is the artifact’s prior — no closed corrections of your own yet</string>
+    <string name="settings_screen_engine_backup_note">One engine for everything: the line, What-if, the watch and the hypo alert all read the same model. The backup digital twin kicks in only when the physio artifact failed to build.</string>
+    <string name="settings_screen_model_unavailable">Personal model unavailable. Until it is restored, the backup DiaPilot model runs.</string>
+    <string name="settings_screen_manual_values_note">Old manual values are kept only for an emergency rollback and take no part in normal operation.</string>
+
+    <!-- Alerts card -->
+    <string name="settings_screen_alerts_title">Alerts</string>
+    <string name="settings_screen_hypo_forecast_label">Hypo forecast (~45 min ahead)</string>
+    <string name="settings_screen_hypo_forecast_hint">The model looks 45 minutes ahead on every minute of data. The rule’s quality is in Analysis, the “Hypo alert” card: precision, catch rate, false alarms per day.</string>
+    <string name="settings_screen_alert_sound_label">Alert sound (heard on silent)</string>
+    <string name="settings_screen_night_gentle_label">Gentle at night, then louder</string>
+    <string name="settings_screen_alert_sound_hint">The sound plays on the ALARM channel — heard even when the phone is on silent (but the alarm volume must be turned up, and DiaPilot added to “Do Not Disturb” exceptions if it is on at night). At night (0-7h) a quiet vibration comes first; after 5 min with no response, the full alarm follows.</string>
+    <string name="settings_screen_check_signal">🔔 Test the signal</string>
+    <string name="settings_screen_signal_sent">Signal sent (vibration available)</string>
+    <string name="settings_screen_vibrator_unavailable">⚠ Vibrator unavailable</string>
+    <string name="settings_screen_dextrose_snooze_label">Snooze alerts after dextrose</string>
+    <string name="settings_screen_dextrose_window_label">Dextrose absorption window</string>
+    <string name="settings_screen_low_refire_label">Repeat while low, every</string>
+    <string name="settings_screen_persist_label">Prolonged hypo → louder after</string>
+    <string name="settings_screen_hypo_alert_hint">Ate dextrose — alerts stay quiet for the absorption window; if glucose is still low once it passes, the alert returns (the treatment did not help). If a hypo lasts longer than “prolonged”, the full alarm repeats every 10 min, even in gentle night mode. An in-range meter reading silences alerts. Implausibly low readings (a sensor artifact) trigger “check your glucose”, not a full alarm.</string>
+    <string name="settings_screen_hyper_forecast_label">High forecast (~40 min ahead)</string>
+    <string name="settings_screen_hyper_forecast_hint">Experimental: a warning before crossing the upper bound — fewer spikes toward 300 starts with 40 minutes of lead time. At night the hypo alert is more sensitive (the lower edge of the band).</string>
+    <string name="settings_screen_hypo_plan_label">My hypo plan (agree it with your doctor)</string>
+    <string name="settings_screen_hypo_plan_placeholder">e.g. 10 g of juice, recheck in 15 min</string>
+    <string name="settings_screen_hypo_plan_hint">The alert reminds you of YOUR plan verbatim — the app does not calculate treatment. Empty means the alert just asks you to check your glucose.</string>
+
+    <!-- Libre 2 own receiver card -->
+    <string name="settings_screen_libre_title">Libre 2 — own receiver (experimental)</string>
+    <string name="settings_screen_own_ble_label">DiaPilot keeps its own BLE link to the sensor</string>
+    <string name="settings_screen_libre_state_info">Sensor %1$s · MAC %2$s · connection #%3$d · keys: %4$d</string>
+    <string name="settings_screen_libre_no_keys">No keys yet. Turn on the switch and scan the sensor (NFC) — the scan turns on streaming to DiaPilot.</string>
+    <string name="settings_screen_libre_warning">⚠ The sensor holds one BLE connection: turning this on takes the stream away from xDrip. To get xDrip back, rescan the sensor there. Decryption goes through OOP2.</string>
+
+    <!-- Diagnostics card -->
+    <string name="settings_screen_diagnostics_title">Diagnostics</string>
+    <string name="settings_screen_age_minutes_ago">%1$d min ago</string>
+    <string name="settings_screen_ble_line">BLE: %1$s · packet %2$s</string>
+    <string name="settings_screen_main_reading_line">Main readings: %1$s (%2$s)</string>
+    <string name="settings_screen_minute_stream_line">Minute stream: %1$s</string>
+    <string name="settings_screen_calibration_line">Minute→main calibration: ×%1$.2f %2$+.1f (n=%3$d)</string>
+    <string name="settings_screen_calibration_none">Minute→main calibration: none</string>
+    <string name="settings_screen_sensor_line">Sensor: %1$s</string>
+    <string name="settings_screen_sensor_line_with_day">Sensor: %1$s · day %2$.1f</string>
+    <string name="settings_screen_service_started_line">Service started: %1$s</string>
+    <string name="settings_screen_watch_server_running">running</string>
+    <string name="settings_screen_watch_server_off">off</string>
+    <string name="settings_screen_watch_server_status_line">Watch server: %1$s</string>
+    <string name="settings_screen_xdrip_broadcast_line">xDrip broadcast: %1$s</string>
+    <string name="settings_screen_pairs_stage4_line">Stage-4 pairs: %1$s</string>
+
+    <!-- Data card -->
+    <string name="settings_screen_data_title">Data</string>
+    <string name="settings_screen_exporting">Exporting…</string>
+    <string name="settings_screen_export_create_failed">could not create the file</string>
+    <string name="settings_screen_export_saved_downloads">Saved to Downloads: %1$s</string>
+    <string name="settings_screen_export_saved_path">Saved: %1$s</string>
+    <string name="settings_screen_export_error">Export error: %1$s</string>
+    <string name="settings_screen_export_database">💾 Export database (.sqlite)</string>
+    <string name="settings_screen_era_start_hint">Training period start: %1$s. Data before this date is kept and visible in history, but the model does not learn from it.</string>
+    <string name="settings_screen_era_date_future_error">The date cannot be in the future</string>
+    <string name="settings_screen_change_era_start">📅 Change the period start</string>
+    <string name="settings_screen_purge_before_era">🧹 Delete data before %1$s</string>
+    <plurals name="settings_screen_purge_rows_title">
+        <item quantity="one">Delete %d row?</item>
+        <item quantity="other">Delete %d rows?</item>
+    </plurals>
+    <string name="settings_screen_purge_confirm_text">Everything recorded before %1$s will be permanently deleted. These records predate the chosen training period start, and the model no longer learns from them.</string>
+    <string name="settings_screen_purge_export_first">Run “Export database” first — there will be nothing to restore from.</string>
+    <string name="settings_screen_purging">Deleting and compacting the database…</string>
+    <string name="settings_screen_purge_era_not_selected">period start not selected</string>
+    <plurals name="settings_screen_purge_result">
+        <item quantity="one">Deleted %1$d row, freed %2$d MB</item>
+        <item quantity="other">Deleted %1$d rows, freed %2$d MB</item>
+    </plurals>
+    <string name="settings_screen_purge_error">Cleanup error: %1$s</string>
+    <string name="settings_screen_delete">Delete</string>
+    <string name="settings_screen_cancel">Cancel</string>
+    <string name="settings_screen_restore_backup">♻️ Restore from a backup (.sqlite)</string>
+    <string name="settings_screen_replace_all_data_title">Replace all data?</string>
+    <string name="settings_screen_replace_all_data_text">The current database will be fully replaced by the chosen backup. The app will restart. This cannot be undone — if unsure, export the current database first.</string>
+    <string name="settings_screen_restoring">Restoring…</string>
+    <string name="settings_screen_restore_error">Restore error: %1$s</string>
+    <string name="settings_screen_replace">Replace</string>
+    <string name="settings_screen_companion_url_label">Companion server (URL)</string>
+    <string name="settings_screen_companion_token_label">Companion token</string>
+    <string name="settings_screen_companion_hint">A personal browser dashboard: glucose, trend, forecast, events — refreshed every minute; the daily database copy also goes there. The server is server/ in the repository. Empty means off.</string>
+    <string name="settings_screen_cloud_folder_choose">☁️ Cloud backup folder — choose</string>
+    <string name="settings_screen_cloud_folder_configured">☁️ Cloud backup: %1$s · change</string>
+    <string name="settings_screen_cloud_configured_fallback">configured</string>
+    <string name="settings_screen_disable_cloud_copy">Turn off the cloud backup</string>
+    <string name="settings_screen_backup_hint">A full copy of all data (glucose, insulin, meals, labels) — to the Downloads folder. Plus an automatic daily copy (7 files, one per weekday, diapilot-auto-backup-N) — and to the cloud folder if one is chosen (point it at a Google Drive folder — Drive itself does the syncing, data goes nowhere but your own cloud). Restoring is the way to move to a new phone.</string>
+
+    <!-- Watch card -->
+    <string name="settings_screen_watch_title">Watch</string>
+    <string name="settings_screen_watch_server_label">Watch face server (port 29863)</string>
+    <string name="settings_screen_watch_hint">A WatchDrip-compatible local server for Zepp OS. The change takes effect after the app restarts.</string>
+    <string name="settings_screen_watch_test_toast">Test sent to the watch (“low” flag for 3 min) — vibration within ~1-2 min</string>
+    <string name="settings_screen_watch_test_vibro">⌚ Test vibration on the watch</string>
+    <string name="settings_screen_watch_test_hint">Checks BOTH paths: the “low” flag to the watch face server (45s) and the mirrored notification (like a real alert). The watch vibrates if either the watch face’s low alarm or Zepp’s notification mirroring with vibration is on.</string>
+    <string name="settings_screen_watch_dim_title">Dim night AOD on the watch</string>
+    <string name="settings_screen_dim_mode_off">Off</string>
+    <string name="settings_screen_dim_mode_scheduled">Scheduled</string>
+    <string name="settings_screen_dim_mode_on_now">On now</string>
+    <string name="settings_screen_dim_start_label">From</string>
+    <string name="settings_screen_dim_end_label">To</string>
+    <string name="settings_screen_unit_hour">h</string>
+    <string name="settings_screen_watch_dim_hint">At night the watch face almost goes dark (dim clock + glucose, red when low), the chart and everything else hidden — AOD can stay on at night without glaring. The flag reaches the watch along with the data (~1 minute of lag).</string>
+
+    <!-- Lock screen card -->
+    <string name="settings_screen_lock_screen_title">Lock screen</string>
+    <string name="settings_screen_overlay_label">Show glucose over the lock screen</string>
+    <string name="settings_screen_overlay_permission_needed">⚠ The “Display over other apps” permission is needed.</string>
+    <string name="settings_screen_grant_permission">Grant permission</string>
+    <string name="settings_screen_overlay_hint">A floating tile with glucose and the trend arrow — like xDrip’s, visible without unlocking. On MIUI also turn on “Display pop-up windows” and showing on the lock screen in DiaPilot’s permissions.</string>
+
+    <!-- Experimental card -->
+    <string name="settings_screen_experimental_title">Experimental</string>
+    <string name="settings_screen_plausibility_label">Distrust an implausible anchor</string>
+    <string name="settings_screen_plausibility_hint">A reading below the 2.0 floor, one that surfaced from a gap, or one inside an artifact spike stops counting as a reliable anchor: the forecast loses TRUSTED status and names the reason. Plausible anchors are untouched. It feeds the hypo-alert path — turn it on while watching.</string>
+    <string name="settings_screen_night_low_label">At night, judge by the band’s lower edge</string>
+    <string name="settings_screen_night_low_hint">The night hypo alert fires on the LOWER edge of the forecast, not the center line — earlier and more often. On checked history this gave many alerts without a real night low, so it is off by default. Turn it on once a real low shows up that lets you judge it fully.</string>
+    <string name="settings_screen_marks_teach_label">Meal marks teach the model</string>
+    <string name="settings_screen_experimental_hint">Turning off any of the three changes what the model learns, and takes effect after the corpus is recomputed.</string>
+</resources>

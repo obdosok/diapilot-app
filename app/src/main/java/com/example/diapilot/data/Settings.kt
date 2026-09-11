@@ -46,9 +46,9 @@ object Settings {
      * personal insulin kernel once enough clean episodes accumulate.
      */
     enum class InsulinProfile(val label: String, val peakMin: Double, val diaMin: Double) {
-        NOVORAPID("НовоРапид", 75.0, 300.0),
-        FIASP("Фиасп", 55.0, 180.0),
-        LYUMJEV("Люмжев", 45.0, 180.0),
+        NOVORAPID("NovoRapid", 75.0, 300.0),
+        FIASP("Fiasp", 55.0, 180.0),
+        LYUMJEV("Lyumjev", 45.0, 180.0),
     }
 
     const val DEFAULT_TARGET = 5.55   // ~100 mg/dl

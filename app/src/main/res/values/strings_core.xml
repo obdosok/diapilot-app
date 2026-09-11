@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Text for values computed in :core (language-neutral there), rendered by
+     com.example.diapilot.i18n.*Text. Russian in values-ru/strings_core.xml.
+     Reserved prefixes: unit_ status_ watch_hint_ command_guard_ isf_
+     libre_status_ trend_nuance_ regime_ health_reason_ insulin_landmark_
+     insulin_ordering_ landmark_refusal_ landmark_rejection_ tail_refusal_
+     dish_question mark_kind_ suggest_trigger_ background_force_ sys_label_
+     food_portion_ language_ -->
+<resources>
+    <!-- UnitsFmt -->
+    <string name="unit_mmol_l">mmol/L</string>
+    <string name="unit_mg_dl">mg/dL</string>
+
+    <!-- StatusSummary: the header's two lines -->
+    <string name="status_age_min">%1$dm</string>
+    <string name="status_age_hm">%1$dh%2$02dm</string>
+    <string name="status_food">“%1$s” %2$s</string>
+    <string name="status_food_cob">“%1$s” %2$s · COB ~%3$s g</string>
+    <string name="status_food_eaten">“%1$s” %2$s ~%3$s g</string>
+    <string name="status_iob">IOB %1$s</string>
+    <string name="status_iob_injected">IOB %1$s · injected %2$s ago</string>
+    <string name="status_last_bolus">%1$s U · %2$s ago</string>
+    <string name="status_value" translatable="false">~%1$s</string>
+    <string name="status_value_band" translatable="false">~%1$s (%2$s–%3$s)</string>
+    <string name="status_forecast_in_an_hour">In an hour %1$s</string>
+    <string name="status_forecast_still_moving">In %1$s %2$s, still moving</string>
+    <string name="status_forecast_flat">Steady from here: %1$s</string>
+    <string name="status_forecast_settles">Levels off at %1$s in %2$s</string>
+
+    <!-- WatchHint: the watch face's hint slot (short) -->
+    <string name="watch_hint_hypo_plan">hypo? plan: %1$s</string>
+    <string name="watch_hint_hypo_check">hypo risk — check</string>
+    <string name="watch_hint_above_target">above target, to ~%1$s</string>
+
+    <!-- CommandGuard: why a parsed command is not written -->
+    <string name="command_guard_not_a_number">number not recognized (NaN/≤0)</string>
+    <string name="command_guard_glucose_missing">glucose value not recognized</string>
+    <string name="command_guard_glucose_out_of_range">glucose outside the physiological range (1–35 mmol/L)</string>
+    <string name="command_guard_dose_missing">dose not recognized</string>
+    <string name="command_guard_bolus_above_fuse">bolus %1$.1f U is above your personal safety limit (%2$.0f U)</string>
+    <string name="command_guard_unknown_purpose">unknown purpose “%1$s”</string>
+    <string name="command_guard_basal_above_fuse">basal %1$.1f U is above your personal safety limit (%2$.0f U)</string>
+    <string name="command_guard_food_empty">empty food description</string>
+    <string name="command_guard_food_too_long">food description too long</string>
+    <string name="command_guard_carbs_implausible">carbs over 300 g — looks like a recognition error</string>
+    <string name="command_guard_activity_empty">empty activity description</string>
+    <string name="command_guard_activity_too_long">activity description too long</string>
+    <string name="command_guard_unknown_action">unknown action “%1$s”</string>
+
+    <!-- IsfAnalysis -->
+    <string name="isf_tod_night">night 00–06</string>
+    <string name="isf_tod_morning">morning 06–12</string>
+    <string name="isf_tod_day">afternoon 12–18</string>
+    <string name="isf_tod_evening">evening 18–24</string>
+    <string name="isf_confidence_insufficient">not enough data</string>
+    <string name="isf_confidence_preliminary">preliminary estimate</string>
+    <string name="isf_confidence_stable">stable estimate</string>
+    <string name="isf_reject_dose_too_small">dose too small</string>
+    <string name="isf_reject_activity_in_window">activity nearby (raises sensitivity)</string>
+    <string name="isf_reject_dose_too_large">dose too large</string>
+    <string name="isf_reject_other_bolus_in_window">another bolus in the window</string>
+    <string name="isf_reject_food_in_window">food in the window (detected)</string>
+    <string name="isf_reject_no_pre_bolus_readings">no readings before the bolus</string>
+    <string name="isf_reject_start_bg_too_low">starting glucose below the threshold</string>
+    <string name="isf_reject_insufficient_cgm_coverage">too few CGM points in the window</string>
+    <string name="isf_reject_hypo_in_window">hypo in the observation window</string>
+    <string name="isf_reject_no_end_window_readings">no readings at the end of the window</string>
+    <string name="isf_reject_likely_unlogged_food">looks like unlogged food (glucose rose after the injection)</string>
+
+    <!-- LibreFram: sensor state -->
+    <string name="libre_status_not_started">not started</string>
+    <string name="libre_status_starting">warming up</string>
+    <string name="libre_status_ready">working</string>
+    <string name="libre_status_expired">expired</string>
+    <string name="libre_status_shutdown">stopped</string>
+    <string name="libre_status_failure">failed</string>
+    <string name="libre_status_unknown">unknown</string>
+
+    <!-- Momentum: trend nuance under the arrow -->
+    <string name="trend_nuance_accelerating">speeding up</string>
+    <string name="trend_nuance_decelerating">slowing down</string>
+    <string name="trend_nuance_reversed">turned around</string>
+
+    <!-- RegimeV1 -->
+    <string name="regime_night">night</string>
+    <string name="regime_activity">activity</string>
+    <string name="regime_post_meal">after a meal</string>
+    <string name="regime_post_bolus">after an injection</string>
+    <string name="regime_quiet">quiet</string>
+
+    <!-- ForecastHealthV1: why a forecast is not trusted -->
+    <string name="health_reason_stale">data is stale (%1$d min)</string>
+    <string name="health_reason_thin_evidence">only %1$.0f recent corrections in effect — the model rests on little data</string>
+    <string name="health_reason_wide_band">the uncertainty band is very wide — the model is unsure here</string>
+    <string name="health_reason_no_minute_stream">minute stream unavailable — no momentum</string>
+    <string name="health_reason_sensor_implausible">the sensor reads implausibly (%1$s) — the anchor is not trusted</string>
+    <plurals name="health_reason_floor_clamped">
+        <item quantity="one">the model hit the physiological floor of %1$.1f mmol/L at %2$d point — beyond it the forecast means nothing</item>
+        <item quantity="other">the model hit the physiological floor of %1$.1f mmol/L at %2$d points — beyond it the forecast means nothing</item>
+    </plurals>
+
+    <!-- Insulin action curve: landmarks, coercion, refusals -->
+    <string name="insulin_landmark_onset">onset</string>
+    <string name="insulin_landmark_visible_fall">visible fall</string>
+    <string name="insulin_landmark_peak">peak</string>
+    <string name="insulin_landmark_active_end">end of active phase</string>
+    <string name="insulin_landmark_slowdown">slowdown</string>
+    <string name="insulin_landmark_tail_end">end</string>
+    <string name="insulin_landmark_coerced" translatable="false">%1$s %2$.0f→%3$.0f</string>
+    <string name="insulin_ordering_conflict">%1$s %2$.0f min is not after %3$s %4$.0f min — the medians came from different injections</string>
+    <string name="landmark_refusal_window_too_short">window shorter than the onset horizon</string>
+    <string name="landmark_refusal_line_unreadable">line unreadable (too few points before/after)</string>
+    <string name="landmark_refusal_no_break">the line never breaks — compensated, or the dose did not act</string>
+    <string name="landmark_refusal_all_rejected">landmarks read, but none passed the checks</string>
+    <string name="landmark_refusal_all_rejected_because">landmarks read, but none passed the checks: %1$s</string>
+    <string name="landmark_rejection_out_of_order">%1$s out of order/bounds</string>
+    <string name="landmark_rejection_beyond_horizon">%1$s beyond the observation horizon</string>
+    <string name="landmark_rejection_onset_out_of_range">onset outside its range</string>
+    <string name="landmark_rejection_onset_dropped_for_peak">onset dropped BECAUSE OF THE PEAK (less than 10 min apart)</string>
+    <string name="tail_refusal_not_enough_doses">fewer than three clean doses</string>
+    <string name="tail_refusal_never_settles">the fall keeps growing to the end of the horizon — the tail is longer than the observations</string>
+
+    <!-- DishRecognitionV1 -->
+    <string name="dish_question">Is this your %1$s?</string>
+    <string name="dish_question_with_facts">Is this your %1$s? (%2$s)</string>
+    <plurals name="dish_question_times">
+        <item quantity="one">%d time</item>
+        <item quantity="other">%d times</item>
+    </plurals>
+    <string name="dish_question_usual_carbs">usually %1$.0f g</string>
+
+    <!-- MealMark: what the user says happened -->
+    <string name="mark_kind_grams_more">there were more grams</string>
+    <string name="mark_kind_grams_less">there were fewer grams</string>
+    <string name="mark_kind_rescue">it was hypo treatment</string>
+    <string name="mark_kind_sensor_lied">the sensor was wrong</string>
+    <string name="mark_kind_ate_more">I ate something else</string>
+    <string name="mark_kind_context">activity/stress/illness</string>
+    <string name="mark_kind_model_wrong">it\'s the model — kernel/subtraction</string>
+    <string name="mark_kind_unknown">I don\'t know</string>
+
+    <!-- FoodSuggest / FoodMemory / SysLabels / portion scaling -->
+    <string name="suggest_trigger_dose">injection</string>
+    <string name="suggest_trigger_detected_rise">glucose rise</string>
+    <string name="background_force_insulin">insulin</string>
+    <string name="background_force_food">food</string>
+    <string name="sys_label_continuation">meal continued</string>
+    <string name="sys_label_dawn">dawn phenomenon</string>
+    <string name="sys_label_sport">exercise/adrenaline</string>
+    <string name="sys_label_unknown">don\'t know</string>
+    <string name="food_portion_word">portion</string>
+
+    <!-- TokenText: labels for stored bolus purposes and note tags -->
+    <string name="bolus_purpose_correction">correction</string>
+    <string name="bolus_purpose_meal">for food</string>
+    <string name="bolus_purpose_top_up">top-up</string>
+    <string name="bolus_purpose_air">air shot</string>
+    <string name="note_tag_injection_belly">injection in the belly</string>
+    <string name="note_tag_injection_thigh">injection in the thigh</string>
+    <string name="note_tag_injection_arm">injection in the arm</string>
+    <string name="note_tag_sleep_debt">sleep debt</string>
+    <string name="note_tag_ill">ill</string>
+    <string name="note_tag_stress">stress</string>
+    <string name="note_tag_alcohol">alcohol</string>
+    <string name="note_tag_workout">workout</string>
+    <string name="note_tag_walk">walk</string>
+    <string name="note_tag_new_sensor">new sensor</string>
+    <string name="note_tag_new_cartridge">new cartridge</string>
+    <string name="note_tag_photo">photo</string>
+    <string name="note_tag_sport">sport</string>
+    <string name="note_tag_gym">gym</string>
+    <string name="note_tag_run">run</string>
+    <string name="note_tag_bike">bike</string>
+    <string name="note_tag_psyllium">psyllium</string>
+    <string name="note_tag_fiber">fiber</string>
+    <string name="note_tag_fatty">fatty food</string>
+    <string name="note_tag_vinegar">vinegar</string>
+    <string name="note_tag_protein_first">protein first</string>
+    <string name="note_tag_dextrose">dextrose</string>
+    <string name="note_tag_cartridge_warming">cartridge warming</string>
+    <string name="note_tag_minutes">%1$d min</string>
+</resources>

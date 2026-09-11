@@ -30,7 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.diapilot.R
 import com.example.diapilot.data.AskClaude
 import com.example.diapilot.data.Stores
 import kotlinx.coroutines.Dispatchers
@@ -56,19 +58,15 @@ fun AskScreen(modifier: Modifier = Modifier) {
             modifier = modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Спросить свои данные", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.ask_screen_setup_title), style = MaterialTheme.typography.titleLarge)
             Text(
-                "Задавайте вопросы своим данным обычным языком: «почему ночью был высокий сахар?», " +
-                    "«как на меня действует пиво?». Ответы строит Claude по сводке ваших данных.\n\n" +
-                    "Нужен ваш API-ключ Anthropic (console.anthropic.com → API Keys). " +
-                    "Ключ хранится только на этом устройстве. Сводка данных отправляется в API " +
-                    "только в момент вопроса.",
+                stringResource(R.string.ask_screen_intro),
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedTextField(
                 value = keyField,
                 onValueChange = { keyField = it },
-                label = { Text("sk-ant-…") },
+                label = { Text(stringResource(R.string.ask_screen_key_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -77,7 +75,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
                     AskClaude.saveApiKey(context, keyField)
                     apiKey = keyField.trim()
                 }
-            }) { Text("Сохранить") }
+            }) { Text(stringResource(R.string.ask_screen_save)) }
         }
         return
     }
@@ -98,14 +96,14 @@ fun AskScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Спросить", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.ask_screen_chat_title), style = MaterialTheme.typography.titleLarge)
             Row {
                 TextButton(
                     enabled = !busy,
                     onClick = { AskClaude.sendDigest(context, Stores.get(context)) },
-                ) { Text("📋 Дайджест") }
+                ) { Text(stringResource(R.string.ask_screen_digest_button)) }
                 if (chat.isNotEmpty()) {
-                    TextButton(onClick = { AskClaude.History.clear(context) }) { Text("Очистить") }
+                    TextButton(onClick = { AskClaude.History.clear(context) }) { Text(stringResource(R.string.ask_screen_clear)) }
                 }
             }
         }
@@ -118,8 +116,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
         ) {
             item {
                 Text(
-                    "Ответы — объяснения ваших данных, не медицинские рекомендации. " +
-                        "Дозы и настройки — только с врачом.",
+                    stringResource(R.string.ask_screen_disclaimer),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -147,7 +144,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
                 }
             }
             if (busy) {
-                item { Text("Думаю…", style = MaterialTheme.typography.bodySmall) }
+                item { Text(stringResource(R.string.ask_screen_thinking), style = MaterialTheme.typography.bodySmall) }
             }
         }
         LaunchedEffect(chat.size, busy) {
@@ -163,11 +160,11 @@ fun AskScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             listOf(
-                "Объясни мой день",
-                "Почему был скачок?",
-                "Как на меня влияет прогулка?",
-                "Что стабильно даёт поздний хвост?",
-                "Когда мне лучше колоть — раньше?",
+                stringResource(R.string.ask_screen_quick_explain_day),
+                stringResource(R.string.ask_screen_quick_why_spike),
+                stringResource(R.string.ask_screen_quick_walk_effect),
+                stringResource(R.string.ask_screen_quick_late_tail),
+                stringResource(R.string.ask_screen_quick_inject_earlier),
             ).forEach { p ->
                 androidx.compose.material3.SuggestionChip(
                     onClick = { send(p) },
@@ -186,7 +183,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Почему ночью был высокий сахар?") },
+                placeholder = { Text(stringResource(R.string.ask_screen_input_placeholder)) },
             )
             val speak = rememberSpeechInput { spoken ->
                 input = if (input.isBlank()) spoken else "$input $spoken"

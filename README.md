@@ -77,8 +77,8 @@ server/  Optional single-user companion (FastAPI): live dashboard + backup targe
 ```
 
 The boundary between core and platform has held since the first commit: all
-the mathematics is testable on the JVM without a phone (about 820 unit tests in
-`:core`, about 180 in `:app`), and it leaves room for Kotlin Multiplatform.
+the mathematics is testable on the JVM without a phone (about 830 unit tests in
+`:core`, about 210 in `:app`), and it leaves room for Kotlin Multiplatform.
 
 The UI has five tabs: Today, History, Analysis, Chat and More (settings).
 
@@ -172,8 +172,16 @@ kept as history; the Android app does not use it and never proposes a dose.
 - **Comments were translated from Russian**, and personal episodes were
   removed while translating. Quantitative statements that remain in comments
   and in `docs/` are engineering evidence from real use, kept without dates.
-- **The UI is currently in Russian.** An English UI with an in-app language
-  switch is planned. The meal parser understands Russian food vocabulary.
+- **The UI is English by default, with Russian available.** Switch between
+  System, English and Russian in Settings → Language; notifications and the
+  widget follow the choice, and Claude answers (chat, dish and component names)
+  come back in that language.
+- **The offline food-note parser reads Russian**: food words, number words,
+  the Russian abbreviations for grams, pieces and millilitres, and activity
+  durations in Russian minutes. Its English is limited to a few words ("beer",
+  "honey", "portion" in the half/double portion mark). English dish names are
+  understood when Claude estimates the meal with your API key. Note tags and
+  injection purposes are stored as Russian tokens and shown in the UI language.
 - **It is built around one user.** The defaults in `PersonalParams` were tuned
   on one person. A per-installation start date for regular meal logging
   (`FoodEra`, stored by `FoodEraSettings`) gates learning: it defaults to the

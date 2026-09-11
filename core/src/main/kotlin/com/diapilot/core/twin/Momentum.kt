@@ -31,8 +31,18 @@ import com.diapilot.core.collector.GlucosePoint
 data class TrendReadout(
     val ratePerMin: Double,   // smoothed mmol/L per min over the last 5 min
     val delta5Mmol: Double,   // s(now) − s(now−5min), median-smoothed
-    val nuance: String?,      // "accelerating" / "decelerating" / "reversed" / null (Russian, user-facing)
+    val nuance: TrendNuance?, // null = nothing the arrow does not already say
 )
+
+/** What the arrow alone cannot tell; the app renders the word (i18n.TwinText). */
+enum class TrendNuance {
+    /** Same direction, meaningfully harder than the previous window. */
+    ACCELERATING,
+    /** Same direction, meaningfully easing off. */
+    DECELERATING,
+    /** A real move flipped sign — the turn already happened. */
+    REVERSED,
+}
 
 fun trendReadout(
     minutePts: List<GlucosePoint>,
@@ -68,19 +78,19 @@ fun trendReadout(
     val d1 = v0 - v5
 
     // Nuance from two adjacent windows; DEAD_BAND keeps noise silent.
-    val nuance: String? = v10?.let { p10 ->
+    val nuance: TrendNuance? = v10?.let { p10 ->
         val d0 = v5 - p10
         when {
             // Same direction, meaningfully harder than the previous window.
             d1 * d0 > 0 && kotlin.math.abs(d1) >= kotlin.math.abs(d0) + NUANCE_BAND_MMOL &&
-                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> "ускоряется"
+                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> TrendNuance.ACCELERATING
             // Same direction, meaningfully easing off.
             d1 * d0 > 0 && kotlin.math.abs(d1) <= kotlin.math.abs(d0) - NUANCE_BAND_MMOL &&
-                kotlin.math.abs(d0) >= MIN_MOVE_MMOL -> "замедляется"
+                kotlin.math.abs(d0) >= MIN_MOVE_MMOL -> TrendNuance.DECELERATING
             // A real move flipped sign — the turn already HAPPENED (no
             // predictions here; the forecast owns the future).
             d1 * d0 < 0 && kotlin.math.abs(d0) >= MIN_MOVE_MMOL &&
-                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> "развернулся"
+                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> TrendNuance.REVERSED
             else -> null
         }
     }
@@ -129,15 +139,15 @@ fun gridTrendReadout(
     val v5 = valueAgo(5) ?: return null
     val v10 = valueAgo(10)
     val d1 = v0 - v5
-    val nuance: String? = v10?.let { p10 ->
+    val nuance: TrendNuance? = v10?.let { p10 ->
         val d0 = v5 - p10
         when {
             d1 * d0 > 0 && kotlin.math.abs(d1) >= kotlin.math.abs(d0) + NUANCE_BAND_MMOL &&
-                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> "ускоряется"
+                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> TrendNuance.ACCELERATING
             d1 * d0 > 0 && kotlin.math.abs(d1) <= kotlin.math.abs(d0) - NUANCE_BAND_MMOL &&
-                kotlin.math.abs(d0) >= MIN_MOVE_MMOL -> "замедляется"
+                kotlin.math.abs(d0) >= MIN_MOVE_MMOL -> TrendNuance.DECELERATING
             d1 * d0 < 0 && kotlin.math.abs(d0) >= MIN_MOVE_MMOL &&
-                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> "развернулся"
+                kotlin.math.abs(d1) >= MIN_MOVE_MMOL -> TrendNuance.REVERSED
             else -> null
         }
     }

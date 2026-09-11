@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">DiaPilot</string>
-    <string name="widget_description">Сахар, тренд и график на рабочем столе</string>
+    <string name="app_name" translatable="false">DiaPilot</string>
+    <string name="widget_description">Glucose, trend and chart on your home screen</string>
 </resources>

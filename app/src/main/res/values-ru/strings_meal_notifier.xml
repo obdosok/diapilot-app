@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="meal_notifier_channel_name">Разметка еды</string>
+    <string name="meal_notifier_channel_description">Вопросы «что вы ели?» по детекту приёмов пищи</string>
+    <string name="meal_notifier_title">Похоже, вы поели в %1$s</string>
+    <string name="meal_notifier_text_bolus">%1$s → %2$s %3$s · болюс %4$.1f ед — что это было?</string>
+    <string name="meal_notifier_text_no_bolus">%1$s → %2$s %3$s · без болюса — что это было?</string>
+    <string name="meal_notifier_action_other">Другое…</string>
+    <string name="meal_notifier_reply_hint">Два слова о еде…</string>
+</resources>

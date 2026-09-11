@@ -60,6 +60,7 @@ import com.diapilot.core.collector.relabelMeal
 import com.example.diapilot.collect.CollectorService
 import com.example.diapilot.collect.MealNotifier
 import com.example.diapilot.data.Stores
+import com.example.diapilot.i18n.localized
 import com.example.diapilot.ui.AnalysisScreen
 import com.example.diapilot.ui.GlucoseChart
 import com.example.diapilot.ui.theme.DiaPilotTheme
@@ -129,7 +130,7 @@ internal data class UiState(
     val deltaMmol: Double? = null,
     // Acceleration nuance from the smoothed momentum: "accelerating" /
     // "decelerating" / "turning in ~N min" — the raw arrow can't say this.
-    val trendNuance: String? = null,
+    val trendNuance: com.diapilot.core.twin.TrendNuance? = null,
     // Unlogged-meal suggestions (detected rise / meal-sized dose without a
     // note, dish predicted from the hour). Deliberately NON-intrusive: the
     // Today screen shows only a counter; accept/edit/decline live in a dialog.
@@ -539,7 +540,7 @@ internal suspend fun loadState(
     // disk snapshot before Compose asks for History. A changed source key keeps
     // stable receipts and causes only the 72-hour hot tail to be recomputed.
     (store as? com.example.diapilot.data.SqliteCollectorStore)?.let { sqlite ->
-        val key=sqlite.stage10ReceiptCacheKey(com.example.diapilot.data.Stage9EpisodeRuntime.CACHE_VERSION,now)
+        val key=com.example.diapilot.data.FoodCalculationRegistry.sourceKey(sqlite,context,now)
         com.example.diapilot.data.FoodCalculationRegistry.restore(context,key)
     }
     // Meal detection belongs to TreatmentsPollWorker. Running it from every
@@ -1306,20 +1307,29 @@ internal suspend fun loadState(
         correctionCandidate = correctionCandidate,
         meterCalLine = meterCal?.takeIf { it.isActive(now) }?.let { c ->
             val mgdlPref = com.example.diapilot.data.Units.isMgdl(context)
+            val text = context.localized()
             val parts = mutableListOf<String>()
             if (c.nChecks >= 2) {
-                parts += (if (c.slope != 1.0) "×%.2f ".format(c.slope) else "") +
-                    com.diapilot.core.analysis.fmtBgDelta(c.interceptMmol, mgdlPref) +
-                    " (по ${c.nChecks} замерам)"
+                val delta = com.diapilot.core.analysis.fmtBgDelta(c.interceptMmol, mgdlPref)
+                parts += if (c.slope != 1.0) {
+                    text.resources.getQuantityString(
+                        R.plurals.main_state_meter_cal_checks_slope, c.nChecks, c.slope, delta, c.nChecks,
+                    )
+                } else {
+                    text.resources.getQuantityString(R.plurals.main_state_meter_cal_checks, c.nChecks, delta, c.nChecks)
+                }
             }
             c.transient?.let { t ->
                 val off = t.offsetAt(now)
                 if (kotlin.math.abs(off) >= 0.1) {
-                    parts += com.diapilot.core.analysis.fmtBgDelta(off, mgdlPref) + " (тает)"
+                    parts += text.getString(
+                        R.string.main_state_meter_cal_fading,
+                        com.diapilot.core.analysis.fmtBgDelta(off, mgdlPref),
+                    )
                 }
             }
             if (parts.isEmpty()) null
-            else "🩸 Калибровка по глюкометру: " + parts.joinToString(" · ")
+            else text.getString(R.string.main_state_meter_cal_prefix, parts.joinToString(" · "))
         },
         twinKernel = liveKernel,
         counterfactualKernels=counterfactualKernels,
@@ -1378,7 +1388,7 @@ internal suspend fun loadState(
                             // dish. The comment above says "version a stored
                             // answer by the model that made it"; a tuning IS
                             // the model that made it.
-                            com.example.diapilot.data.PhysioTuning.summary(
+                            com.example.diapilot.data.PhysioTuning.identity(
                                 com.example.diapilot.data.PhysioTuning.read(context),
                             ),
                         ).joinToString("|")
@@ -1486,12 +1496,13 @@ internal suspend fun loadState(
                 it.get(java.util.Calendar.HOUR_OF_DAY) +
                     it.get(java.util.Calendar.MINUTE) / 60.0
             }
+            val text = context.localized()
             com.example.diapilot.data.PhysioRuntime.artifact(store, now)
                 ?.personModelAt(hour, emptySet())
-                ?.let { it.insulin.isf to "physio, час ${hour.toInt()}" }
+                ?.let { it.insulin.isf to text.getString(R.string.main_state_isf_source_hour, hour.toInt()) }
                 ?.let { (isf, src) ->
                 val tuned = com.example.diapilot.data.ManualInsulinRuntime.params(context).isfMmolPerU
-                if (tuned != null) tuned to "$src · твоя настройка" else isf to src
+                if (tuned != null) tuned to text.getString(R.string.main_state_isf_source_manual, src) else isf to src
             }
         },
         statusLines = timed("statusLines") {
@@ -1519,13 +1530,13 @@ internal suspend fun loadState(
             val future = prediction.filter { it.tsMs > now }
             val settleIdx = com.diapilot.core.analysis.settleIndex(future.map { it.mmol })
             val predPt = settleIdx?.let { future[it] }
-            com.diapilot.core.analysis.statusSummary(
+            com.example.diapilot.i18n.StatusText.lines(context, com.diapilot.core.analysis.statusSummary(
                 com.diapilot.core.analysis.StatusInput(
                     iobUnits = localIob,
                     lastBolusUnits = lastBolus?.units,
                     lastBolusAgeMin = lastBolus?.let { (now - it.tsMs) / 60_000 },
                     foodLabel = foodNote?.content
-                        ?: foodMeal?.let { labelByOnset4h[it.onsetMs] ?: "еда" },
+                        ?: foodMeal?.let { labelByOnset4h[it.onsetMs] ?: context.localized().getString(R.string.main_state_generic_food_label) },
                     foodAgeMin = foodTs?.let { (now - it) / 60_000 },
                     foodCarbs = foodNote?.estCarbs,
                     // What is LEFT of everything eaten, from the same absorption
@@ -1545,7 +1556,7 @@ internal suspend fun loadState(
                     predSettled = settleIdx != null && settleIdx < future.size - 1,
                     mgdl = com.example.diapilot.data.Units.isMgdl(context),
                 ),
-            )
+            ))
         },
         forecastHealth = forecastResult?.health,
         // Autosens sentence — a secondary "model detail" (collapsed in the UI).
@@ -1557,11 +1568,10 @@ internal suspend fun loadState(
         // announce a sensitivity it had never used. Same reason the ISF line below
         // exists at all. Bonus: one fewer 14-hour recompute per state build.
         sensitivityLine = forecastResult?.appliedIsf?.autosensFactor?.let { r ->
+            val text = context.localized()
             when {
-                r >= 1.25 ->
-                    "⚡ Инсулин в последние часы действует сильнее обычного (×%.1f) — чувствительность могла измениться".format(r)
-                r <= 0.8 ->
-                    "⚡ Инсулин в последние часы действует слабее обычного (×%.1f)".format(r)
+                r >= 1.25 -> text.getString(R.string.main_state_sensitivity_stronger, r)
+                r <= 0.8 -> text.getString(R.string.main_state_sensitivity_weaker, r)
                 else -> null
             }
         },
@@ -1570,19 +1580,23 @@ internal suspend fun loadState(
         // and it never suggests a dose.
         appliedIsfLine = forecastResult?.appliedIsf?.let { isf ->
             val mgdl = com.example.diapilot.data.Units.isMgdl(context)
+            val text = context.localized()
             fun isfText(v: Double) =
-                if (mgdl) "%.0f мг/дл/ед".format(v * 18.0) else "%.1f ммоль/ед".format(v)
+                if (mgdl) text.getString(R.string.main_state_isf_unit_mgdl, v * 18.0)
+                else text.getString(R.string.main_state_isf_unit_mmol, v)
             val factors = buildList {
                 if (kotlin.math.abs(isf.todFactor - 1.0) >= 0.02) {
-                    add("время суток ×%.2f".format(isf.todFactor))
+                    add(text.getString(R.string.main_state_isf_factor_tod, isf.todFactor))
                 }
                 if (kotlin.math.abs(isf.autosensFactor - 1.0) >= 0.02) {
-                    add("автосенс ×%.2f".format(isf.autosensFactor))
+                    add(text.getString(R.string.main_state_isf_factor_autosens, isf.autosensFactor))
                 }
             }
-            "Прогноз считал по ${isfText(isf.effectiveMmolPerU)}" +
-                if (factors.isEmpty()) " (база, без поправок)"
-                else " = база ${isfText(isf.baseMmolPerU)} × " + factors.joinToString(" × ")
+            if (factors.isEmpty()) text.getString(R.string.main_state_applied_isf_plain, isfText(isf.effectiveMmolPerU))
+            else text.getString(
+                R.string.main_state_applied_isf_factors,
+                isfText(isf.effectiveMmolPerU), isfText(isf.baseMmolPerU), factors.joinToString(" × "),
+            )
         },
     )
     android.util.Log.i(

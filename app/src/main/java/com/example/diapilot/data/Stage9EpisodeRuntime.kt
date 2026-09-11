@@ -1,5 +1,9 @@
 package com.example.diapilot.data
 
+import android.content.Context
+import com.example.diapilot.R
+import com.example.diapilot.i18n.isRussianUi
+import com.example.diapilot.i18n.localized
 import com.diapilot.core.analysis.IsfEpisode
 import com.diapilot.core.analysis.isFoodNote
 import com.diapilot.core.collector.Annotation
@@ -70,7 +74,8 @@ object Stage9EpisodeRuntime {
         notes:List<Annotation>, readings:List<GlucosePoint>, boluses:List<BolusPoint>,
         episodes:List<IsfEpisode>, foodEraStartMs:Long?, nowMs:Long, budgetMs:Long=2_000L,
         carbEvidenceAsOf:(Long,Long)->CarbEvidenceV1?={_,_->null},
-    ):Map<Long,EpisodeAttributionExplanationV1> = buildDetailed(notes,readings,boluses,episodes,foodEraStartMs,nowMs,budgetMs,carbEvidenceAsOf).receipts
+        context:Context,
+    ):Map<Long,EpisodeAttributionExplanationV1> = buildDetailed(notes,readings,boluses,episodes,foodEraStartMs,nowMs,budgetMs,carbEvidenceAsOf,context=context).receipts
 
     fun buildDetailed(
         notes:List<Annotation>, readings:List<GlucosePoint>, boluses:List<BolusPoint>,
@@ -79,8 +84,15 @@ object Stage9EpisodeRuntime {
         lookbackMs:Long=30*DAY,
         personModelForBolus:((BolusPoint)->com.diapilot.core.hybrid.HybridPersonModel?)?=null,
         clusterOffset:Int=0,
+        /** Receipts are display text, built in the app language; FoodCalculationRegistry
+         *  keeps that language with its cache and rebuilds after a switch. */
+        context:Context,
     ):BuildResult {
         val started=android.os.SystemClock.elapsedRealtime()
+        val text=context.localized()
+        val ru=text.isRussianUi()
+        fun s(id:Int,vararg args:Any):String=text.getString(id,*args)
+        fun min(v:String)=s(R.string.stage9_episode_minutes,v)
         val causal=episodes.filter{foodEraStartMs!=null&&it.t0Ms>=foodEraStartMs&&!it.activityContaminated}
             .mapIndexed{i,e->IdentifiedIsfEvidenceV1(e.t0Ms,e.t0Ms+4*3_600_000L,e.isf.coerceAtLeast(.1),if(e.postActivityTail).25 else 1.0,i+1,"food-era correction candidate")}
         // Current Twin kernel is deliberately absent. Every historical bolus
@@ -129,8 +141,8 @@ object Stage9EpisodeRuntime {
                 appearance=com.diapilot.core.hybrid.CarbAppearancePolicyV1.PHYSIO_SHIPPED,
             )?:continue
             receipt.allocations.forEachIndexed{i,a->
-                val neighbours=receipt.allocations.filterIndexed{j,_->j!=i}.joinToString{n->"${(n.startMs-a.startMs)/60_000} мин"}.ifBlank{"нет"}
-                val kernelHash=receipt.insulinKernelHashes.values.firstOrNull()?.take(10)?:"без bolus"
+                val neighbours=receipt.allocations.filterIndexed{j,_->j!=i}.joinToString{n->min(((n.startMs-a.startMs)/60_000).toString())}.ifBlank{s(R.string.stage9_episode_none)}
+                val kernelHash=receipt.insulinKernelHashes.values.firstOrNull()?.take(10)?:s(R.string.stage9_episode_no_bolus)
                 // TRIMMED TO COVERAGE. The solver zeroes a meal's basis beyond
                 // its continuous CGM coverage, so the raw curve ended in a run
                 // of zeros and "0.0 mmol/L by the end of the window" — the censoring
@@ -143,52 +155,69 @@ object Stage9EpisodeRuntime {
                 val peak=covered.maxByOrNull{it.median}
                 val modelPeakMin=peak?.let{(it.tsMs-a.startMs)/60_000.0}
                 val censoredTail=a.contributionCurve.size>covered.size
-                val curveText="Кривая вклада ${spark(covered.map{it.median})}"+
-                    (if(censoredTail)" (покрытие до ~${fmt(a.coverageMin)} мин, дальше окно обрезано)" else "")+
-                    ": самый ранний вклад по модельной кривой с учётом lag после ${fmt((a.causalOnsetMs-a.startMs)/60_000.0)} мин; " +
-                    "модельный пик ${modelPeakMin?.let{fmt(it)+" мин"}?:"—"}, ${peak?.let{fmt(it.median)}?:"—"} ммоль/л; " +
-                    "на последней покрытой точке ${covered.lastOrNull()?.let{fmt(it.median)}?:"—"}. " +
-                    "До следующего приёма ${pct(a.fractionBeforeNext.median)}, после него ${pct(a.fractionAfterNext.median)}."
+                val curveArgs=arrayOf<Any>(
+                    spark(covered.map{it.median}),fmt((a.causalOnsetMs-a.startMs)/60_000.0),
+                    modelPeakMin?.let{min(fmt(it))}?:"—",peak?.let{fmt(it.median)}?:"—",
+                    covered.lastOrNull()?.let{fmt(it.median)}?:"—",
+                    pct(a.fractionBeforeNext.median),pct(a.fractionAfterNext.median),
+                )
+                val curveText=if(censoredTail)s(R.string.stage9_episode_curve_censored,*curveArgs,fmt(a.coverageMin))
+                    else s(R.string.stage9_episode_curve,*curveArgs)
                 val transferText=receipt.tailTransferAudit?.let{audit->
+                    val share=audit.previousMealsShareOfRecognizedFoodLate
+                    val transferArgs=arrayOf<Any>(
+                        fmt(audit.earlyDeficitMmol),fmt(audit.lastSurplusMmol),
+                        pct(share.p10),pct(share.p90),pct(audit.unassignedLateShare.median),
+                    )
                     when {
-                        audit.detected&&audit.resolution==AttributionResolutionV1.RESOLVED -> "У ранних приёмов дефицит ${fmt(audit.earlyDeficitMmol)}, у последнего избыток ${fmt(audit.lastSurplusMmol)} ммоль/л; вероятен перенос хвоста. После совместного перерасчёта ${pct(audit.previousMealsShareOfRecognizedFoodLate.p10)}–${pct(audit.previousMealsShareOfRecognizedFoodLate.p90)} распознанного пищевого вклада относится к предыдущим блюдам; нераспределённый остаток ${pct(audit.unassignedLateShare.median)}."
-                        audit.detected -> "У ранних приёмов дефицит ${fmt(audit.earlyDeficitMmol)}, у последнего избыток ${fmt(audit.lastSurplusMmol)} ммоль/л; возможен перенос хвоста, но надёжно разделить нельзя. Допустимая доля предыдущих блюд в распознанном пищевом вкладе ${pct(audit.previousMealsShareOfRecognizedFoodLate.p10)}–${pct(audit.previousMealsShareOfRecognizedFoodLate.p90)}; нераспределённый остаток ${pct(audit.unassignedLateShare.median)}."
-                        audit.resolution!=AttributionResolutionV1.RESOLVED -> "Перекрытие есть; надёжно разделить вклад блюд нельзя. Общий остаток оставлен нераспределённым."
-                        else -> "Согласованный перенос хвоста не установлен."
+                        audit.detected&&audit.resolution==AttributionResolutionV1.RESOLVED -> s(R.string.stage9_episode_transfer_resolved,*transferArgs)
+                        audit.detected -> s(R.string.stage9_episode_transfer_possible,*transferArgs)
+                        audit.resolution!=AttributionResolutionV1.RESOLVED -> s(R.string.stage9_episode_transfer_overlap)
+                        else -> s(R.string.stage9_episode_transfer_none)
                     }
                 }.orEmpty()
                 val portions=a.perNoteOnsetsMs.mapNotNull{ts->causalCluster.firstOrNull{abs(it.tsMs-ts)<1}}
-                    .joinToString("; "){p->"${fmt(p.estCarbs?:0.0)} г в ${java.text.SimpleDateFormat("HH:mm",Locale.getDefault()).format(java.util.Date(p.tsMs))}"}
+                    .joinToString("; "){p->s(R.string.stage9_episode_portion,fmt(p.estCarbs?:0.0),java.text.SimpleDateFormat("HH:mm",Locale.getDefault()).format(java.util.Date(p.tsMs)))}
+                // The CS is printed from the receipt that USED it, never as a literal:
+                // a hardcoded «0,248» would keep printing after the learner moves.
+                val cs=String.format(Locale.US,"%.3f",receipt.globalCs.median).let{if(ru)it.replace('.',',') else it}
                 val explanation=EpisodeAttributionExplanationV1(
                     receipt.version,
-                    // The CS is printed from the receipt that USED it, never as a literal:
-                    // a hardcoded «0,248» would keep printing after the learner moves.
-                    "${fmt(a.modelForecastMmol)} ммоль/л: ${fmt(a.recordedCarbsG)} г × общий CS ${"%.3f".format(receipt.globalCs.median).replace('.',',')}",
+                    s(R.string.stage9_episode_forecast,fmt(a.modelForecastMmol),fmt(a.recordedCarbsG),cs),
                     // The printed "allowed L-H" range reads as a free measurement; it is not — the
                     // per-meal amplitude is clamped to the prior (x1.35, or x1.60
                     // at weak provenance) and the group mass is bounded too. The
                     // clamp is now stated where the number is shown.
                     if(a.status==AttributionResolutionV1.RESOLVED)
-                        "Этому приёму совместная модель отнесла ${fmt(a.bestAllocationMmol)} ммоль/л; допустимо ${fmt(a.allocationLowMmol)}–${fmt(a.allocationHighMmol)} (оценка удержана в границах приора)"
-                    else "Приёмы перекрываются: отдельный подъём этого блюда не установлен. Диапазон ${fmt(a.allocationLowMmol)}–${fmt(a.allocationHighMmol)} ммоль/л (в границах приора); точка ${fmt(a.bestAllocationMmol)} — техническая медиана, не факт.",
-                    phaseSummary(a,receipt.clusterTiming),
-                    "Соседние приёмы: $neighbours. Неучтённая еда/остаток кластера: ${fmt(receipt.unloggedFoodResidualMmol.median)} ммоль/л",
-                    "Лучшая доля ${pct(a.shareMedian)}, возможный диапазон ${pct(a.shareLow)}–${pct(a.shareHigh)}",
-                    when(a.status){AttributionResolutionV1.RESOLVED->"разделение устойчиво";AttributionResolutionV1.UNRESOLVED->"неразрешимо: надёжно разделить соседние приёмы нельзя";AttributionResolutionV1.CENSORED->"окно этого приёма обрезано (${fmt(a.coverageMin)} мин); показан диапазон"},
-                    if(personModelForBolus!=null) "$EPISODE_KERNEL_VERSION_V1; единая CDF выбранного PHYSIO-профиля; hash $kernelHash"
+                        s(R.string.stage9_episode_allocated_resolved,fmt(a.bestAllocationMmol),fmt(a.allocationLowMmol),fmt(a.allocationHighMmol))
+                    else s(R.string.stage9_episode_allocated_overlap,fmt(a.allocationLowMmol),fmt(a.allocationHighMmol),fmt(a.bestAllocationMmol)),
+                    phaseSummary(text,a,receipt.clusterTiming),
+                    s(R.string.stage9_episode_overlap,neighbours,fmt(receipt.unloggedFoodResidualMmol.median)),
+                    s(R.string.stage9_episode_allocation,pct(a.shareMedian),pct(a.shareLow),pct(a.shareHigh)),
+                    when(a.status){
+                        AttributionResolutionV1.RESOLVED->s(R.string.stage9_episode_resolution_resolved)
+                        AttributionResolutionV1.UNRESOLVED->s(R.string.stage9_episode_resolution_unresolved)
+                        AttributionResolutionV1.CENSORED->s(R.string.stage9_episode_resolution_censored,fmt(a.coverageMin))
+                    },
+                    if(personModelForBolus!=null) s(R.string.stage9_episode_kernel_physio,EPISODE_KERNEL_VERSION_V1,kernelHash)
                     else "$EPISODE_KERNEL_VERSION_V1; causal prior ${EpisodeKernelPriorsV1.PHYSIOLOGICAL_V1.identity}; hash $kernelHash",
-                    if(personModelForBolus!=null) "Условное удаление укола на графике и эта деконволюция используют один ретроспективный CGM-профиль. ISF остаётся персональным для часа болюса; live-прогноз и гипо-алерты этим профилем не изменяются."
-                    else "Медиану меняет только инерционное дневное ISF по прошлым эпизодам. TOD/гипо и другие контексты пока не promoted и лишь расширяют интервал.",
-                    confidence(a.confidence),
-                    (a.caveats.map(::caveatRu)+listOfNotNull("углеводы ${fmt(a.gramsLow)}–${fmt(a.gramsHigh)} г (${a.gramsProvenance})",if(portions.isNotBlank())"порции: $portions" else null,"датчик и фон остаются неопределёнными",if(receipt.inputTruncated)"кластер ограничен вычислительным лимитом" else null)).joinToString("; "),
-                    causalProvenance="Causal: frozen prior + CarbEvidence/ISF с knownAt ≤ cutoff; текущий Twin kernel и неревизионируемый текст блюда не используются.",
-                    diagnosticProvenance="Retrospective post-hoc: CGM после еды, fitted background, residual и allocation; в live forecast/alerts не входят.",
+                    if(personModelForBolus!=null) s(R.string.stage9_episode_kernel_difference_physio)
+                    else s(R.string.stage9_episode_kernel_difference_prior),
+                    confidence(text,a.confidence),
+                    (a.caveats.map{caveat(text,it)}+listOfNotNull(
+                        s(R.string.stage9_episode_caveat_carbs,fmt(a.gramsLow),fmt(a.gramsHigh),a.gramsProvenance),
+                        if(portions.isNotBlank())s(R.string.stage9_episode_caveat_portions,portions) else null,
+                        s(R.string.stage9_episode_caveat_sensor),
+                        if(receipt.inputTruncated)s(R.string.stage9_episode_caveat_truncated) else null,
+                    )).joinToString("; "),
+                    causalProvenance=s(R.string.stage9_episode_causal_provenance),
+                    diagnosticProvenance=s(R.string.stage9_episode_diagnostic_provenance),
                     timeResolvedCurve=curveText,
                     tailTransfer=transferText,
-                    compactSummary="Ожидалось +${fmt(a.modelForecastMmol)}; по эпизоду +${fmt(a.bestAllocationMmol)} (${fmt(a.allocationLowMmol)}–${fmt(a.allocationHighMmol)}) ммоль/л",
+                    compactSummary=s(R.string.stage9_episode_compact_summary,fmt(a.modelForecastMmol),fmt(a.bestAllocationMmol),fmt(a.allocationLowMmol),fmt(a.allocationHighMmol)),
                     unloggedResidualMmol=receipt.unloggedFoodResidualMmol.median,
                     compactFinding=when(a.timingScope){
-                        com.diapilot.core.hybrid.MealTimingScopeV1.COMPLETED_BEFORE_CLUSTER -> "Ранний вклад завершился до следующей еды и зафиксирован отдельно; в общую сумму углеводов он включён."
+                        com.diapilot.core.hybrid.MealTimingScopeV1.COMPLETED_BEFORE_CLUSTER -> s(R.string.stage9_episode_finding_completed)
                         // A window-bound triplet on the user's card was the
                         // WINDOW BOUND printed as a measurement: mainEndMin is
                         // the last supported grid bin, and when the series is
@@ -197,16 +226,15 @@ object Stage9EpisodeRuntime {
                         // an "end at 120 min" figure in the insulin doc — a bound must say
                         // it is a bound.
                         com.diapilot.core.hybrid.MealTimingScopeV1.CLUSTER_ONLY -> receipt.clusterTiming?.let{ct->
-                            val bounded=ct.mainEndMin>=355.0
-                            "Общий тайминг серии: старт ~${fmt(ct.onsetMin)} мин"+
-                                (if(bounded)"; серия ещё активна на границе окна (6 ч), пик и конец не установлены."
-                                else "; пик ~${fmt(ct.levelPeakMin)}, основная фаза до ~${fmt(ct.mainEndMin)} мин.")
-                        } ?:"Блюда серии не разделились; амплитуда считается по сумме углеводов."
+                            if(ct.mainEndMin>=355.0) s(R.string.stage9_episode_finding_series_bounded,fmt(ct.onsetMin))
+                            else s(R.string.stage9_episode_finding_series,fmt(ct.onsetMin),fmt(ct.levelPeakMin),fmt(ct.mainEndMin))
+                        } ?:s(R.string.stage9_episode_finding_series_unsplit)
                         else->when(a.status){
-                        AttributionResolutionV1.RESOLVED -> if(receipt.tailTransferAudit?.detected==true) "Обнаружен вероятный перенос хвоста между соседними блюдами." else "Вклад блюда удалось отделить от соседних событий."
-                        AttributionResolutionV1.UNRESOLVED -> "Приёмы перекрываются: отдельно оценить это блюдо пока нельзя."
-                        AttributionResolutionV1.CENSORED -> "Не хватает последующей истории CGM для полной оценки."
+                        AttributionResolutionV1.RESOLVED -> if(receipt.tailTransferAudit?.detected==true) s(R.string.stage9_episode_finding_transfer) else s(R.string.stage9_episode_finding_resolved)
+                        AttributionResolutionV1.UNRESOLVED -> s(R.string.stage9_episode_finding_unresolved)
+                        AttributionResolutionV1.CENSORED -> s(R.string.stage9_episode_finding_censored)
                     }},
+                    unresolved=a.status==AttributionResolutionV1.UNRESOLVED,
                 )
                 // One session receipt belongs to its first portion. Per-portion
                 // onsets/grams are listed inside it; copying the whole allocation
@@ -220,7 +248,11 @@ object Stage9EpisodeRuntime {
     }
     private fun fmt(v:Double)=String.format(Locale.US,"%.1f",v)
     private fun pct(v:Double)=String.format(Locale.US,"%.0f%%",100*v.coerceIn(0.0,1.0))
-    private fun confidence(v:Double)=when{v>=.7->"высокая";v>=.4->"средняя";else->"низкая"}
+    private fun confidence(text:Context,v:Double)=text.getString(when{
+        v>=.7->R.string.stage9_episode_confidence_high
+        v>=.4->R.string.stage9_episode_confidence_medium
+        else->R.string.stage9_episode_confidence_low
+    })
     private fun spark(values:List<Double>):String {
         if(values.isEmpty())return "—"
         val blocks="▁▂▃▄▅▆▇█";val max=values.maxOrNull()?.coerceAtLeast(1e-9)?:return "—"
@@ -228,22 +260,46 @@ object Stage9EpisodeRuntime {
         return (0 until minOf(8,values.size)).map{i->values[(i*step).toInt().coerceAtMost(values.lastIndex)]}
             .joinToString(""){blocks[((it/max)*(blocks.lastIndex)).toInt().coerceIn(0,blocks.lastIndex)].toString()}
     }
-    private fun phaseName(p:ObservedPhaseV1)=when(p){ObservedPhaseV1.START->"старт";ObservedPhaseV1.LEVEL_MAXIMUM->"максимум уровня";ObservedPhaseV1.LATE_PHASE->"поздняя фаза";ObservedPhaseV1.PLATEAU->"плато"}
-    private fun phaseSummary(a:MealAllocationV1,cluster:ClusterTimingV1?):String {
+    private fun phaseName(text:Context,p:ObservedPhaseV1)=text.getString(when(p){
+        ObservedPhaseV1.START->R.string.stage9_episode_phase_start
+        ObservedPhaseV1.LEVEL_MAXIMUM->R.string.stage9_episode_phase_level_max
+        ObservedPhaseV1.LATE_PHASE->R.string.stage9_episode_phase_late
+        ObservedPhaseV1.PLATEAU->R.string.stage9_episode_phase_plateau
+    })
+    private fun phaseSummary(text:Context,a:MealAllocationV1,cluster:ClusterTimingV1?):String {
         if(a.timingScope==com.diapilot.core.hybrid.MealTimingScopeV1.CLUSTER_ONLY)
-            return "Индивидуальные фазы не устанавливаются. "+(cluster?.let{
+            return cluster?.let{
                 // The same window-bound trap as compactFinding: when the series
                 // is still active at the 6-hour horizon, mainEndMin (and often
                 // the fitted peak) IS the horizon, not a measurement.
                 if(it.mainEndMin>=355.0)
-                    "Общий тайминг серии (~${fmt(a.clusterCarbsG)} г): старт ~${fmt(it.onsetMin)} мин; серия ещё активна на границе окна (6 ч), максимум и конец не установлены."
-                else "Общий тайминг серии (~${fmt(a.clusterCarbsG)} г): старт ~${fmt(it.onsetMin)}, максимум уровня ~${fmt(it.levelPeakMin)}, основная фаза до ~${fmt(it.mainEndMin)} мин."
-            }?:"Общий тайминг кластера пока тоже не выделен.")
+                    text.getString(R.string.stage9_episode_phases_cluster_bounded,fmt(a.clusterCarbsG),fmt(it.onsetMin))
+                else text.getString(R.string.stage9_episode_phases_cluster,fmt(a.clusterCarbsG),fmt(it.onsetMin),fmt(it.levelPeakMin),fmt(it.mainEndMin))
+            }?:text.getString(R.string.stage9_episode_phases_cluster_none)
         if(a.timingScope==com.diapilot.core.hybrid.MealTimingScopeV1.COMPLETED_BEFORE_CLUSTER)
-            return "Не менее 90% раннего вклада завершилось до следующего приёма; его фаза зафиксирована отдельно и не растянута БЖУ последующей еды."
-        val seen=a.observedPhases.joinToString(transform=::phaseName)
-        val missing=(a.phaseWindowsAvailable-a.observedPhases).joinToString(transform=::phaseName)
-        return buildString{if(seen.isNotBlank())append("Установлено: $seen. ");if(missing.isNotBlank())append("Окно доступно, но не установлено: $missing.");if(seen.isBlank()&&missing.isBlank())append("Данных для установления фазы пока недостаточно.")}
+            return text.getString(R.string.stage9_episode_phases_completed)
+        val seen=a.observedPhases.joinToString{phaseName(text,it)}
+        val missing=(a.phaseWindowsAvailable-a.observedPhases).joinToString{phaseName(text,it)}
+        if(seen.isBlank()&&missing.isBlank())return text.getString(R.string.stage9_episode_phases_no_data)
+        return listOfNotNull(
+            seen.takeIf{it.isNotBlank()}?.let{text.getString(R.string.stage9_episode_phases_seen,it)},
+            missing.takeIf{it.isNotBlank()}?.let{text.getString(R.string.stage9_episode_phases_missing,it)},
+        ).joinToString(" ")
     }
-    private fun caveatRu(s:String)=when(s){"overlap not identifiable"->"перекрытие неидентифицируемо";"individual timing replaced by aggregate meal-cluster timing"->"индивидуальный тайминг заменён общим таймингом пищевого кластера";"at least 90% completed before next intake; early contribution locked"->"не менее 90% раннего вклада завершилось до следующей еды и зафиксировано";"joint model mismatch; episode excluded from confident food learning"->"совместная модель не объяснила эпизод: он исключён из уверенного обучения еды";"meal-specific late window censored"->"позднее окно этого приёма обрезано";"meal-specific CGM window censored at gap or low density"->"окно CGM этого приёма обрезано разрывом или редкими точками";"input truncated; allocation unresolved"->"вход обрезан; разделение не установлено";"insulin uncertainty propagated"->"неопределённость инсулина учтена в интервале";"shared process residual retained"->"общий необъяснённый остаток сохранён";"phase window available but phase not established"->"окно фазы доступно, но фаза не установлена";"grams provenance is weak"->"слабое происхождение оценки углеводов";"unknown context widens insulin interval"->"неизвестный контекст расширяет интервал insulin";else->s}
+    /** Core's caveats are English identifiers; unknown ones are shown as they are. */
+    private val CAVEATS=mapOf(
+        "overlap not identifiable" to R.string.stage9_episode_caveat_overlap,
+        "individual timing replaced by aggregate meal-cluster timing" to R.string.stage9_episode_caveat_cluster_timing,
+        "at least 90% completed before next intake; early contribution locked" to R.string.stage9_episode_caveat_locked,
+        "joint model mismatch; episode excluded from confident food learning" to R.string.stage9_episode_caveat_mismatch,
+        "meal-specific late window censored" to R.string.stage9_episode_caveat_late_censored,
+        "meal-specific CGM window censored at gap or low density" to R.string.stage9_episode_caveat_cgm_censored,
+        "input truncated; allocation unresolved" to R.string.stage9_episode_caveat_input_truncated,
+        "insulin uncertainty propagated" to R.string.stage9_episode_caveat_insulin,
+        "shared process residual retained" to R.string.stage9_episode_caveat_residual,
+        "phase window available but phase not established" to R.string.stage9_episode_caveat_phase,
+        "grams provenance is weak" to R.string.stage9_episode_caveat_weak_grams,
+        "unknown context widens insulin interval" to R.string.stage9_episode_caveat_unknown_context,
+    )
+    private fun caveat(text:Context,s:String)=CAVEATS[s]?.let(text::getString)?:s
 }

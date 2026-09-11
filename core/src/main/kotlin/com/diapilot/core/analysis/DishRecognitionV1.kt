@@ -202,13 +202,15 @@ object DishRecognitionV1 {
         return nt.all { n -> tt.any { t -> sameWord(n, t) } }
     }
 
-    /** The confirmation move's wording: what is asked, with the two facts that
-     *  make the answer informed — how often the user ate it, and the usual grams. */
-    fun question(c: Candidate): String {
-        val facts = buildList {
-            if (c.dish.intakes > 0) add("${c.dish.intakes} раз")
-            c.dish.typicalCarbsG?.let { add("обычно %.0f г".format(it)) }
-        }.joinToString(", ")
-        return "Это ваш ${c.dish.proposed.title}?" + if (facts.isNotEmpty()) " ($facts)" else ""
-    }
+    /** The confirmation move: what is asked, with the two facts that make the
+     *  answer informed — how often the user ate it, and the usual grams. The
+     *  app words it ("Is this your smoothie? (28 times, usually 22 g)"). */
+    fun question(c: Candidate): DishQuestion = DishQuestion(
+        title = c.dish.proposed.title,
+        intakes = c.dish.intakes.takeIf { it > 0 },
+        typicalCarbsG = c.dish.typicalCarbsG,
+    )
+
+    /** [intakes] null when the dish was never eaten; [typicalCarbsG] null when unknown. */
+    data class DishQuestion(val title: String, val intakes: Int?, val typicalCarbsG: Double?)
 }

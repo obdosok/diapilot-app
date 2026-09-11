@@ -8,6 +8,8 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.diapilot.MainActivity
+import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 
 /**
  * "The stream stopped — bring the phone to the sensor." Today's incident: a
@@ -63,8 +65,9 @@ object StreamStallNotifier {
     private const val PREF_LAST = "stream_stall_last_ms"
     const val STALL_MIN = 25L
 
-    /** Fire (cooldown-guarded) unless data is actually fresh. */
-    fun maybeNotify(context: Context, reason: String) {
+    /** Fire (cooldown-guarded) unless data is actually fresh. [reason] is one
+     *  of the `stream_stall_notifier_reason_*` strings. */
+    fun maybeNotify(context: Context, @androidx.annotation.StringRes reason: Int) {
         try {
             val store = com.example.diapilot.data.Stores.get(context)
             val now = System.currentTimeMillis()
@@ -80,13 +83,14 @@ object StreamStallNotifier {
             prefs.edit().putLong(PREF_LAST, now).apply()
 
             val ageMin = if (freshest > 0) (now - freshest) / 60_000 else -1
+            val text = context.localized()
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
                 NotificationChannel(
-                    CHANNEL, "Поток данных остановился",
+                    CHANNEL, text.getString(R.string.stream_stall_notifier_channel_name),
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
-                    description = "Сенсор перестал отдавать данные — нужен NFC-скан"
+                    description = text.getString(R.string.stream_stall_notifier_channel_description)
                     // Blindness here isn't cosmetic: while the stream is down, the
                     // hypo alert cannot fire at all. This is the only signal
                     // that can still reach the user at that moment.
@@ -97,12 +101,14 @@ object StreamStallNotifier {
                 NOTIF_ID,
                 NotificationCompat.Builder(context, CHANNEL)
                     .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
-                    .setContentTitle("📡 Нет данных с сенсора" +
-                        (if (ageMin > 0) " уже $ageMin мин" else ""))
-                    .setContentText(
-                        "$reason. Приложи телефон к сенсору (NFC) — скан восстановит " +
-                            "связь и добьёт пропуск из памяти сенсора.",
+                    .setContentTitle(
+                        if (ageMin > 0) {
+                            text.getString(R.string.stream_stall_notifier_title_with_age, ageMin)
+                        } else {
+                            text.getString(R.string.stream_stall_notifier_title_no_age)
+                        },
                     )
+                    .setContentText(text.getString(R.string.stream_stall_notifier_body, text.getString(reason)))
                     .setStyle(NotificationCompat.BigTextStyle())
                     .setContentIntent(
                         PendingIntent.getActivity(
@@ -113,7 +119,7 @@ object StreamStallNotifier {
                     .setAutoCancel(true)
                     .build(),
             )
-            Log.i(TAG, "stall notified: $reason (age=$ageMin min)")
+            Log.i(TAG, "stall notified: ${context.resources.getResourceEntryName(reason)} (age=$ageMin min)")
         } catch (e: Exception) {
             Log.w(TAG, "notify failed: ${e.message}")
         }

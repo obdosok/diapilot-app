@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainActivity.kt: Libre NFC scan toasts -->
+    <string name="main_activity_libre_scan_failed">Libre: scan failed — hold the phone against the sensor</string>
+    <string name="main_activity_libre_oop2_no_response">Libre %1$s: OOP2 did not respond — decoding unavailable</string>
+    <string name="main_activity_libre_data_corrupt">Libre %1$s: data corrupted (CRC), scan again</string>
+    <string name="main_activity_libre_parse_failed">Libre %1$s: could not parse data</string>
+    <string name="main_activity_libre_prefix">Libre %1$s:</string>
+    <string name="main_activity_libre_mgdl">%1$.0f mg/dL</string>
+    <string name="main_activity_libre_status_day">%1$s, day %2$.1f</string>
+    <string name="main_activity_libre_stream">stream %1$d</string>
+    <string name="main_activity_libre_backfill">history +%1$d</string>
+    <string name="main_activity_libre_backfill_with_skipped">history +%1$d (already had %2$d)</string>
+    <string name="main_activity_libre_no_calibration">history: no calibration</string>
+    <string name="main_activity_libre_new_sensor_flag">NEW SENSOR</string>
+    <string name="main_activity_ble_no_keys">BLE: OOP2 did not hand out keys</string>
+    <string name="main_activity_ble_rejected">BLE: sensor did not accept the command — scan again</string>
+    <string name="main_activity_ble_streaming">BLE: streaming is ours, MAC %1$s</string>
+
+    <!-- MainActivity.kt: pen NFC scan toasts -->
+    <string name="main_activity_pen_scan_failed">Pen: scan failed — hold it up again and keep it there</string>
+    <string name="main_activity_pen_scan_incomplete">scan incomplete, hold it up again</string>
+    <string name="main_activity_pen_result">Pen %1$s: %2$s</string>
+    <string name="main_activity_pen_no_new_doses">Pen %1$s: no new doses</string>
+    <plurals name="main_activity_pen_new_doses">
+        <item quantity="one">new dose — %1$d</item>
+        <item quantity="other">new doses — %1$d</item>
+    </plurals>
+    <plurals name="main_activity_pen_primes">
+        <item quantity="one">prime — %1$d</item>
+        <item quantity="other">primes — %1$d</item>
+    </plurals>
+
+    <!-- MainActivity.kt: bottom nav tabs -->
+    <string name="main_activity_tab_today">Today</string>
+    <string name="main_activity_tab_history">History</string>
+    <string name="main_activity_tab_analysis">Analysis</string>
+    <string name="main_activity_tab_chat">Chat</string>
+    <string name="main_activity_tab_more">More</string>
+    <string name="main_activity_add_event">Add event</string>
+
+    <!-- TodayScreen.kt: header -->
+    <string name="today_screen_reading_age">%1$d min ago</string>
+    <string name="today_screen_isf_now">ISF now %1$.2f mmol/L per U · %2$s</string>
+
+    <!-- TodayScreen.kt: correction candidate chip -->
+    <string name="today_screen_confirm_correction">✓ Confirm clean correction %1$.1f U</string>
+    <string name="today_screen_correction_candidate_hint">No food, other bolus, activity or hypo nearby.</string>
+
+    <!-- TodayScreen.kt: dish-recognition dialog moves -->
+    <string name="today_screen_dish_assumption_head">🍽 “%1$s”: parsed as — %2$s</string>
+    <string name="today_screen_dish_assumption_note_with_id">One clarifying question: the answer is appended to the note and to the library (“%1$s”); it won\'t be asked again.</string>
+    <string name="today_screen_dish_assumption_note">One clarifying question: the answer is appended to the note and to the library.</string>
+    <string name="today_screen_dish_assumption_placeholder">e.g. whole-grain</string>
+    <string name="today_screen_dish_assumption_save">Save</string>
+    <string name="today_screen_dish_confirm_head">🍽 “%1$s” — %2$s</string>
+    <string name="today_screen_dish_confirm_note">The note is already saved; “Yes” will add the dish\'s structure and remember the wording. The note\'s grams do not change.</string>
+    <string name="today_screen_dish_confirm_yes">Yes, that\'s it</string>
+    <string name="today_screen_dish_confirm_no">No</string>
+
+    <!-- TodayScreen.kt: food suggestion badge -->
+    <string name="today_screen_food_suggestions_badge">🍽 Looks like there was food: %1$d ▸</string>
+
+    <!-- TodayScreen.kt: rare-clean-moment calibration card -->
+    <string name="today_screen_calibration_need_isf">the sensitivity factor (ISF)</string>
+    <string name="today_screen_calibration_need_carb_ratio">the carb ratio</string>
+    <string name="today_screen_calibration_need_both">ISF and the carb ratio</string>
+    <string name="today_screen_calibration_title">🧪 A rare clean moment for data</string>
+    <string name="today_screen_calibration_hint">Glucose is steady, no active food or insulin. If by your own judgment you eat or dose — log it precisely (grams, or the “%1$s” tag): these notes give the model the most. Right now it is missing %2$s.</string>
+
+    <!-- TodayScreen.kt: 24h summary line -->
+    <string name="today_screen_mean_bg">%1$s avg</string>
+    <string name="today_screen_insulin_carbs_summary">%1$.0f U · %2$.0f g</string>
+    <string name="today_screen_kcal">~%1$.0f kcal</string>
+    <string name="today_screen_protein">P %1$.0f g</string>
+    <string name="today_screen_fat">F %1$.0f g</string>
+    <plurals name="today_screen_nutrition_meals">
+        <item quantity="one">%1$d dish estimated</item>
+        <item quantity="other">%1$d dishes estimated</item>
+    </plurals>
+    <string name="today_screen_no_data_hint">No data yet. In xDrip, enable Inter-app settings → Broadcast locally and xDrip Web Service — everything else collects itself.</string>
+
+    <!-- TodayScreen.kt: basal reminder / dextrose -->
+    <string name="today_screen_basal_due">🕐 Basal time? Usually ~%1$s</string>
+    <string name="today_screen_log_basal_button">Log %1$.0f U</string>
+    <string name="today_screen_dextrose_first">🍬 +1 dextrose tablet (%1$.0f g)</string>
+    <string name="today_screen_dextrose_more">🍬 One more tablet · already %1$d (%2$.0f g)</string>
+
+    <!-- TodayScreen.kt: Health Connect prompts -->
+    <string name="today_screen_connect_health_connect">Connect heart rate and sleep (Health Connect)</string>
+    <string name="today_screen_allow_steps">Allow steps (open Health Connect) →</string>
+
+    <!-- TodayScreen.kt: What-if trajectory summary -->
+    <string name="today_screen_after_minutes">in %1$dm</string>
+    <string name="today_screen_after_hours_minutes">in %1$dh%2$dm</string>
+    <string name="today_screen_whatif_risk_floored">⚠ the line hit the model\'s boundary — minimum unknown</string>
+    <string name="today_screen_whatif_risk_center_below">⚠ central line below range: %1$s %2$s</string>
+    <string name="today_screen_whatif_risk_lower_below">⚠ lower bound below range: %1$s %2$s</string>
+    <string name="today_screen_whatif_below_model_boundary">below the model\'s boundary</string>
+
+    <!-- TodayScreen.kt: "How it was calculated" dialog -->
+    <string name="today_screen_calc_title">How it was calculated · %1$s</string>
+    <string name="today_screen_calc_model">Model: %1$s</string>
+    <string name="today_screen_calc_carbs">Carbs: %1$.1f g · %2$s</string>
+    <string name="today_screen_calc_unknown">unknown</string>
+    <string name="today_screen_calc_macros">P/F: %1$s / %2$s g · duration %3$.0f min</string>
+    <string name="today_screen_calc_global_cs">Global CS: %1$.3f [%2$.3f…%3$.3f] mmol/L per g. This is a broad development prior/posterior, not a per-dish CS.</string>
+    <string name="today_screen_calc_causal_evidence">Causal online evidence: n=%1$d, days=%2$d. %3$s. Retrospective Stage 8 sensitivity rows do not count as online evidence and cannot promote the parameter on their own.</string>
+    <string name="today_screen_calc_food_amplitude">Full food amplitude: %1$.2f mmol/L; the same line\'s contribution from the current anchor: +60 %2$+.2f, +180 %3$+.2f.</string>
+    <string name="today_screen_calc_timing">Timing: %1$s (%2$s); onset %3$.0f, half arrived %4$.0f, rise end %5$.0f min; uncertainty ±%6$.0f min.</string>
+    <string name="today_screen_calc_curve_choice">How the curve was chosen: %1$s. The dish name plays no part in timing.</string>
+    <string name="today_screen_calc_insulin_isf">Insulin +60: %1$+.2f mmol/L; ISF %2$.2f [%3$.2f…%4$.2f].</string>
+    <string name="today_screen_calc_background">Background/basal/trend +60: %1$+.2f mmol/L.</string>
+    <string name="today_screen_calc_uncertainty">Uncertainty: %1$s. Observational associations are not interpreted as causes.</string>
+    <string name="today_screen_close">Close</string>
+
+    <!-- InlineWhatIfPanel -->
+    <string name="today_screen_whatif_add_units">Add\n%1$.1f U</string>
+    <string name="today_screen_whatif_second_dose">2nd +</string>
+    <string name="today_screen_whatif_more_units">More\n%1$.1f U</string>
+    <string name="today_screen_whatif_after_label">after</string>
+    <string name="today_screen_whatif_walk_label">walk</string>
+    <string name="today_screen_whatif_activity_minutes">%1$d min</string>
+    <string name="today_screen_whatif_now_label">now</string>
+    <string name="today_screen_whatif_intensity_light">light</string>
+    <string name="today_screen_whatif_intensity_normal">normal</string>
+    <string name="today_screen_whatif_intensity_fast">fast</string>
+    <string name="today_screen_whatif_on_top_iob">on top of IOB %1$.1f U</string>
+    <string name="today_screen_whatif_summary">in 1h: %1$s · minimum %2$s · at 3h: %3$s · scenario, not a dose</string>
+    <string name="today_screen_whatif_model_limited">⚠ model limited</string>
+
+    <!-- FoodSuggestDialog -->
+    <string name="today_screen_food_suggest_title">Looks like there was food</string>
+    <string name="today_screen_food_suggest_units">%1$.1f U</string>
+    <string name="today_screen_food_suggest_what_label">What you ate</string>
+    <string name="today_screen_food_suggest_carbs_label">Carbs, g</string>
+    <string name="today_screen_food_suggest_save">✓ Save</string>
+    <string name="today_screen_food_suggest_cancel">Cancel</string>
+    <string name="today_screen_food_suggest_grams">~%1$.0f g</string>
+    <string name="today_screen_food_suggest_unknown_dish">what was it?</string>
+    <string name="today_screen_food_suggest_accept">✓ Accept</string>
+    <string name="today_screen_food_suggest_edit">Edit</string>
+</resources>

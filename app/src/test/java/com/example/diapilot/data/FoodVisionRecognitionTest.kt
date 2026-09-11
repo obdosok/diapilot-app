@@ -43,12 +43,12 @@ class FoodVisionRecognitionTest {
     @Test
     fun `the dish list travels in the message text`() {
         val text = messageText(body())
-        assertTrue("no \"which of these, or none\" question", "какое из этих блюд на фото, или ни одно" in text)
+        assertTrue("no \"which of these, or none\" question", "which of these dishes is in the photo, or none" in text)
         assertTrue("no smoothie id", "id=smoothie" in text)
         assertTrue("no pancakes id", "id=pancakes_ham_cheese" in text)
-        assertTrue("no typical portion", "обычно 22 г" in text)
+        assertTrue("no typical portion", "usually 22 g" in text)
         // recognition ≠ re-estimation: the canon owns the composition
-        assertTrue("does not say the composition of a known dish is not re-estimated", "состав НЕ переоценивай" in text)
+        assertTrue("does not say the composition of a known dish is not re-estimated", "do NOT re-estimate the composition" in text)
     }
 
     @Test
@@ -66,7 +66,7 @@ class FoodVisionRecognitionTest {
         val props = schema(b)
         assertFalse(props.has("known_dish_id"))
         assertFalse(props.has("known_dish_portion"))
-        assertFalse("an empty block must not land in the text", "ИЗВЕСТНЫЕ БЛЮДА" in messageText(b))
+        assertFalse("an empty block must not land in the text", "KNOWN DISHES" in messageText(b))
     }
 
     @Test

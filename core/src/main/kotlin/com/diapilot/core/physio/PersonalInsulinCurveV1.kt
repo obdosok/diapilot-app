@@ -31,12 +31,12 @@ data class PersonalInsulinCurveV1(
     /** The raw aggregate before smoothing, for display and audit. */
     val measuredKnots:List<HybridCdfKnot> = knots,
     /**
-     * Landmark names that had to be moved to satisfy [PhysioBoundsV1].
+     * Landmarks that had to be moved to satisfy [PhysioBoundsV1], with from/to.
      *
      * Named rather than hidden: a coerced tail is still a measurement, and the
      * user is entitled to know the app moved their number and by how much.
      */
-    val coerced:List<String> = emptyList(),
+    val coerced:List<CoercedLandmark> = emptyList(),
     /** Were untagged (P3) doses needed to reach support? */
     val usesUntagged:Boolean = false,
 ) {

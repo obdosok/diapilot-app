@@ -48,7 +48,7 @@ object ForecastHealthV1 {
 
     data class Verdict(
         val health: ForecastHealth,
-        val reasons: List<String>,
+        val reasons: List<HealthReason>,
     )
 
     /**
@@ -73,24 +73,21 @@ object ForecastHealthV1 {
         minuteStreamAvailable: Boolean,
         sensorSuspect: String? = null,
     ): Verdict {
-        val reasons = mutableListOf<String>()
+        val reasons = mutableListOf<HealthReason>()
         if (anchorAgeMs > STALE_ANCHOR_MS) {
-            reasons.add("данные устарели (${anchorAgeMs / 60_000} мин)")
+            reasons.add(HealthReason.StaleData(anchorAgeMs / 60_000))
         }
         if (evidenceCount > 0 && effectiveEvidence < THIN_EVIDENCE) {
-            reasons.add(
-                "эффективно свежих коррекций всего %.0f — модель опирается на мало данных"
-                    .format(effectiveEvidence),
-            )
+            reasons.add(HealthReason.ThinEvidence(effectiveEvidence))
         }
         if (corridorHalfWidth60 > WIDE_CORRIDOR_60_MMOL) {
-            reasons.add("коридор очень широк — модель не уверена в этом режиме")
+            reasons.add(HealthReason.WideCorridor)
         }
         if (!momentumAvailable && !minuteStreamAvailable) {
-            reasons.add("минутный поток недоступен — без momentum")
+            reasons.add(HealthReason.NoMinuteStream)
         }
         if (sensorSuspect != null) {
-            reasons.add("датчик читает неправдоподобно ($sensorSuspect) — якорю не доверяем")
+            reasons.add(HealthReason.SensorImplausible(sensorSuspect))
         }
         val health = when {
             anchorAgeMs > STALE_ANCHOR_MS -> ForecastHealth.STALE
@@ -100,4 +97,25 @@ object ForecastHealthV1 {
         }
         return Verdict(health, reasons)
     }
+}
+
+/** Why a forecast is not TRUSTED; the app renders the sentence (i18n.TwinText). */
+sealed interface HealthReason {
+    /** The anchor reading is [ageMin] minutes old. */
+    data class StaleData(val ageMin: Long) : HealthReason
+
+    /** Only [effectiveCorrections] recency-weighted corrections behind the amplitude. */
+    data class ThinEvidence(val effectiveCorrections: Double) : HealthReason
+
+    /** The band at one hour is wider than [ForecastHealthV1.WIDE_CORRIDOR_60_MMOL]. */
+    data object WideCorridor : HealthReason
+
+    /** Neither the minute stream nor momentum is available. */
+    data object NoMinuteStream : HealthReason
+
+    /** The sensor reads implausibly; [detail] is the plausibility verdict, as data. */
+    data class SensorImplausible(val detail: String) : HealthReason
+
+    /** The trajectory hit the physiological floor ([floorMmol]) at [points] points. */
+    data class FloorClamped(val floorMmol: Double, val points: Int) : HealthReason
 }

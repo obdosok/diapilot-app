@@ -16,6 +16,7 @@ import android.util.Log
 import android.widget.RemoteViews
 import com.example.diapilot.MainActivity
 import com.example.diapilot.R
+import com.example.diapilot.i18n.localized
 
 /**
  * Home-screen widget: the current (calibrated) glucose, trend arrow, 5-min
@@ -61,6 +62,9 @@ object BgWidget {
     }
 
     private fun build(context: Context): RemoteViews {
+        // Widget text in the app language — below API 33 the provider's own
+        // context still carries the system language.
+        val text = context.localized()
         val views = RemoteViews(context.packageName, R.layout.widget_bg)
         val store = com.example.diapilot.data.Stores.get(context)
         val now = System.currentTimeMillis()
@@ -126,8 +130,9 @@ object BgWidget {
         views.setTextViewText(
             R.id.widget_age,
             when {
-                ageMin < 0 -> "нет данных"
-                ageMin >= com.diapilot.core.PersonalParams.DEFAULT.ageNoiseMin -> "$ageMin мин"
+                ageMin < 0 -> text.getString(R.string.bg_widget_no_data)
+                ageMin >= com.diapilot.core.PersonalParams.DEFAULT.ageNoiseMin ->
+                    text.getString(R.string.bg_widget_age_min, ageMin)
                 else -> ""
             },
         )
@@ -138,14 +143,20 @@ object BgWidget {
             .surfaceIobUnits(store, context, now) ?: 0.0
         val lastBolus = store.boluses(
             now - com.diapilot.core.PersonalParams.DEFAULT.lastDoseShowMin * 60_000, now,
-        ).filter { it.purpose != "воздух" }.lastOrNull()
+        ).filter { it.purpose != com.diapilot.core.api.DiaForFacts.PURPOSE_AIR }.lastOrNull()
         val insulinLine = buildString {
             if (iob >= 0.2) append("IOB %.1f".format(java.util.Locale.ENGLISH, iob))
             lastBolus?.let { b ->
                 if (isNotEmpty()) append("  ·  ")
                 val min = (now - b.tsMs) / 60_000
-                val ago = if (min < 60) "${min}м" else "${min / 60}ч${min % 60}м"
-                append("укол %.1f ед · %s".format(java.util.Locale.ENGLISH, b.units, ago))
+                val ago = if (min < 60) text.getString(R.string.bg_widget_ago_min, min)
+                else text.getString(R.string.bg_widget_ago_hm, min / 60, min % 60)
+                append(
+                    text.getString(
+                        R.string.bg_widget_last_dose,
+                        "%.1f".format(java.util.Locale.ENGLISH, b.units), ago,
+                    ),
+                )
             }
         }
         views.setTextViewText(R.id.widget_insulin, insulinLine)

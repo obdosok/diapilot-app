@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ask_claude_error">Ошибка: %1$s</string>
+
+    <string name="stream_stall_notifier_reason_stopped">Поток с сенсора остановился</string>
+    <string name="stream_stall_notifier_reason_login_rejected">BLE-логин отвергнут на всех соседних индексах</string>
+
+    <string name="physio_tuning_as_shipped">как отгружено</string>
+    <string name="physio_tuning_trust">доверие %1$s</string>
+    <string name="physio_tuning_insulin">инсулин %1$s·%2$s·%3$s·%4$s</string>
+    <string name="physio_tuning_kcal_per_hour">%1$s ккал/ч</string>
+    <string name="physio_tuning_sieve">сито %1$s</string>
+    <string name="physio_tuning_types">типы %1$s</string>
+    <string-array name="physio_tuning_triangle_labels">
+        <item>быстрые·старт</item>
+        <item>быстрые·пик</item>
+        <item>быстрые·конец</item>
+        <item>быстрые·макро</item>
+        <item>средние·старт</item>
+        <item>средние·пик</item>
+        <item>средние·конец</item>
+        <item>средние·макро</item>
+        <item>медленные·старт</item>
+        <item>медленные·пик</item>
+        <item>медленные·конец</item>
+        <item>медленные·макро</item>
+    </string-array>
+
+    <string name="hybrid_shadow_kinetics">углеводы: быстрые %1$s%%, средние %2$s%%, медленные %3$s%%; форма %4$s; доверие %5$s%%; источник %6$s</string>
+    <string name="hybrid_shadow_kinetics_tail">углеводы: быстрые %1$s%%, средние %2$s%%, медленные %3$s%%; форма %4$s; доверие %5$s%%; источник %6$s; остаточный БЖУ-хвост модели до ~%7$s мин (после 90%% реакции)</string>
+    <string name="hybrid_shadow_kinetics_none">структурные признаки не записаны; нейтральный приор</string>
+
+    <string name="hybrid_readout_kinetics">быстр/средн/медл %1$d/%2$d/%3$d%%; %4$s</string>
+    <string name="hybrid_readout_kinetics_tail">быстр/средн/медл %1$d/%2$d/%3$d%%; %4$s; следовой хвост до ~%5$d мин</string>
+
+    <string name="label_screen_basis_dish_profile">профиль блюда</string>
+    <string name="label_screen_basis_global_cs">глобальный CS</string>
+    <string name="label_screen_basis_macros_duration">Б/Ж и длительность приёма</string>
+
+    <string name="food_calculation_uncertainty_stage10">%1$s Stage 10 side-by-side — прогноз: %2$s; отнесённый вклад: %3$s; фазы: %4$s; перекрытие: %5$s; распределение: %6$s; %7$s; %8$s; %9$s; %10$s; %11$s; уверенность %12$s; %13$s. Диагностика не управляет предупреждениями: owner = legacy.</string>
+
+    <string name="stage9_episode_minutes">%1$s мин</string>
+    <string name="stage9_episode_none">нет</string>
+    <string name="stage9_episode_no_bolus">без bolus</string>
+    <string name="stage9_episode_curve">Кривая вклада %1$s: самый ранний вклад по модельной кривой с учётом lag после %2$s мин; модельный пик %3$s, %4$s ммоль/л; на последней покрытой точке %5$s. До следующего приёма %6$s, после него %7$s.</string>
+    <string name="stage9_episode_curve_censored">Кривая вклада %1$s (покрытие до ~%8$s мин, дальше окно обрезано): самый ранний вклад по модельной кривой с учётом lag после %2$s мин; модельный пик %3$s, %4$s ммоль/л; на последней покрытой точке %5$s. До следующего приёма %6$s, после него %7$s.</string>
+    <string name="stage9_episode_transfer_resolved">У ранних приёмов дефицит %1$s, у последнего избыток %2$s ммоль/л; вероятен перенос хвоста. После совместного перерасчёта %3$s–%4$s распознанного пищевого вклада относится к предыдущим блюдам; нераспределённый остаток %5$s.</string>
+    <string name="stage9_episode_transfer_possible">У ранних приёмов дефицит %1$s, у последнего избыток %2$s ммоль/л; возможен перенос хвоста, но надёжно разделить нельзя. Допустимая доля предыдущих блюд в распознанном пищевом вкладе %3$s–%4$s; нераспределённый остаток %5$s.</string>
+    <string name="stage9_episode_transfer_overlap">Перекрытие есть; надёжно разделить вклад блюд нельзя. Общий остаток оставлен нераспределённым.</string>
+    <string name="stage9_episode_transfer_none">Согласованный перенос хвоста не установлен.</string>
+    <string name="stage9_episode_portion">%1$s г в %2$s</string>
+    <string name="stage9_episode_forecast">%1$s ммоль/л: %2$s г × общий CS %3$s</string>
+    <string name="stage9_episode_allocated_resolved">Этому приёму совместная модель отнесла %1$s ммоль/л; допустимо %2$s–%3$s (оценка удержана в границах приора)</string>
+    <string name="stage9_episode_allocated_overlap">Приёмы перекрываются: отдельный подъём этого блюда не установлен. Диапазон %1$s–%2$s ммоль/л (в границах приора); точка %3$s — техническая медиана, не факт.</string>
+    <string name="stage9_episode_overlap">Соседние приёмы: %1$s. Неучтённая еда/остаток кластера: %2$s ммоль/л</string>
+    <string name="stage9_episode_allocation">Лучшая доля %1$s, возможный диапазон %2$s–%3$s</string>
+    <string name="stage9_episode_resolution_resolved">разделение устойчиво</string>
+    <string name="stage9_episode_resolution_unresolved">неразрешимо: надёжно разделить соседние приёмы нельзя</string>
+    <string name="stage9_episode_resolution_censored">окно этого приёма обрезано (%1$s мин); показан диапазон</string>
+    <string name="stage9_episode_kernel_physio">%1$s; единая CDF выбранного PHYSIO-профиля; hash %2$s</string>
+    <string name="stage9_episode_kernel_difference_physio">Условное удаление укола на графике и эта деконволюция используют один ретроспективный CGM-профиль. ISF остаётся персональным для часа болюса; live-прогноз и гипо-алерты этим профилем не изменяются.</string>
+    <string name="stage9_episode_kernel_difference_prior">Медиану меняет только инерционное дневное ISF по прошлым эпизодам. TOD/гипо и другие контексты пока не promoted и лишь расширяют интервал.</string>
+    <string name="stage9_episode_confidence_high">высокая</string>
+    <string name="stage9_episode_confidence_medium">средняя</string>
+    <string name="stage9_episode_confidence_low">низкая</string>
+    <string name="stage9_episode_caveat_carbs">углеводы %1$s–%2$s г (%3$s)</string>
+    <string name="stage9_episode_caveat_portions">порции: %1$s</string>
+    <string name="stage9_episode_caveat_sensor">датчик и фон остаются неопределёнными</string>
+    <string name="stage9_episode_caveat_truncated">кластер ограничен вычислительным лимитом</string>
+    <string name="stage9_episode_caveat_overlap">перекрытие неидентифицируемо</string>
+    <string name="stage9_episode_caveat_cluster_timing">индивидуальный тайминг заменён общим таймингом пищевого кластера</string>
+    <string name="stage9_episode_caveat_locked" formatted="false">не менее 90% раннего вклада завершилось до следующей еды и зафиксировано</string>
+    <string name="stage9_episode_caveat_mismatch">совместная модель не объяснила эпизод: он исключён из уверенного обучения еды</string>
+    <string name="stage9_episode_caveat_late_censored">позднее окно этого приёма обрезано</string>
+    <string name="stage9_episode_caveat_cgm_censored">окно CGM этого приёма обрезано разрывом или редкими точками</string>
+    <string name="stage9_episode_caveat_input_truncated">вход обрезан; разделение не установлено</string>
+    <string name="stage9_episode_caveat_insulin">неопределённость инсулина учтена в интервале</string>
+    <string name="stage9_episode_caveat_residual">общий необъяснённый остаток сохранён</string>
+    <string name="stage9_episode_caveat_phase">окно фазы доступно, но фаза не установлена</string>
+    <string name="stage9_episode_caveat_weak_grams">слабое происхождение оценки углеводов</string>
+    <string name="stage9_episode_caveat_unknown_context">неизвестный контекст расширяет интервал insulin</string>
+    <string name="stage9_episode_causal_provenance">Causal: frozen prior + CarbEvidence/ISF с knownAt ≤ cutoff; текущий Twin kernel и неревизионируемый текст блюда не используются.</string>
+    <string name="stage9_episode_diagnostic_provenance">Retrospective post-hoc: CGM после еды, fitted background, residual и allocation; в live forecast/alerts не входят.</string>
+    <string name="stage9_episode_compact_summary">Ожидалось +%1$s; по эпизоду +%2$s (%3$s–%4$s) ммоль/л</string>
+    <string name="stage9_episode_finding_completed">Ранний вклад завершился до следующей еды и зафиксирован отдельно; в общую сумму углеводов он включён.</string>
+    <string name="stage9_episode_finding_series_bounded">Общий тайминг серии: старт ~%1$s мин; серия ещё активна на границе окна (6 ч), пик и конец не установлены.</string>
+    <string name="stage9_episode_finding_series">Общий тайминг серии: старт ~%1$s мин; пик ~%2$s, основная фаза до ~%3$s мин.</string>
+    <string name="stage9_episode_finding_series_unsplit">Блюда серии не разделились; амплитуда считается по сумме углеводов.</string>
+    <string name="stage9_episode_finding_transfer">Обнаружен вероятный перенос хвоста между соседними блюдами.</string>
+    <string name="stage9_episode_finding_resolved">Вклад блюда удалось отделить от соседних событий.</string>
+    <string name="stage9_episode_finding_unresolved">Приёмы перекрываются: отдельно оценить это блюдо пока нельзя.</string>
+    <string name="stage9_episode_finding_censored">Не хватает последующей истории CGM для полной оценки.</string>
+    <string name="stage9_episode_phase_start">старт</string>
+    <string name="stage9_episode_phase_level_max">максимум уровня</string>
+    <string name="stage9_episode_phase_late">поздняя фаза</string>
+    <string name="stage9_episode_phase_plateau">плато</string>
+    <string name="stage9_episode_phases_cluster_bounded">Индивидуальные фазы не устанавливаются. Общий тайминг серии (~%1$s г): старт ~%2$s мин; серия ещё активна на границе окна (6 ч), максимум и конец не установлены.</string>
+    <string name="stage9_episode_phases_cluster">Индивидуальные фазы не устанавливаются. Общий тайминг серии (~%1$s г): старт ~%2$s, максимум уровня ~%3$s, основная фаза до ~%4$s мин.</string>
+    <string name="stage9_episode_phases_cluster_none">Индивидуальные фазы не устанавливаются. Общий тайминг кластера пока тоже не выделен.</string>
+    <string name="stage9_episode_phases_completed" formatted="false">Не менее 90% раннего вклада завершилось до следующего приёма; его фаза зафиксирована отдельно и не растянута БЖУ последующей еды.</string>
+    <string name="stage9_episode_phases_seen">Установлено: %1$s.</string>
+    <string name="stage9_episode_phases_missing">Окно доступно, но не установлено: %1$s.</string>
+    <string name="stage9_episode_phases_no_data">Данных для установления фазы пока недостаточно.</string>
+</resources>

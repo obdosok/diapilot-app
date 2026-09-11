@@ -68,25 +68,26 @@ const val MEAL_NOTE_AFTER_MS = 30L * 60_000
 /**
  * What the user says happened. These are the user's own words, not diagnoses of ours —
  * the button list is deliberately the one the user asked for, including "I don't know".
+ * The names are stored; the app renders the button text (i18n.FoodText).
  */
-enum class MarkKind(val ru: String, val emoji: String) {
+enum class MarkKind(val emoji: String) {
     /** The plate held more than the note says. */
-    GRAMS_MORE("граммов было больше", "⬆"),
+    GRAMS_MORE("⬆"),
 
     /** The plate held less than the note says. */
-    GRAMS_LESS("граммов было меньше", "⬇"),
+    GRAMS_LESS("⬇"),
 
     /** A hypo was being treated. Counter-regulation, not a meal. */
-    RESCUE("это было купирование", "🍬"),
+    RESCUE("🍬"),
 
     /** The trace is an instrument fault (compression, an impossible value). */
-    SENSOR_LIED("сенсор врал", "📉"),
+    SENSOR_LIED("📉"),
 
     /** Something was eaten that never reached a note. */
-    ATE_MORE("съел что-то ещё", "🍴"),
+    ATE_MORE("🍴"),
 
     /** Activity, stress or illness acted inside the window. */
-    CONTEXT("активность/стресс/болезнь", "🏃"),
+    CONTEXT("🏃"),
 
     /**
      * OUR arithmetic, not the user's body — the kernel add-back or a neighbour subtraction
@@ -100,7 +101,7 @@ enum class MarkKind(val ru: String, val emoji: String) {
      * sound amplitude observation while the actual error sits in the subtrahend, teaching
      * the corpus to trust our own kernel error and forget the data that contradicted it.
      */
-    MODEL_WRONG("дело в модели — ядро/вычитание", "🧮"),
+    MODEL_WRONG("🧮"),
 
     /**
      * NOT A REFUSAL — a full answer, and the one that carries the most information about
@@ -108,7 +109,7 @@ enum class MarkKind(val ru: String, val emoji: String) {
      * "ordinary", and such a window must never be counted as a clean stretch. See
      * [MarkPolicy.understood].
      */
-    UNKNOWN("не знаю", "❓"),
+    UNKNOWN("❓"),
 }
 
 /** What class of event the meal turns out to be. */

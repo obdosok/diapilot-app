@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="meal_notifier_channel_name">Meal labelling</string>
+    <string name="meal_notifier_channel_description">“What did you eat?” questions when a meal is detected</string>
+    <string name="meal_notifier_title">Looks like you ate at %1$s</string>
+    <!-- %1$s → %2$s: glucose before and at the peak; %3$s: unit; %4$.1f: bolus units. -->
+    <string name="meal_notifier_text_bolus">%1$s → %2$s %3$s · bolus %4$.1f U — what was it?</string>
+    <string name="meal_notifier_text_no_bolus">%1$s → %2$s %3$s · no bolus — what was it?</string>
+    <string name="meal_notifier_action_other">Other…</string>
+    <string name="meal_notifier_reply_hint">A few words about the food…</string>
+</resources>

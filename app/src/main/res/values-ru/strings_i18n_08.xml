@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HypoAlertNotifier.kt -->
+    <string name="hypo_alert_notifier_watch_test_channel_name">Тест часов</string>
+    <string name="hypo_alert_notifier_watch_test_channel_desc">Проверка зеркалирования уведомлений на часы</string>
+    <string name="hypo_alert_notifier_watch_test_title">⌚ Тест сигнала на часы · %1$s</string>
+    <string name="hypo_alert_notifier_watch_test_text">Если Zepp зеркалит уведомления — часы завибрируют сейчас.</string>
+    <string name="hypo_alert_notifier_protocol_line">Ваш план: %1$s</string>
+    <string name="hypo_alert_notifier_protocol_default">Проверьте сахар и действуйте по своему плану лечения гипо.</string>
+    <string name="hypo_alert_notifier_predict_text">Прогноз: ниже %1$s к %2$s, минимум ~%3$s. %4$s</string>
+    <string name="hypo_alert_notifier_artifact_title">⚠ Критически низко или сбой сенсора</string>
+    <string name="hypo_alert_notifier_artifact_text">Значение %1$s. Возможен артефакт сенсора — СРОЧНО перепроверьте глюкометром и действуйте по своему плану. Ввод замера уточнит калибровку.</string>
+    <string name="hypo_alert_notifier_persistent_title_blind">⚠ Затяжная гипа — видели %1$d из %2$d мин</string>
+    <string name="hypo_alert_notifier_persistent_title">⚠ Затяжная гипа — %1$d мин</string>
+    <string name="hypo_alert_notifier_persistent_text_blind">Сахар долго ниже %1$s (%2$s). %3$d мин без надёжных данных — их не считаем. Если лечение не помогает — действуйте по своему плану. %4$s</string>
+    <string name="hypo_alert_notifier_persistent_text">Сахар долго ниже %1$s (%2$s). Если лечение не помогает — действуйте по своему плану. %3$s</string>
+    <string name="hypo_alert_notifier_low_title">⚠ Сейчас низко — %1$s</string>
+    <string name="hypo_alert_notifier_low_text">Сахар ниже %1$s. %2$s</string>
+    <string name="hypo_alert_notifier_predict_title">⚠ Возможна гипа через ~%1$.0f мин</string>
+    <string name="hypo_alert_notifier_sensor_check_title">🔎 Датчик читает неправдоподобно низко</string>
+    <string name="hypo_alert_notifier_sensor_check_text">Значение %1$s похоже на сбой сенсора (компрессия/EOL за ночь). Перепроверьте глюкометром и доверяйте своему самочувствию — реальный лёгкий лоу может быть под этим. Ввод замера уточнит калибровку.</string>
+    <string name="hypo_alert_notifier_channel_name">Прогноз гипогликемии</string>
+    <string name="hypo_alert_notifier_channel_desc">Упреждающее предупреждение: модель видит гипо впереди</string>
+    <string name="hypo_alert_notifier_sustained_high_title">↑ Высоко уже %1$d мин</string>
+    <string name="hypo_alert_notifier_sustained_high_text">Выше %1$s непрерывно, максимум %2$s. Действуйте по своему плану.</string>
+    <string name="hypo_alert_notifier_hyper_predict_title">↗ Возможен выход вверх через ~%1$.0f мин</string>
+    <string name="hypo_alert_notifier_hyper_predict_text">Прогноз: выше %1$s к %2$s, пик ~%3$s. Проверьте и действуйте по своему плану.</string>
+    <string name="hypo_alert_notifier_hyper_channel_name">Прогноз высокого сахара</string>
+    <string name="hypo_alert_notifier_hyper_channel_desc">Упреждающее предупреждение о выходе вверх</string>
+
+    <!-- Libre2PairLog.kt -->
+    <string name="libre2_pair_log_stats_kb">%1$.0f КБ</string>
+    <string name="libre2_pair_log_stats_empty">пусто</string>
+
+    <!-- RapidFallNotifier.kt -->
+    <string name="rapid_fall_notifier_title_urgent">⬇ Быстрое падение — возможна гипо</string>
+    <string name="rapid_fall_notifier_title">⬇ Сахар быстро падает</string>
+    <string name="rapid_fall_notifier_text">Сейчас %1$s · %2$s в минуту · через ~20 мин может быть %3$s</string>
+    <string name="rapid_fall_notifier_channel_name">Быстрое падение сахара</string>
+    <string name="rapid_fall_notifier_channel_desc">Раннее предупреждение по минутному потоку — на 3–4 минуты раньше обычных алармов</string>
+
+    <!-- PhysioAutoFitRuntime.kt -->
+    <string name="physio_auto_fit_runtime_safety_label">коридор ±20%% вокруг измеренного %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+
+    <!-- AnalysisOverviewScreen.kt -->
+    <string name="analysis_overview_screen_title">Анализ</string>
+    <string name="analysis_overview_screen_subtitle">То, что помогает оценить здоровье и честность прогноза.</string>
+    <string name="analysis_overview_screen_metrics_failed">Не удалось прочитать метрики</string>
+    <string name="analysis_overview_screen_loading">Считаю краткую статистику…</string>
+    <string name="analysis_overview_screen_glucose_card_title">Глюкоза</string>
+    <string name="analysis_overview_screen_days_7">7 дней</string>
+    <string name="analysis_overview_screen_days_30">30 дней</string>
+    <string name="analysis_overview_screen_backtests_note">Исследовательские бэктесты и переобучение больше не запускаются при открытии этой вкладки.</string>
+
+    <string name="analysis_overview_screen_daily_balance_title">Баланс по суткам</string>
+    <string name="analysis_overview_screen_daily_balance_intro">углеводы × CS − единицы × ISF = изменение сахара за сутки. Граница суток 04:00, не полночь: в это время он спит и не ел, поэтому обе опорные точки берутся в покое.</string>
+    <string name="analysis_overview_screen_daily_balance_empty">Пока нечего показать: нужно хотя бы %1$d годных суток (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</string>
+    <string name="analysis_overview_screen_daily_balance_col_day">сутки</string>
+    <string name="analysis_overview_screen_daily_balance_col_carbs">углев</string>
+    <string name="analysis_overview_screen_daily_balance_col_units">ед</string>
+    <string name="analysis_overview_screen_daily_balance_col_delta">dСахар</string>
+    <string name="analysis_overview_screen_daily_balance_col_g_per_u">г/ед</string>
+    <string name="analysis_overview_screen_daily_balance_median">Медиана за %1$d суток: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</string>
+    <string name="analysis_overview_screen_daily_balance_footnote">Это оценка АМПЛИТУДЫ и только её: за сутки все тайминги — очередь ккал, сито, форма инсулина — сокращаются из уравнения. Она не говорит, КОГДА что-то произошло, и не заменяет прогноз.</string>
+
+    <string name="analysis_overview_screen_rescue_safety_title">Предотвращённые гипогликемии / rescue</string>
+    <string name="analysis_overview_screen_rescue_safety_intro">Декстроза меняет исход. Поэтому отсутствие измеренной гипогликемии после неё не считается успешным прогнозом: такой эпизод цензурируется и входит в safety-метрику «потребовалось спасение».</string>
+    <string name="analysis_overview_screen_rescue_safety_summary">За 30 дней: rescue-событий %1$d; совместимы с предотвращённой гипогликемией %2$d.</string>
+    <string name="analysis_overview_screen_rescue_safety_row">%1$s · %2$s г · сахар %3$s · скорость %4$s ммоль/л/мин · bolus за 4 ч %5$s ед. Конечный исход причинно не оценивается без rescue.</string>
+    <string name="analysis_overview_screen_rescue_safety_footnote">Это улучшает оценку безопасности и обнаруживает stacking/ошибку прогноза. Один такой смешанный эпизод не переобучает ISF или профиль отдельного укола.</string>
+
+    <string name="analysis_overview_screen_episode_status_identified_isf">изолированная коррекция: ISF идентифицируем</string>
+    <string name="analysis_overview_screen_episode_status_effective_response_only">еда + инсулин: только совместный ответ</string>
+    <string name="analysis_overview_screen_episode_status_carb_error_candidate">возможна ошибка углеводов</string>
+    <string name="analysis_overview_screen_episode_status_timing_mismatch">итог сходится, траектория — нет</string>
+    <string name="analysis_overview_screen_episode_status_sensor_or_process">возможен датчик/процесс</string>
+    <string name="analysis_overview_screen_episode_status_retrospective_correction">изолированная коррекция найдена ретроспективно; годится для диагностики, но не для автообучения</string>
+    <string name="analysis_overview_screen_episode_status_censored">окно не завершено</string>
+    <string name="analysis_overview_screen_episode_status_unexplained">не объяснено / смешано</string>
+
+    <string name="analysis_overview_screen_today_card_title">Сегодня / текущее состояние</string>
+    <string name="analysis_overview_screen_today_no_checkpoints">Пока нет завершённых 60/120-минутных causal checkpoints.</string>
+    <string name="analysis_overview_screen_today_what_changed">Что изменилось</string>
+    <string name="analysis_overview_screen_today_what_explains">Что может объяснять</string>
+    <string name="analysis_overview_screen_today_what_unexplained">Что пока не объясняется</string>
+    <string name="analysis_overview_screen_today_unallocated">Неаллоцированная часть остаётся unresolved/confounded.</string>
+    <string name="analysis_overview_screen_today_mixed_data">Какие данные смешаны</string>
+    <string name="analysis_overview_screen_today_timeline">Хронология</string>
+
+    <string name="analysis_overview_screen_evidence_source_missing">Для этого фактора пока нет структурированных записей.</string>
+    <string name="analysis_overview_screen_evidence_no_exposures">Источник подключён, но подходящих событий ещё не было.</string>
+    <string name="analysis_overview_screen_evidence_not_identifiable">Данные есть, но это влияние пока нельзя отделить от еды, инсулина или других факторов.</string>
+    <string name="analysis_overview_screen_evidence_insufficient">Подходящих независимых эпизодов пока недостаточно.</string>
+    <string name="analysis_overview_screen_evidence_null_compatible">Практически значимая устойчивая связь пока не обнаружена.</string>
+    <string name="analysis_overview_screen_evidence_hypothesis">В истории есть возможный сигнал, но направление или величина ещё неустойчивы.</string>
+    <string name="analysis_overview_screen_evidence_preliminary">Предварительная связь повторяется в доступных данных, но ещё требует будущей проверки.</string>
+    <string name="analysis_overview_screen_evidence_supported">Связь прошла prospective-проверку на будущих данных.</string>
+    <string name="analysis_overview_screen_evidence_conflicting">Разные части истории показывают разные направления эффекта.</string>
+
+    <string name="analysis_overview_screen_hint_absorption">Записывать Б/Ж или подтверждать разбор фото до оценки результата.</string>
+    <string name="analysis_overview_screen_hint_duration_absorption">Указывать длительность приёма в уточнении еды.</string>
+    <string name="analysis_overview_screen_hint_alcohol_background">Отмечать алкоголь в записи еды.</string>
+    <string name="analysis_overview_screen_hint_cartridge_kinetics">Отмечать «новая ампула» при каждой замене.</string>
+    <string name="analysis_overview_screen_hint_injection_site">Отмечать место укола при его изменении.</string>
+    <string name="analysis_overview_screen_hint_cartridge_heat">Отмечать нагрев/жару вместе с текущей ампулой.</string>
+    <string name="analysis_overview_screen_hint_stress_illness_background">Отмечать стресс или болезнь в момент события.</string>
+    <string name="analysis_overview_screen_hint_default">Продолжать обычный сбор данных.</string>
+
+    <string name="analysis_overview_screen_measurement_activity_same_isf">Что считается: только чистые коррекции; сравнивается сила снижения после инсулина, если активность была до коррекции, с днями без неё. Еда и активность внутри окна исключают чистую оценку ISF.</string>
+    <string name="analysis_overview_screen_measurement_activity_same_effective">Что считается: законченные цепочки еды + IOB/болюса. Остаточное снижение относительно модели делится на ожидаемый вклад инсулина; активность ищется от 6 часов до начала и до конца эпизода. Это суммарный эффективный ответ (включая утилизацию глюкозы мышцами), а не доказанный чистый ISF.</string>
+
+    <string name="analysis_overview_screen_stats_no_data">%1$s · нет данных</string>
+    <string name="analysis_overview_screen_stats_mean">среднее %1$.1f ммоль/л</string>
+    <string name="analysis_overview_screen_stats_in_range">%1$.0f%% в диапазоне</string>
+    <string name="analysis_overview_screen_stats_below_above">%1$.1f%% ниже · %2$.1f%% выше</string>
+
+    <string name="analysis_overview_screen_model_card_title">Персональная модель</string>
+    <string name="analysis_overview_screen_model_not_installed">Модель не установлена</string>
+    <string name="analysis_overview_screen_model_in_use">Измеренная модель используется для прогноза</string>
+    <plurals name="analysis_overview_screen_model_trained">
+        <item quantity="one">Обучена по %1$d дню · данные по %2$s</item>
+        <item quantity="few">Обучена по %1$d дня · данные по %2$s</item>
+        <item quantity="many">Обучена по %1$d дням · данные по %2$s</item>
+        <item quantity="other">Обучена по %1$d дням · данные по %2$s</item>
+    </plurals>
+</resources>

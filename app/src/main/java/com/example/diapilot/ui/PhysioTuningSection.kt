@@ -24,11 +24,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import com.diapilot.core.physio.PhysioAutoFitV1
+import com.example.diapilot.R
 import com.example.diapilot.data.HybridModelStore
+import com.example.diapilot.i18n.localized
 import com.example.diapilot.data.PhysioAutoFitController
 import com.example.diapilot.data.PhysioAutoFitRuntime
 import com.example.diapilot.data.PhysioTuning
@@ -125,7 +128,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
     var kcal by remember { mutableStateOf(s(initial.emptyingKcalPerHour)) }
     var sieve by remember { mutableStateOf(s2(initial.carbSieving)) }
     var spread by remember { mutableStateOf(s2(initial.carbSpread)) }
-    var applied by remember { mutableStateOf(PhysioTuning.summary(initial)) }
+    var applied by remember { mutableStateOf(PhysioTuning.summary(initial, context)) }
 
     // The fit's state lives in a process-scoped holder, NOT in this
     // composition. Leaving the tab used to cancel the run and re-enable the
@@ -193,7 +196,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
         PhysioTuning.setCarbSieving(context, num(sieve))
         PhysioTuning.setCarbSpread(context, num(spread))
         HybridModelStore.retune(context)
-        applied = PhysioTuning.summary(PhysioTuning.read(context))
+        applied = PhysioTuning.summary(PhysioTuning.read(context), context)
     }
 
     /**
@@ -215,27 +218,38 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
         offered = true
     }
 
-    fun describe(metric: PhysioAutoFitV1.Metric, b: PhysioAutoFitV1.Batch): String {
-        val name = if (metric == PhysioAutoFitV1.Metric.SHAPE) "форма" else "баланс"
-        if (b.fits.isEmpty()) return "ни один эпизод не посчитался"
+    fun describe(
+        androidContext: android.content.Context,
+        metric: PhysioAutoFitV1.Metric,
+        b: PhysioAutoFitV1.Batch,
+    ): String {
+        val text = androidContext.localized()
+        val name = text.getString(
+            if (metric == PhysioAutoFitV1.Metric.SHAPE) {
+                R.string.physio_tuning_section_metric_shape
+            } else {
+                R.string.physio_tuning_section_metric_balance
+            },
+        )
+        if (b.fits.isEmpty()) return text.getString(R.string.physio_tuning_section_describe_no_episodes)
         val m = b.median
         val lines = listOf(
-            "${b.fits.size} эпизодов · $name",
-            "ISF %.2f  (%s)".format(m.isf, PhysioAutoFitRuntime.spread(b) { it.isf }),
-            "инсулин %.0f · %.0f · %.0f · %.0f".format(
-                m.onsetMin,
-                m.fullSpeedMin,
-                m.phaseMin,
-                m.tailMin,
+            text.getString(R.string.physio_tuning_section_describe_episodes_metric, b.fits.size, name),
+            text.getString(
+                R.string.physio_tuning_section_describe_isf,
+                m.isf, PhysioAutoFitRuntime.spread(b) { it.isf },
             ),
-            "полн. скорость по эпизодам %s".format(
+            text.getString(
+                R.string.physio_tuning_section_describe_insulin,
+                m.onsetMin, m.fullSpeedMin, m.phaseMin, m.tailMin,
+            ),
+            text.getString(
+                R.string.physio_tuning_section_describe_full_speed_spread,
                 PhysioAutoFitRuntime.spread(b) { it.fullSpeedMin },
             ),
-            "%.0f ккал/ч · сито %.2f · типы %.2f · доверие %.2f".format(
-                m.emptyingKcalPerHour,
-                m.carbSieving,
-                m.carbSpread,
-                m.trustRamp,
+            text.getString(
+                R.string.physio_tuning_section_describe_totals,
+                m.emptyingKcalPerHour, m.carbSieving, m.carbSpread, m.trustRamp,
             ),
         )
         return lines.joinToString(separator = System.lineSeparator())
@@ -243,10 +257,9 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
 
     Card(modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Параметры модели (Physio)", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.physio_tuning_section_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Пусто = как отгружено. Ничего не меняется, пока не нажмёшь «Применить». " +
-                    "Эти числа доходят и до гипо-тревоги.",
+                stringResource(R.string.physio_tuning_section_intro_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -262,20 +275,23 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 .artifact(com.example.diapilot.data.Stores.get(context))
                 ?.personModelAt(12.0, emptySet())?.insulin
             Text(
-                "Сейчас применено: " + (liveShape?.let {
-                    "инсулин %.0f·%.0f·%.0f · ISF %.3f".format(
-                        it.onsetMin, it.peakMin, it.tailDurationMin, it.isf,
-                    )
-                } ?: "модель не установлена") + " · " + applied,
+                stringResource(
+                    R.string.physio_tuning_section_currently_applied,
+                    liveShape?.let {
+                        stringResource(
+                            R.string.physio_tuning_section_applied_shape,
+                            it.onsetMin, it.peakMin, it.tailDurationMin, it.isf,
+                        )
+                    } ?: stringResource(R.string.physio_tuning_section_no_model),
+                    applied,
+                ),
                 style = MaterialTheme.typography.labelMedium,
             )
             // WHICH SOURCE WON, not just what the number is. This card used to
             // say "applied" over a shape that never left these preferences, and
             // nothing on screen could have told the user.
             Text(
-                "Кривая инсулина: поля ниже — то же переопределение, что «Задать " +
-                    "вручную». Пустые — считается по сегментам укола. ISF идёт " +
-                    "своим путём и закрепляется отдельно.",
+                stringResource(R.string.physio_tuning_section_curve_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -307,16 +323,20 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             // screen with twelve more controls would let both be set against
             // each other with nothing to say so. Pasting a bench export applies
             // the set atomically and neutralises `carbSpread` with it.
-            Text("Форма углеводов со стенда", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Вставь сюда выгрузку песочницы (кнопка «Выгрузить всё»). Возьмутся только " +
-                    "двенадцать чисел треугольников; «различие типов» при этом станет 1.00, " +
-                    "потому что оно выражает то же самое.",
+                stringResource(R.string.physio_tuning_section_carb_shape_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                stringResource(R.string.physio_tuning_section_carb_shape_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                if (PhysioTuning.read(context).carbTriangles != null) "сейчас: свой набор"
-                else "сейчас: отгруженные",
+                if (PhysioTuning.read(context).carbTriangles != null) {
+                    stringResource(R.string.physio_tuning_section_triangles_custom)
+                } else {
+                    stringResource(R.string.physio_tuning_section_triangles_shipped)
+                },
                 style = MaterialTheme.typography.labelMedium,
             )
             // SHOWN AND EDITABLE. The first version could only accept a set,
@@ -325,6 +345,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             // that `carbSpread` would be set against them by hand — the applier
             // now neutralises it whenever a set is present, so what is left is
             // only the ordering, and that is clamped on save.
+            val triangleLabels = androidx.compose.ui.res.stringArrayResource(R.array.physio_tuning_triangle_labels)
             triFields.chunked(4).forEachIndexed { row, group ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     group.forEachIndexed { col, value ->
@@ -334,42 +355,48 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                             onValueChange = { nv ->
                                 triFields = triFields.toMutableList().also { it[idx] = nv }
                             },
-                            label = { Text(PhysioTuning.TRIANGLE_LABELS[idx], maxLines = 1) },
+                            label = { Text(triangleLabels[idx], maxLines = 1) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
             }
+            val statusNotAllFields = stringResource(R.string.physio_tuning_section_status_not_all_fields)
+            val statusAppliedReordered = stringResource(R.string.physio_tuning_section_status_applied_reordered)
+            val statusApplied = stringResource(R.string.physio_tuning_section_status_applied)
+            val statusRevertedShipped = stringResource(R.string.physio_tuning_section_status_reverted_shipped)
+            val statusParseFailed = stringResource(R.string.physio_tuning_section_status_parse_failed)
+            val statusAppliedFromExport = stringResource(R.string.physio_tuning_section_status_applied_from_export)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     val nums = triFields.mapNotNull { it.trim().replace(',', '.').toDoubleOrNull() }
                     if (nums.size != 12) {
-                        triStatus = "не все двенадцать полей — число не разобралось"
+                        triStatus = statusNotAllFields
                     } else {
                         val ordered = PhysioTuning.orderTriangles(nums)
                         PhysioTuning.setCarbTriangles(context, ordered)
                         spread = "1"
                         PhysioTuning.setCarbSpread(context, 1.0)
                         HybridModelStore.retune(context)
-                        applied = PhysioTuning.summary(PhysioTuning.read(context))
+                        applied = PhysioTuning.summary(PhysioTuning.read(context), context)
                         triFields = ordered.map { "%.2f".format(it).trimEnd('0').trimEnd('.') }
-                        triStatus = if (ordered != nums) "применено, порядок поправлен" else "применено"
+                        triStatus = if (ordered != nums) statusAppliedReordered else statusApplied
                     }
-                }) { Text("Применить поля") }
+                }) { Text(stringResource(R.string.physio_tuning_section_apply_fields_button)) }
                 Button(onClick = {
                     PhysioTuning.setCarbTriangles(context, null)
                     HybridModelStore.retune(context)
-                    applied = PhysioTuning.summary(PhysioTuning.read(context))
+                    applied = PhysioTuning.summary(PhysioTuning.read(context), context)
                     triFields = PhysioTuning.effectiveTriangles(context)
                         .map { "%.2f".format(it).trimEnd('0').trimEnd('.') }
-                    triStatus = "вернулись отгруженные"
-                }) { Text("Сбросить") }
+                    triStatus = statusRevertedShipped
+                }) { Text(stringResource(R.string.physio_tuning_section_reset_button)) }
             }
             OutlinedTextField(
                 value = benchPaste,
                 onValueChange = { benchPaste = it },
-                label = { Text("или вставь JSON выгрузки") },
+                label = { Text(stringResource(R.string.physio_tuning_section_paste_json_label)) },
                 singleLine = false,
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
@@ -380,25 +407,28 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                     onClick = {
                         val tri = PhysioTuning.trianglesFromBenchExport(benchPaste)
                         if (tri == null) {
-                            triStatus = "не разобралось — нужны все двенадцать чисел"
+                            triStatus = statusParseFailed
                         } else {
                             PhysioTuning.setCarbTriangles(context, tri)
                             spread = "1"
                             PhysioTuning.setCarbSpread(context, 1.0)
                             HybridModelStore.retune(context)
-                            applied = PhysioTuning.summary(PhysioTuning.read(context))
+                            applied = PhysioTuning.summary(PhysioTuning.read(context), context)
                             triFields = PhysioTuning.effectiveTriangles(context)
                                 .map { "%.2f".format(it).trimEnd('0').trimEnd('.') }
-                            triStatus = "применено из выгрузки"
+                            triStatus = statusAppliedFromExport
                         }
                     },
-                ) { Text("Применить набор") }
+                ) { Text(stringResource(R.string.physio_tuning_section_apply_set_button)) }
             }
             if (triStatus.isNotBlank()) {
                 Text(triStatus, style = MaterialTheme.typography.labelMedium)
             }
 
-            Text("Куда доходят эти ручки", style = MaterialTheme.typography.titleSmall)
+            Text(
+                stringResource(R.string.physio_tuning_section_reach_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
             // WHICH SURFACES vs WHICH VALUE — two different questions, and this
             // card used to answer only the first while looking like it answered
             // both. There is one engine, so every surface reads the same model;
@@ -411,18 +441,22 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             // is a BASE that `closed_episode_global_isf` then scales by its
             // promoted effect. Both are by design and neither was visible here.
             listOf(
-                Triple("линия прогноза и What-if", "да", true),
-                Triple("гипо-тревога", "да", true),
-                Triple("часы и виджет", "да", true),
+                Triple(R.string.physio_tuning_section_reach_forecast, R.string.physio_tuning_section_reach_yes, true),
+                Triple(R.string.physio_tuning_section_reach_hypo_alert, R.string.physio_tuning_section_reach_yes, true),
                 Triple(
-                    "тайминги инсулина",
-                    "ТОЛЬКО пока нет измеренной кривой",
+                    R.string.physio_tuning_section_reach_watch_widget,
+                    R.string.physio_tuning_section_reach_yes,
+                    true,
+                ),
+                Triple(
+                    R.string.physio_tuning_section_reach_insulin_timing,
+                    R.string.physio_tuning_section_reach_timing_verdict,
                     false,
                 ),
-                Triple("ISF", "как БАЗА — учитель её домножает", false),
+                Triple(R.string.physio_tuning_section_reach_isf, R.string.physio_tuning_section_reach_isf_verdict, false),
             ).forEach { (who, verdict, full) ->
                 Text(
-                    "· $who — $verdict",
+                    stringResource(R.string.physio_tuning_section_reach_row, stringResource(who), stringResource(verdict)),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (full) {
                         MaterialTheme.colorScheme.onSurface
@@ -432,31 +466,26 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 )
             }
             Text(
-                "Что реально применилось — в логе старта под меткой «PhysioTuning: ПРИМЕНЕНО к модели». " +
-                    "Если оно не совпадает с введённым — так и задумано, см. список выше.",
+                stringResource(R.string.physio_tuning_section_reach_log_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Модель одна, поэтому ISF, кривая " +
-                    "инсулина и доверие до него доходят. А ккал/ч, сито и различие типов, как и " +
-                    "выученные кривые блюд, читает только физио-плечо — там они не работают.",
+                stringResource(R.string.physio_tuning_section_reach_model_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Text(
-                "Доверие к горизонту: %.2f".format(ramp),
+                stringResource(R.string.physio_tuning_section_trust_ramp_label, ramp),
                 style = MaterialTheme.typography.labelLarge,
             )
             Slider(value = ramp, onValueChange = { ramp = it }, valueRange = 0f..1f, steps = 19)
             Text(
                 when {
-                    ramp >= 0.99 ->
-                        "1.00 — как в отгруженной модели: на часе до линии доходит половина " +
-                            "еды и половина инсулина"
-                    ramp <= 0.01 -> "0.00 — ужатия нет, физиология доходит целиком"
-                    else -> "на часе доходит %.0f%%".format(100 * (1 - 0.5 * ramp))
+                    ramp >= 0.99 -> stringResource(R.string.physio_tuning_section_ramp_full)
+                    ramp <= 0.01 -> stringResource(R.string.physio_tuning_section_ramp_zero)
+                    else -> stringResource(R.string.physio_tuning_section_ramp_partial, 100 * (1 - 0.5 * ramp))
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -470,14 +499,14 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 OutlinedTextField(
                     value = on,
                     onValueChange = { on = it },
-                    label = { Text("старт, мин") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_onset)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = pk,
                     onValueChange = { pk = it },
-                    label = { Text("полн. скорость") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_full_speed)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -490,22 +519,20 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 OutlinedTextField(
                     value = phase,
                     onValueChange = { phase = it },
-                    label = { Text("фаза, мин") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_phase)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = tail,
                     onValueChange = { tail = it },
-                    label = { Text("хвост, мин") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_tail)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
             }
             Text(
-                "Кривая разгоняется от «старта» до «полной скорости», держит максимум всю " +
-                    "«фазу», потом спадает до «хвоста». Хвост несёт ровно пятую часть дозы. " +
-                    "Стенд на его эпизодах даёт 28 · 40 · 30 · 165.",
+                stringResource(R.string.physio_tuning_section_curve_shape_explainer),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -518,14 +545,14 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 OutlinedTextField(
                     value = isf,
                     onValueChange = { isf = it },
-                    label = { Text("ISF, ммоль/ед") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_isf)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = kcal,
                     onValueChange = { kcal = it },
-                    label = { Text("ккал/ч") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_kcal)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -576,15 +603,18 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             ) {
                 Text(
                     if (adaptive == null) {
-                        "Адаптивный: ещё не посчитан (нужно ≥" +
-                            "${com.diapilot.core.physio.DailyBalanceIsfV1.MIN_DAYS} " +
-                            "годных суток за ${com.diapilot.core.physio.DailyBalanceIsfV1.WINDOW_DAYS} дн)"
+                        stringResource(
+                            R.string.physio_tuning_section_adaptive_pending,
+                            com.diapilot.core.physio.DailyBalanceIsfV1.MIN_DAYS,
+                            com.diapilot.core.physio.DailyBalanceIsfV1.WINDOW_DAYS,
+                        )
                     } else {
                         // "days", not "episodes": the estimator's unit changed
                         // and a label naming the old unit would misdescribe
                         // what the number is counted from.
-                        "Адаптивный: %.2f ммоль/ед · %d суток за %d дн".format(
-                            java.util.Locale.ROOT, adaptive.isf, adaptive.days,
+                        stringResource(
+                            R.string.physio_tuning_section_adaptive_ready,
+                            adaptive.isf, adaptive.days,
                             com.diapilot.core.physio.DailyBalanceIsfV1.WINDOW_DAYS,
                         )
                     },
@@ -605,32 +635,27 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             }
             Text(
                 if (source == com.example.diapilot.data.IsfSource.Choice.ADAPTIVE) {
-                    "Используется АДАПТИВНЫЙ (баланс суток). Сравните его с вашим числом: " +
-                        "если два независимых измерителя сходятся, выбор мало что меняет. " +
-                        "Систематическое смещение прогноза ISF не чинит."
+                    stringResource(R.string.physio_tuning_section_isf_source_adaptive_note)
                 } else {
-                    "Используется ВАШЕ число из поля выше."
+                    stringResource(R.string.physio_tuning_section_isf_source_manual_note)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             artifactIsf?.let { (applied, learned, episodes) ->
                 Text(
-                    "Применён к модели: %.3f ммоль/ед".format(applied),
+                    stringResource(R.string.physio_tuning_section_isf_applied, applied),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 if (learned != null) {
                     Text(
-                        "Альтернатива — измеренный/адаптивный: %.3f (эпизодов %d). ".format(learned, episodes) +
-                            "Ваше число закреплено и учитель его не трогает. " +
-                            // THE OFFER CARRIES A WARNING. On one real history a walk-forward
-                            // check on a repaired bench run, paired by day, found
-                            // the learner's value losing to the pinned one on
-                            // every column. A control
-                            // that offers a possibly worse number must say so,
-                            // or it is an invitation dressed as information.
-                            "Проверьте его на своей истории, прежде чем переключаться: " +
-                            "выученное число может дать форму хуже и больше ложных тревог.",
+                        // THE OFFER CARRIES A WARNING. On one real history a walk-forward
+                        // check on a repaired bench run, paired by day, found
+                        // the learner's value losing to the pinned one on
+                        // every column. A control
+                        // that offers a possibly worse number must say so,
+                        // or it is an invitation dressed as information.
+                        stringResource(R.string.physio_tuning_section_isf_alternative, learned, episodes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
@@ -650,10 +675,10 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                                 context, kept.copy(isfMmolPerU = null),
                             )
                             com.example.diapilot.data.PhysioTuning.setIsfMmol(context, null)
-                        }) { Text("Перейти на адаптивный") }
+                        }) { Text(stringResource(R.string.physio_tuning_section_switch_to_adaptive_button)) }
                         TextButton(onClick = {
                             isf = "%.3f".format(java.util.Locale.ROOT, learned)
-                        }) { Text("Закрепить его значение") }
+                        }) { Text(stringResource(R.string.physio_tuning_section_pin_value_button)) }
                     }
                 }
             }
@@ -665,14 +690,14 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 OutlinedTextField(
                     value = sieve,
                     onValueChange = { sieve = it },
-                    label = { Text("сито") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_sieve)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = spread,
                     onValueChange = { spread = it },
-                    label = { Text("различие типов") },
+                    label = { Text(stringResource(R.string.physio_tuning_section_label_spread)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -683,7 +708,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(onClick = { commit() }) { Text("Применить") }
+                Button(onClick = { commit() }) { Text(stringResource(R.string.physio_tuning_section_apply_button)) }
                 TextButton(
                     onClick = {
                         ramp = 1f
@@ -699,31 +724,42 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                         PhysioAutoFitController.clear()
                         PhysioTuning.reset(context)
                         HybridModelStore.retune(context)
-                        applied = PhysioTuning.summary(PhysioTuning.read(context))
+                        applied = PhysioTuning.summary(PhysioTuning.read(context), context)
                     },
-                ) { Text("Вернуть отгруженные") }
+                ) { Text(stringResource(R.string.physio_tuning_section_revert_shipped_button)) }
             }
 
-            Text("Автоподбор по последним 10 эпизодам", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Тайминги инсулина подбираются ТОЛЬКО в коридоре ±20% вокруг измеренного " +
-                    "профиля — их читает посегментный анализ твоих уколов, и подменять их " +
-                    "числом, которое лучше подошло к графику, нельзя. Очередь и типы " +
-                    "углеводов ходят в физиологичных пределах. ISF свободен: он и правда " +
-                    "дрейфует, и ловить этот дрейф — часть работы приложения.",
+                stringResource(R.string.physio_tuning_section_autofit_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                stringResource(R.string.physio_tuning_section_autofit_explainer),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Замок = не трогать при подборе. Запертая ручка остаётся на том, что применено " +
-                    "сейчас, а не на заводском.",
+                stringResource(R.string.physio_tuning_section_autofit_lock_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             listOf(
-                listOf("isf" to "ISF", "onset" to "старт", "fullSpeed" to "полн.скор", "phase" to "фаза"),
-                listOf("tail" to "хвост", "kcal" to "ккал/ч", "sieve" to "сито", "spread" to "типы"),
-                listOf("ramp" to "доверие", "fastShift" to "сдвиг быстрых"),
+                listOf(
+                    "isf" to R.string.physio_tuning_section_axis_isf,
+                    "onset" to R.string.physio_tuning_section_axis_onset,
+                    "fullSpeed" to R.string.physio_tuning_section_axis_full_speed,
+                    "phase" to R.string.physio_tuning_section_axis_phase,
+                ),
+                listOf(
+                    "tail" to R.string.physio_tuning_section_axis_tail,
+                    "kcal" to R.string.physio_tuning_section_axis_kcal,
+                    "sieve" to R.string.physio_tuning_section_axis_sieve,
+                    "spread" to R.string.physio_tuning_section_axis_spread,
+                ),
+                listOf(
+                    "ramp" to R.string.physio_tuning_section_axis_ramp,
+                    "fastShift" to R.string.physio_tuning_section_axis_fast_shift,
+                ),
             ).forEach { group ->
                 Row(
                     Modifier.fillMaxWidth(),
@@ -736,7 +772,9 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                             onClick = {
                                 locks = if (axis in locks) locks - axis else locks + axis
                             },
-                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            label = {
+                                Text(stringResource(label), style = MaterialTheme.typography.labelSmall)
+                            },
                         )
                     }
                 }
@@ -748,8 +786,8 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 listOf(
-                    "форма" to PhysioAutoFitV1.Metric.SHAPE,
-                    "баланс" to PhysioAutoFitV1.Metric.BALANCE,
+                    R.string.physio_tuning_section_metric_shape to PhysioAutoFitV1.Metric.SHAPE,
+                    R.string.physio_tuning_section_metric_balance to PhysioAutoFitV1.Metric.BALANCE,
                 ).forEach { (name, metric) ->
                     Button(
                         // Disabled from the SHARED state, so it stays disabled
@@ -777,21 +815,29 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                                 ),
                             )
                         },
-                    ) { Text(name) }
+                    ) { Text(stringResource(name)) }
                 }
                 if (running != null) {
-                    TextButton(onClick = {}, enabled = false) { Text("идёт расчёт") }
+                    TextButton(onClick = {}, enabled = false) {
+                        Text(stringResource(R.string.physio_tuning_section_running_indicator))
+                    }
                 }
             }
 
             when (val f = fit) {
                 is PhysioAutoFitController.State.Running -> {
-                    val label = if (f.metric == PhysioAutoFitV1.Metric.SHAPE) "форма" else "баланс"
+                    val label = stringResource(
+                        if (f.metric == PhysioAutoFitV1.Metric.SHAPE) {
+                            R.string.physio_tuning_section_metric_shape
+                        } else {
+                            R.string.physio_tuning_section_metric_balance
+                        },
+                    )
                     Text(
                         if (f.total == 0) {
-                            "Подбор «$label»: собираю эпизоды…"
+                            stringResource(R.string.physio_tuning_section_running_collecting, label)
                         } else {
-                            "Подбор «$label»: эпизод ${f.done} из ${f.total}"
+                            stringResource(R.string.physio_tuning_section_running_progress, label, f.done, f.total)
                         },
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -804,15 +850,14 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                         )
                     }
                     Text(
-                        "Можно уйти с вкладки — расчёт продолжается. Каждый эпизод это около " +
-                            "двухсот прогонов модели, так что десять занимают минуту-две.",
+                        stringResource(R.string.physio_tuning_section_running_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
                 is PhysioAutoFitController.State.Done -> {
-                    Text(describe(f.metric, f.batch), style = MaterialTheme.typography.labelMedium)
+                    Text(describe(context, f.metric, f.batch), style = MaterialTheme.typography.labelMedium)
 
                     // WHAT IT BOUGHT, against what is applied today, on the same
                     // episodes. Both numbers are shown even when the fit made
@@ -828,12 +873,13 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Против применённого сейчас, на тех же ${f.batch.fits.size} эпизодах:",
+                        stringResource(R.string.physio_tuning_section_done_against_applied, f.batch.fits.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "форма %.2f -> %.2f (%+.2f)   сдвиг %.2f -> %.2f (%+.2f)".format(
+                        stringResource(
+                            R.string.physio_tuning_section_done_shape_bias,
                             f.shapeBefore, f.shapeAfter, dShape,
                             f.biasBefore, f.biasAfter, dBias,
                         ),
@@ -841,12 +887,12 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                     )
                     Text(
                         when {
-                            dShape < -0.05 && dBias <= 0.05 -> "Лучше по обоим — это редкий случай."
-                            dShape < -0.05 -> "Форма лучше, сдвиг хуже: линия точнее следует за " +
-                                "поворотами, но сидит дальше от факта."
-                            dBias < -0.05 && dShape > 0.05 -> "Сдвиг лучше, форма хуже: средний " +
-                                "уровень выправлен, ходы линии — нет."
-                            else -> "Разница в пределах шума. Применять незачем."
+                            dShape < -0.05 && dBias <= 0.05 ->
+                                stringResource(R.string.physio_tuning_section_outcome_both_better)
+                            dShape < -0.05 -> stringResource(R.string.physio_tuning_section_outcome_shape_better)
+                            dBias < -0.05 && dShape > 0.05 ->
+                                stringResource(R.string.physio_tuning_section_outcome_bias_better)
+                            else -> stringResource(R.string.physio_tuning_section_outcome_noise)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -859,7 +905,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                     // it puts the chart on that moment so the user can look.
                     HorizontalDivider()
                     Text(
-                        "На чём подобрано — нажми, чтобы открыть график на этом месте",
+                        stringResource(R.string.physio_tuning_section_episodes_header),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -875,11 +921,11 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                         Button(
                             enabled = f.batch.fits.isNotEmpty(),
                             onClick = { offer(f.batch.median) },
-                        ) { Text("Подставить в поля") }
+                        ) { Text(stringResource(R.string.physio_tuning_section_load_into_fields_button)) }
                         TextButton(onClick = {
                             offered = false
                             PhysioAutoFitController.clear()
-                        }) { Text("Убрать") }
+                        }) { Text(stringResource(R.string.physio_tuning_section_clear_button)) }
                     }
                 }
 
@@ -891,27 +937,19 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
 
             if (offered) {
                 Text(
-                    "Числа подставлены в поля выше, но НЕ применены. Разброс в скобках — это " +
-                        "разногласие между эпизодами, а не погрешность: если он широкий, " +
-                        "медиана описывает не все дни одинаково.",
+                    stringResource(R.string.physio_tuning_section_offered_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             Text(
-                "ЧТО ИЗМЕРЕНО: рампа («доверие») удерживает половину еды и инсулина на часе, " +
-                    "и из-за неё поздний пик покупает лишний инсулиновый эффект даром — то " +
-                    "есть тайминг протекает в количество. Со снятой рампой подбор по его 22 " +
-                    "эпизодам даёт пик 40–42 мин в 13 случаях.",
+                stringResource(R.string.physio_tuning_section_measured_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "ЧТО НЕ ИЗМЕРЕНО: что станет с гипо-тревогами. Направление — раньше, то есть " +
-                    "в сторону безопасности, но насколько раньше, не проверено. Модель-ревью " +
-                    "ещё не проходило. И подбор по «балансу» тянет ISF вниз, подъедая недобор " +
-                    "еды: смотри на арм «форма», если хочешь именно чувствительность.",
+                stringResource(R.string.physio_tuning_section_not_measured_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -940,9 +978,20 @@ private fun EpisodeRow(
     val units = e.boluses.sumOf { it.units }
     // Relative minutes, because "+15 min" says what a clock time does not: how
     // the meal and the dose sat against each other inside the window.
+    val context = LocalContext.current
     val events = buildList {
-        e.foods.forEach { add((it.tsMs - e.startMs) / 60_000 to "еда %.0f г".format(it.carbsG)) }
-        e.boluses.forEach { add((it.tsMs - e.startMs) / 60_000 to "%.1f ед".format(it.units)) }
+        e.foods.forEach {
+            add(
+                (it.tsMs - e.startMs) / 60_000 to
+                    context.getString(R.string.physio_tuning_section_episode_food, it.carbsG),
+            )
+        }
+        e.boluses.forEach {
+            add(
+                (it.tsMs - e.startMs) / 60_000 to
+                    context.getString(R.string.physio_tuning_section_episode_units, it.units),
+            )
+        }
     }.sortedBy { it.first }
     Column(
         Modifier
@@ -952,7 +1001,8 @@ private fun EpisodeRow(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
-            "%s · %.0f ч · %.0f г · %.1f ед".format(
+            stringResource(
+                R.string.physio_tuning_section_episode_summary,
                 fmt.format(java.util.Date(e.startMs)), hours, carbs, units,
             ),
             style = MaterialTheme.typography.labelMedium,
@@ -964,13 +1014,17 @@ private fun EpisodeRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val eventTexts = events.map {
+            stringResource(R.string.physio_tuning_section_episode_offset, it.first, it.second)
+        }
         Text(
-            events.joinToString("  ") { "+%d %s".format(it.first, it.second) },
+            eventTexts.joinToString("  "),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            "этот эпизод хочет: ISF %.2f · пик %.0f · форма %.2f".format(
+            stringResource(
+                R.string.physio_tuning_section_episode_wants,
                 fit.knobs.isf, fit.knobs.fullSpeedMin, fit.score.shape,
             ),
             style = MaterialTheme.typography.labelSmall,

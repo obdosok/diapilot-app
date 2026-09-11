@@ -35,7 +35,7 @@ class InsulinCurveRuntimeTest {
         // «nothing happened» is how a built curve fails to reach the forecast
         // with nobody the wiser — which is exactly what the screen caught.
         assertNotNull("a refusal must carry its reason", applied.refusal)
-        assertTrue(applied.refusal!!, applied.refusal.contains("монотон"))
+        assertTrue(applied.refusal!!, applied.refusal.contains("monoton"))
     }
 
     /**
@@ -66,6 +66,6 @@ class InsulinCurveRuntimeTest {
         val thin = PersonalInsulinCurveV1(knots, 2, 1, 2.0, target)
         val applied = InsulinCurveRuntime.applyWithReason(base(), thin)
         assertEquals(base().insulin, applied.model.insulin)
-        assertTrue(applied.refusal!!, applied.refusal.contains("наблюдений"))
+        assertTrue(applied.refusal!!, applied.refusal.contains("observations"))
     }
 }
