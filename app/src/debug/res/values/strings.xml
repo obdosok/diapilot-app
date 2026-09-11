@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: a distinct launcher, notification and widget label, so a
+     debug install is never mistaken for another DiaPilot on the same phone.
+     Release builds keep the name from src/main/res/values/strings.xml. -->
+<resources>
+    <string name="app_name" translatable="false">DiaPilot debug</string>
+</resources>

@@ -20,8 +20,10 @@ import com.diapilot.core.collector.GlucosePoint
 object DiaForFacts {
 
     /** The air shot that purges a fresh cartridge — insulin that left the pen
-     *  but never entered the body. It is the one `prime` DiaPilot records. */
-    const val PURPOSE_AIR = "воздух"
+     *  but never entered the body. It is the one `prime` DiaPilot records.
+     *  The stored key; test purposes with [com.diapilot.core.analysis.isPrimePurpose],
+     *  which also accepts the older Russian token. */
+    const val PURPOSE_AIR = "prime"
 
     /*
      * THE FLOOR. Nothing before the food-era start ([FoodEra.startMs]) is
@@ -112,7 +114,7 @@ object DiaForFacts {
                 occurredAtMs = b.tsMs,
                 payload = EventPayloads.insulin(
                     b.units,
-                    if (b.purpose == PURPOSE_AIR) InsulinKind.PRIME else InsulinKind.BOLUS,
+                    if (com.diapilot.core.analysis.isPrimePurpose(b.purpose)) InsulinKind.PRIME else InsulinKind.BOLUS,
                     bolusProduct,
                     DeliveryStatus.DELIVERED,
                 ),

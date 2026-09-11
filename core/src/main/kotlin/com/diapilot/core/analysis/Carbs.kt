@@ -8,11 +8,69 @@
  */
 package com.diapilot.core.analysis
 
+/*
+ * LLM PROTOCOL MARKERS. New analyses carry the English markers below, whatever
+ * the reply language; the prompts ask for them and the serializer writes them.
+ * Stored analyses and restored backups contain the older Russian markers
+ * ([LEGACY_LINE_PREFIXES]), so every parser reads BOTH forms, forever — test a
+ * line with [isMarkerLine], never with a bare `startsWith`.
+ */
+
 /** Prefix of the machine-readable carbs line the Vision prompt requires. */
-const val CARBS_LINE_PREFIX = "УГЛЕВОДЫ"
-const val PROTEIN_LINE_PREFIX = "БЕЛКИ"
-const val FAT_LINE_PREFIX = "ЖИРЫ"
-const val KCAL_LINE_PREFIX = "ККАЛ"
+const val CARBS_LINE_PREFIX = "CARBS"
+const val PROTEIN_LINE_PREFIX = "PROTEIN"
+const val FAT_LINE_PREFIX = "FAT"
+const val KCAL_LINE_PREFIX = "KCAL"
+
+/** Per-component confidence/speed line (see [serializeFoodAnalysis]). */
+const val META_LINE_PREFIX = "META"
+
+/** Composition-line tags after "=": carbs of one unit, natural portion of one unit. */
+const val COMPONENT_CARBS_TAG = "carbs"
+const val COMPONENT_PORTION_TAG = "portion"
+
+/** The older Russian composition tags, read forever. */
+const val LEGACY_COMPONENT_CARBS_TAG = "угл"
+const val LEGACY_COMPONENT_PORTION_TAG = "порц"
+
+/** Marker -> the Russian marker older builds asked for and stored. */
+val LEGACY_LINE_PREFIXES: Map<String, String> = mapOf(
+    "CARBS" to "УГЛЕВОДЫ",
+    "PROTEIN" to "БЕЛКИ",
+    "FAT" to "ЖИРЫ",
+    "KCAL" to "ККАЛ",
+    "GI" to "ГИ",
+    "NAME" to "НАЗВАНИЕ",
+    "COMPOSITION" to "СОСТАВ",
+    "ASSUMPTION" to "ДОПУЩЕНИЕ",
+    "CLARIFICATION" to "УТОЧНЕНИЕ",
+    "META" to "МЕТА",
+)
+
+/** Both spellings of [prefix]: the current marker and its legacy Russian form. */
+fun markerForms(prefix: String): List<String> = listOfNotNull(prefix, LEGACY_LINE_PREFIXES[prefix])
+
+/**
+ * Is [line] a [prefix] machine line?
+ *
+ * The current English marker must be followed by a colon ("CARBS: 40 g"), so
+ * a prose line such as "Carbs mostly come from rice" is never read as data.
+ * The legacy Russian marker keeps the exact rule each parser applied to it
+ * before: carbs and nutrition lines matched on the bare word, the GI marker on the word
+ * followed by a colon or a space, every other marker on the word plus colon.
+ */
+fun isMarkerLine(line: String, prefix: String): Boolean {
+    val t = line.trim()
+    if (Regex("""^${Regex.escape(prefix)}\s*:""", RegexOption.IGNORE_CASE).containsMatchIn(t)) return true
+    val legacy = LEGACY_LINE_PREFIXES[prefix] ?: return false
+    return when (prefix) {
+        CARBS_LINE_PREFIX, PROTEIN_LINE_PREFIX, FAT_LINE_PREFIX, KCAL_LINE_PREFIX ->
+            t.startsWith(legacy, ignoreCase = true)
+        GI_LINE_PREFIX ->
+            t.startsWith("$legacy:", ignoreCase = true) || t.startsWith("$legacy ", ignoreCase = true)
+        else -> t.startsWith("$legacy:", ignoreCase = true)
+    }
+}
 
 data class FoodNutrition(
     val proteinG: Double? = null,
@@ -31,7 +89,7 @@ data class FoodNutrition(
 fun parseFoodNutrition(analysis: String?): FoodNutrition {
     fun value(prefix: String): Double? {
         val raw = analysis?.lineSequence()
-            ?.lastOrNull { it.trim().startsWith(prefix, ignoreCase = true) }
+            ?.lastOrNull { isMarkerLine(it, prefix) }
             ?.substringAfter(':', "")
             ?: return null
         return Regex("""\d+(?:[.,]\d+)?""").find(raw)?.value
@@ -49,10 +107,10 @@ fun parseFoodNutrition(analysis: String?): FoodNutrition {
 
 fun nutritionLines(n: FoodNutrition): String = buildString {
     n.proteinG?.let {
-        appendLine("$PROTEIN_LINE_PREFIX: ${"%.1f".format(java.util.Locale.ROOT, it)} г")
+        appendLine("$PROTEIN_LINE_PREFIX: ${"%.1f".format(java.util.Locale.ROOT, it)} g")
     }
     n.fatG?.let {
-        appendLine("$FAT_LINE_PREFIX: ${"%.1f".format(java.util.Locale.ROOT, it)} г")
+        appendLine("$FAT_LINE_PREFIX: ${"%.1f".format(java.util.Locale.ROOT, it)} g")
     }
     n.kcal?.let {
         appendLine("$KCAL_LINE_PREFIX: ${"%.0f".format(java.util.Locale.ROOT, it)}")
@@ -65,10 +123,9 @@ fun nutritionLines(n: FoodNutrition): String = buildString {
 fun withFoodNutrition(analysis: String?, nutrition: FoodNutrition): String {
     val kept = analysis.orEmpty().lineSequence()
         .filterNot { line ->
-            val t = line.trim()
-            t.startsWith(PROTEIN_LINE_PREFIX, ignoreCase = true) ||
-                t.startsWith(FAT_LINE_PREFIX, ignoreCase = true) ||
-                t.startsWith(KCAL_LINE_PREFIX, ignoreCase = true)
+            isMarkerLine(line, PROTEIN_LINE_PREFIX) ||
+                isMarkerLine(line, FAT_LINE_PREFIX) ||
+                isMarkerLine(line, KCAL_LINE_PREFIX)
         }
         .joinToString("\n")
         .trim()
@@ -88,7 +145,7 @@ fun withFoodNutrition(analysis: String?, nutrition: FoodNutrition): String {
 fun parseCarbsEstimate(analysis: String): Double? {
     val line = analysis.lineSequence()
         .map { it.trim() }
-        .lastOrNull { it.startsWith(CARBS_LINE_PREFIX, ignoreCase = true) }
+        .lastOrNull { isMarkerLine(it, CARBS_LINE_PREFIX) }
         ?: return null
     val numbers = Regex("""\d+(?:[.,]\d+)?""")
         .findAll(line)
@@ -102,7 +159,7 @@ fun parseCarbsEstimate(analysis: String): Double? {
 }
 
 /** Prefix of the machine-readable glycemic-index line in LLM food analyses. */
-const val GI_LINE_PREFIX = "ГИ"
+const val GI_LINE_PREFIX = "GI"
 
 /**
  * Extract the glycemic index from an LLM food analysis — same contract as
@@ -112,7 +169,7 @@ const val GI_LINE_PREFIX = "ГИ"
 fun parseGiEstimate(analysis: String): Double? {
     val line = analysis.lineSequence()
         .map { it.trim() }
-        .lastOrNull { it.startsWith("$GI_LINE_PREFIX:", ignoreCase = true) || it.startsWith("$GI_LINE_PREFIX ", ignoreCase = true) }
+        .lastOrNull { isMarkerLine(it, GI_LINE_PREFIX) }
         ?: return null
     val numbers = Regex("""\d+(?:[.,]\d+)?""")
         .findAll(line)
@@ -133,7 +190,7 @@ fun parseGiEstimate(analysis: String): Double? {
 fun giTimeToPeakMin(gi: Double): Double = (115.0 - 0.85 * gi).coerceIn(35.0, 100.0)
 
 /** Prefix of the machine-readable clean-title line in LLM food analyses. */
-const val TITLE_LINE_PREFIX = "НАЗВАНИЕ"
+const val TITLE_LINE_PREFIX = "NAME"
 
 /**
  * Extract the LLM's clean dish title (`TITLE_LINE_PREFIX: cantucci with tea`) — the
@@ -143,12 +200,12 @@ const val TITLE_LINE_PREFIX = "НАЗВАНИЕ"
 fun parseNameSuggestion(analysis: String): String? =
     analysis.lineSequence()
         .map { it.trim() }
-        .firstOrNull { it.startsWith("$TITLE_LINE_PREFIX:", ignoreCase = true) }
+        .firstOrNull { isMarkerLine(it, TITLE_LINE_PREFIX) }
         ?.substringAfter(':')?.trim()?.trim('«', '»', '"', '.', ' ')
         ?.takeIf { it.isNotEmpty() && it.length <= 40 }
 
 /** Prefix of machine-readable per-component lines in LLM food analyses. */
-const val COMPONENT_LINE_PREFIX = "СОСТАВ"
+const val COMPONENT_LINE_PREFIX = "COMPOSITION"
 
 /**
  * Composite meals, step 1: knowledge transfer needs NAMES that match.
@@ -222,7 +279,7 @@ private fun numBefore(text: String, tag: String): Double? =
 fun parseComponents(analysis: String): List<ComponentEstimate> =
     analysis.lineSequence()
         .map { it.trim() }
-        .filter { it.startsWith("$COMPONENT_LINE_PREFIX:", ignoreCase = true) }
+        .filter { isMarkerLine(it, COMPONENT_LINE_PREFIX) }
         .mapNotNull { line ->
             val rest = line.substringAfter(':').trim()
             var name = rest.substringBefore('=').trim().trim('-', '•', '*', ' ')
@@ -232,8 +289,8 @@ fun parseComponents(analysis: String): List<ComponentEstimate> =
                 name = name.removeRange(m.range).trim()
             }
             val eq = rest.substringAfter('=', "")
-            val portion = numBefore(eq, "порц")
-            val carbsTag = numBefore(eq, "угл")
+            val portion = numBefore(eq, COMPONENT_PORTION_TAG) ?: numBefore(eq, LEGACY_COMPONENT_PORTION_TAG)
+            val carbsTag = numBefore(eq, COMPONENT_CARBS_TAG) ?: numBefore(eq, LEGACY_COMPONENT_CARBS_TAG)
             val carbs = when {
                 carbsTag != null -> carbsTag
                 portion != null -> carbsForPortion(conceptFor(name)?.id, portion)
@@ -264,17 +321,35 @@ fun parseComponents(analysis: String): List<ComponentEstimate> =
  * authoritative; bullet-only = raw LLM range midpoints → keep the stored estCarbs.
  */
 fun hasCanonicalComposition(analysis: String?): Boolean =
-    analysis?.lineSequence()?.any {
-        it.trim().startsWith("$COMPONENT_LINE_PREFIX:", ignoreCase = true)
-    } == true
+    analysis?.lineSequence()?.any { isMarkerLine(it, COMPONENT_LINE_PREFIX) } == true
 
-/** The canonical `COMPONENT_LINE_PREFIX:` line for a component (portion + carbs). */
-fun sostavLine(name: String, count: Int, carbs: Double, portionGrams: Double?): String = buildString {
-    append("$COMPONENT_LINE_PREFIX: ${name.trim()}")
+/**
+ * The canonical `COMPONENT_LINE_PREFIX:` line for a component (portion + carbs):
+ * "COMPOSITION: bread ×2 = 12 carbs · 35 portion".
+ *
+ * [legacy] writes the older Russian marker and tags instead. Only a rewrite of
+ * a line that is ALREADY in that form uses it, so editing a number in a stored
+ * analysis changes the number and nothing else.
+ */
+fun sostavLine(
+    name: String,
+    count: Int,
+    carbs: Double,
+    portionGrams: Double?,
+    legacy: Boolean = false,
+): String = buildString {
+    val marker = if (legacy) LEGACY_LINE_PREFIXES.getValue(COMPONENT_LINE_PREFIX) else COMPONENT_LINE_PREFIX
+    val carbsTag = if (legacy) LEGACY_COMPONENT_CARBS_TAG else COMPONENT_CARBS_TAG
+    val portionTag = if (legacy) LEGACY_COMPONENT_PORTION_TAG else COMPONENT_PORTION_TAG
+    append("$marker: ${name.trim()}")
     if (count > 1) append(" ×$count")
-    append(" = %.0f угл".format(carbs))
-    portionGrams?.takeIf { it > 0 }?.let { append(" · %.0f порц".format(it)) }
+    append(" = %.0f $carbsTag".format(carbs))
+    portionGrams?.takeIf { it > 0 }?.let { append(" · %.0f $portionTag".format(it)) }
 }
+
+/** True when [line] is a composition line in the older Russian form. */
+fun isLegacyCompositionLine(line: String): Boolean =
+    line.trim().startsWith("${LEGACY_LINE_PREFIXES.getValue(COMPONENT_LINE_PREFIX)}:", ignoreCase = true)
 
 /** Per-UNIT grams by component name — the dictionary-learning view of
  *  [parseComponents], kept for existing callers. */
@@ -335,14 +410,14 @@ data class FoodAnalysisOut(
     val assumptions: List<FoodAssumptionOut> = emptyList(),
 )
 
-const val ASSUMPTION_LINE_PREFIX = "ДОПУЩЕНИЕ"
-const val CLARIFICATION_LINE_PREFIX = "УТОЧНЕНИЕ"
+const val ASSUMPTION_LINE_PREFIX = "ASSUMPTION"
+const val CLARIFICATION_LINE_PREFIX = "CLARIFICATION"
 
 /** The stored assumptions of a note, newest analysis last — what the dialogue
  *  turns into ONE pointed question. */
 fun parseFoodAssumptions(analysis: String?): List<FoodAssumptionOut> =
     analysis?.lineSequence()
-        ?.filter { it.trim().startsWith("$ASSUMPTION_LINE_PREFIX:", ignoreCase = true) }
+        ?.filter { isMarkerLine(it, ASSUMPTION_LINE_PREFIX) }
         ?.map { line ->
             val body = line.substringAfter(':').trim()
             val component = Regex("""^\[([^\]]+)\]\s*""").find(body)?.groupValues?.get(1)
@@ -362,7 +437,7 @@ fun parseFoodAssumptions(analysis: String?): List<FoodAssumptionOut> =
 fun hasClarification(analysis: String?, component: String?): Boolean =
     component != null && analysis?.lineSequence()?.any {
         val t = it.trim()
-        t.startsWith("$CLARIFICATION_LINE_PREFIX:", ignoreCase = true) &&
+        isMarkerLine(t, CLARIFICATION_LINE_PREFIX) &&
             t.substringAfter(':').trim().startsWith("[$component]", ignoreCase = true)
     } == true
 
@@ -386,14 +461,15 @@ fun serializeFoodAnalysis(a: FoodAnalysisOut): String = buildString {
     fun oneLine(s: String?): String {
         val flat = s?.replace('\n', ' ')?.replace('\r', ' ')?.trim()
             ?.replace(Regex("""\s{2,}"""), " ").orEmpty()
-        val reserved = flat.startsWith("$COMPONENT_LINE_PREFIX:", ignoreCase = true) ||
-            flat.startsWith("$TITLE_LINE_PREFIX:", ignoreCase = true) ||
-            flat.startsWith(CARBS_LINE_PREFIX, ignoreCase = true) ||
+        // Both marker forms are reserved: the parsers read the legacy ones too.
+        val reserved = isMarkerLine(flat, COMPONENT_LINE_PREFIX) ||
+            isMarkerLine(flat, TITLE_LINE_PREFIX) ||
+            isMarkerLine(flat, CARBS_LINE_PREFIX) ||
             // A dish name opening with a fake CLARIFICATION_LINE_PREFIX would make
             // hasClarification true and silently suppress the layer-5
             // question — the exact defect the layer exists to remove.
-            flat.startsWith("$ASSUMPTION_LINE_PREFIX:", ignoreCase = true) ||
-            flat.startsWith("$CLARIFICATION_LINE_PREFIX:", ignoreCase = true)
+            isMarkerLine(flat, ASSUMPTION_LINE_PREFIX) ||
+            isMarkerLine(flat, CLARIFICATION_LINE_PREFIX)
         return if (reserved) "· $flat" else flat
     }
 
@@ -439,7 +515,7 @@ fun serializeFoodAnalysis(a: FoodAnalysisOut): String = buildString {
         }
         if (bits.isEmpty()) null else "${c.name.trim()} [${bits.joinToString(" · ")}]"
     }
-    if (meta.isNotEmpty()) appendLine("МЕТА: " + meta.joinToString("; "))
+    if (meta.isNotEmpty()) appendLine("$META_LINE_PREFIX: " + meta.joinToString("; "))
     // Layer 5: guesses are stored NAMED, so the dialogue can ask one pointed
     // question and a later reader can see what was assumption rather than
     // fact. Defanged like every other free-text field.
@@ -461,8 +537,8 @@ fun serializeFoodAnalysis(a: FoodAnalysisOut): String = buildString {
     val hi = listOfNotNull(a.totalCarbsMin, a.totalCarbsMax).maxOrNull()
     when {
         lo != null && hi != null && hi > lo ->
-            appendLine("$CARBS_LINE_PREFIX: " + String.format(java.util.Locale.ROOT, "%.0f–%.0f г", lo, hi))
-        lo != null -> appendLine("$CARBS_LINE_PREFIX: " + String.format(java.util.Locale.ROOT, "%.0f г", lo))
+            appendLine("$CARBS_LINE_PREFIX: " + String.format(java.util.Locale.ROOT, "%.0f–%.0f g", lo, hi))
+        lo != null -> appendLine("$CARBS_LINE_PREFIX: " + String.format(java.util.Locale.ROOT, "%.0f g", lo))
     }
 }.trimEnd('\n')
 
@@ -484,7 +560,7 @@ private fun parseComponentBullets(analysis: String): List<Pair<String, Double>> 
             val firstWord = name.lowercase().substringBefore(' ')
             if (firstWord == "\u0435\u0441\u043b\u0438" || firstWord.startsWith("\u0432\u043e\u0437\u043c\u043e\u0436\u043d")) return@mapNotNull null
             val tail = m.groupValues[2]
-            val g = Regex("""[~\u2248]?\s*(\d+(?:[.,]\d+)?)(?:\s*[\u2013\u2014-]\s*(\d+(?:[.,]\d+)?))?\s*г\b""")
+            val g = Regex("""[~\u2248]?\s*(\d+(?:[.,]\d+)?)(?:\s*[\u2013\u2014-]\s*(\d+(?:[.,]\d+)?))?\s*(?:г|g)\b""")
                 .find(tail) ?: return@mapNotNull null
             val lo = g.groupValues[1].replace(',', '.').toDouble()
             val hi = g.groupValues[2].takeIf { it.isNotEmpty() }?.replace(',', '.')?.toDouble()

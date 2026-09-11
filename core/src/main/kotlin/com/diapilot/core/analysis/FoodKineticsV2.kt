@@ -173,7 +173,7 @@ private data class MetaSpeed(val speed:CarbSpeed,val confidence:Double)
 
 /** Read the component-level structured tool output already stored in META. */
 private fun componentSpeedMeta(analysis:String):Map<String,MetaSpeed> {
-    val line=analysis.lineSequence().lastOrNull{it.trim().startsWith("МЕТА:",true)}?:return emptyMap()
+    val line=analysis.lineSequence().lastOrNull{isMarkerLine(it,META_LINE_PREFIX)}?:return emptyMap()
     return line.substringAfter(':').split(';').mapNotNull { raw ->
         val name=normalizeFoodName(raw.substringBefore('[').trim());if(name.isBlank())return@mapNotNull null
         val body=raw.substringAfter('[',"").substringBeforeLast(']',"").lowercase()

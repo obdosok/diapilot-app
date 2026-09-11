@@ -8,8 +8,10 @@ package com.diapilot.core.analysis
 
 import com.diapilot.core.collector.Annotation
 
-/** Rescue carbs are food, but merging them into a meal misstates both. */
-const val RESCUE_NOTE_PREFIX = "декстроза"
+/** Rescue carbs are food, but merging them into a meal misstates both. The
+ *  stored prefix of the rescue note ("dextrose ×2"); test notes with
+ *  [isRescueNote], which also accepts the older Russian prefix. */
+const val RESCUE_NOTE_PREFIX = "dextrose"
 
 /** A note that names something eaten (vs a context tag or system label). */
 fun isFoodNote(n: Annotation): Boolean =
@@ -67,9 +69,9 @@ fun groupMealSessions(
     if (food.isEmpty()) return emptyList()
     val sessions = mutableListOf<MutableList<Annotation>>()
     food.forEach { n ->
-        val rescue = n.content.startsWith(RESCUE_NOTE_PREFIX, ignoreCase = true)
+        val rescue = isRescueNote(n.content)
         val cur = sessions.lastOrNull()
-        val curRescue = cur?.last()?.content?.startsWith(RESCUE_NOTE_PREFIX, ignoreCase = true)
+        val curRescue = cur?.last()?.content?.let(::isRescueNote)
         val reachMs = if (cur == null || extentMinOf == null) gapMs else {
             val fromStart = (extentMinOf(cur) * 60_000).toLong() - (cur.last().tsMs - cur.first().tsMs)
             maxOf(gapMs, fromStart)

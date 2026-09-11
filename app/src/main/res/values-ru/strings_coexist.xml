@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- SettingsScreen, Data card -->
+    <string name="settings_screen_auto_backup_label">Ежедневная копия в Загрузки</string>
+
+    <!-- SettingsScreen, Libre 2 card -->
+    <string name="settings_screen_libre_nfc_label">Сканировать Libre 2 по NFC</string>
+    <string name="settings_screen_libre_nfc_hint">Считывает сенсор, когда телефон поднесён к нему; данные расшифровывает OOP2. Нужен установленный OOP2. Для своего BLE ниже это должно быть включено.</string>
+
+    <!-- MainActivity: a Libre tag while the scan is switched off -->
+    <string name="main_activity_libre_nfc_off">Libre: сканирование по NFC выключено — включите в «Ещё» → Libre 2</string>
+</resources>

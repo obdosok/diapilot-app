@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.diapilot"
+    namespace = "io.github.obdosok.diapilot"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,15 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.diapilot"
+        // The public build's own identity. It deliberately differs from any
+        // private build of this source, so the two install side by side, each
+        // with its own sandbox (database, photos, preferences), and neither can
+        // update, overwrite or uninstall the other. Everything that embeds the
+        // id — the FileProvider authority, broadcast actions, file names in
+        // shared storage — derives from `${applicationId}` /
+        // `BuildConfig.APPLICATION_ID` (see AppIdentity), never from a literal.
+        // The Kotlin package and `namespace` above are a separate matter.
+        applicationId = "io.github.obdosok.diapilot"
         minSdk = 26
         targetSdk = 36
         // Stage 7 maintenance/What-if hotfix. A higher code makes Android
@@ -42,7 +50,7 @@ android {
             // The debug key rather than a new release keystore is what keeps the
             // user's data: same `applicationId`, same signature and the same
             // `versionCode` make this an update in place, so
-            // `/data/user/0/com.example.diapilot` — the SQLite history and
+            // `/data/user/0/<applicationId>` — the SQLite history and
             // `files/photos` — survives. A DIFFERENT key would make the install
             // fail and tempt someone into `uninstall`, which is exactly how six
             // weeks of glucose history would be lost.

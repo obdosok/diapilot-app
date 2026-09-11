@@ -78,7 +78,7 @@ data class StatusForecast(
 
 /**
  * The summary as data; the app renders it in the UI language
- * (`com.example.diapilot.i18n.StatusText`). [acting] is the first line's
+ * (`io.github.obdosok.diapilot.i18n.StatusText`). [acting] is the first line's
  * fragments, [forecast] the second line.
  */
 data class StatusSummary(val acting: List<StatusActing>, val forecast: StatusForecast?) {

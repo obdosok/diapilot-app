@@ -11,7 +11,12 @@
     <string name="label_screen_food_forecast_only">прогноз +%1$s %2$s</string>
     <string name="label_screen_food_structured_mixture">структурная смесь по БЖУ</string>
     <string name="label_screen_food_physio_template">общий физиологический шаблон (БЖУ не разобраны)</string>
-    <string name="label_screen_food_cluster_summary">В этом приёме (блюд: %1$d, желудок общий): половина пришла ~%2$d</string>
+    <plurals name="label_screen_food_cluster_summary">
+        <item quantity="one">В этом приёме (блюдо: %1$d, желудок общий): половина пришла ~%2$d</item>
+        <item quantity="few">В этом приёме (блюда: %1$d, желудок общий): половина пришла ~%2$d</item>
+        <item quantity="many">В этом приёме (блюд: %1$d, желудок общий): половина пришла ~%2$d</item>
+        <item quantity="other">В этом приёме (блюда: %1$d, желудок общий): половина пришла ~%2$d</item>
+    </plurals>
     <string name="label_screen_food_cluster_p90">90%% ~%1$d мин</string>
     <string name="label_screen_food_cluster_prior_absorbed">К этому блюду предыдущее усвоено на %1$d%%</string>
     <string name="label_screen_food_macro_line">БЖУ: %1$.0f / %2$.0f / %3$.0f г · ~%4$.0f ккал</string>
@@ -52,7 +57,12 @@
     <!-- Stage10MealReceipt -->
     <string name="label_screen_receipt_next_meal">К следующей еде в %1$s модель относит уже %2$.0f%% вклада: +%3$.1f из +%4$.1f ммоль/л; остаток %5$.0f%%.</string>
     <string name="label_screen_receipt_cluster_completed">Ранний вклад завершён до следующей еды: углеводы входят в общую амплитуду, но не растягивают тайминг серии.</string>
-    <string name="label_screen_receipt_cluster_only">Серия из %1$d записей (~%2$s г) считается одним приёмом: блюда не разделились.</string>
+    <plurals name="label_screen_receipt_cluster_only">
+        <item quantity="one">Серия из %1$d записи (~%2$s г) считается одним приёмом: блюда не разделились.</item>
+        <item quantity="few">Серия из %1$d записей (~%2$s г) считается одним приёмом: блюда не разделились.</item>
+        <item quantity="many">Серия из %1$d записей (~%2$s г) считается одним приёмом: блюда не разделились.</item>
+        <item quantity="other">Серия из %1$d записей (~%2$s г) считается одним приёмом: блюда не разделились.</item>
+    </plurals>
     <string name="label_screen_receipt_unlogged_residual">Незакрытый остаток: +%1$.1f ммоль/л — в этом окне действовало что-то незаписанное</string>
     <string name="label_screen_receipt_hide_calc">Скрыть расчёт</string>
     <string name="label_screen_receipt_how_calculated">Как рассчитано?</string>
@@ -86,7 +96,12 @@
     <string name="label_screen_close">Закрыть</string>
     <string name="label_screen_nutrition_title">БЖУ и ккал</string>
     <string name="label_screen_nutrition_empty">Нет записей для заполнения либо не настроен ключ LLM.</string>
-    <string name="label_screen_nutrition_summary">Один запрос · %1$d типовых порций · %2$d записей. Углеводы и состав не меняются.</string>
+    <plurals name="label_screen_nutrition_summary">
+        <item quantity="one">Один запрос · %1$d типовая порция · %2$d записей. Углеводы и состав не меняются.</item>
+        <item quantity="few">Один запрос · %1$d типовые порции · %2$d записей. Углеводы и состав не меняются.</item>
+        <item quantity="many">Один запрос · %1$d типовых порций · %2$d записей. Углеводы и состав не меняются.</item>
+        <item quantity="other">Один запрос · %1$d типовые порции · %2$d записей. Углеводы и состав не меняются.</item>
+    </plurals>
     <string name="label_screen_nutrition_row">%1$s: Б %2$.0f · Ж %3$.0f · %4$.0f ккал</string>
 
     <!-- Shared buttons -->

@@ -31,7 +31,7 @@ data class ApiResponse(val status: Int, val reason: String, val body: String) {
  * `GET /api/v1/events?after=<seq>&limit=<n>` — the read side of the journal.
  *
  * Kept free of any HTTP plumbing so the whole contract can be exercised in
- * `:core:test`; [com.example.diapilot.collect.WatchServer] only supplies the
+ * `:core:test`; [io.github.obdosok.diapilot.collect.WatchServer] only supplies the
  * parsed query and writes the status line.
  */
 object EventsApi {

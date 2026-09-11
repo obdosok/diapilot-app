@@ -457,12 +457,15 @@ class HybridForecastEngine(
 
     private fun foodTokens(text: String): Set<String> {
         val main = text.split(
-            Regex("""\b(?:ГИ|УГЛЕВОДЫ|СОСТАВ)\s*:""", RegexOption.IGNORE_CASE),
+            // Protocol markers in both forms: the English ones new analyses use
+            // and the older Russian ones stored analyses still contain.
+            Regex("""\b(?:ГИ|УГЛЕВОДЫ|СОСТАВ|GI|CARBS|COMPOSITION)\s*:""", RegexOption.IGNORE_CASE),
             limit = 2,
         ).first()
         val stop = setOf(
             "грамм", "порция", "порц", "обычный", "примерно",
             "каждый", "каждая", "каждое", "половина",
+            "carbs", "portion",
         )
         return Regex("""[\p{L}]{3,}""")
             .findAll(main.lowercase())

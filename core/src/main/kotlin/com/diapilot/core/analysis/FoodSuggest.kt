@@ -79,7 +79,7 @@ fun predictDishAt(
     zone: ZoneId = ZoneId.systemDefault(),
 ): DishPrediction? {
     val food = notes.filter {
-        isFoodNote(it) && !it.content.lowercase().startsWith(RESCUE_NOTE_PREFIX)
+        isFoodNote(it) && !isRescueNote(it.content)
     }
     if (food.isEmpty()) return null
     val targetHour = hourOf(atMs, zone)
@@ -103,7 +103,7 @@ fun predictDishAt(
 
 /**
  * Unlogged-meal suggestions over the last [lookbackMs]. Triggers:
- *  - a meal-sized bolus (>= [MIN_MEAL_DOSE_U], intent null or the Russian phrase for "for food") with no
+ *  - a meal-sized bolus (>= [MIN_MEAL_DOSE_U], intent null or [BolusPurpose.MEAL]) with no
  *    food note within ±45 min — the user dosed for food and skipped the note;
  *  - a DETECTED meal (deviation detector) with no food note within ±45 min.
  * A bolus and a detection within 45 min of each other are ONE meal (the
@@ -126,7 +126,7 @@ fun suggestFood(
     val doseTriggers = boluses
         .filter {
             it.tsMs in from..nowMs && it.units >= MIN_MEAL_DOSE_U &&
-                (it.purpose == null || it.purpose == "на еду") && !covered(it.tsMs)
+                (it.purpose == null || BolusPurpose.of(it.purpose) == BolusPurpose.MEAL) && !covered(it.tsMs)
         }
 
     val out = mutableListOf<FoodSuggestion>()

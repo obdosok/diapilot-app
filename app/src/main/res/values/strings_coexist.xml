@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Opt-in switches for everything the app shares with the rest of the phone
+     (see Settings.DEFAULT_* and AppIdentity). Russian in values-ru. -->
+<resources>
+    <!-- SettingsScreen, Data card -->
+    <string name="settings_screen_auto_backup_label">Daily backup to Downloads</string>
+
+    <!-- SettingsScreen, Libre 2 card -->
+    <string name="settings_screen_libre_nfc_label">Scan Libre 2 over NFC</string>
+    <string name="settings_screen_libre_nfc_hint">Reads the sensor when you hold the phone to it; OOP2 decrypts the data. Needs OOP2 installed. Own BLE below needs this on.</string>
+
+    <!-- MainActivity: a Libre tag while the scan is switched off -->
+    <string name="main_activity_libre_nfc_off">Libre: NFC scanning is off — turn it on in More → Libre 2</string>
+</resources>

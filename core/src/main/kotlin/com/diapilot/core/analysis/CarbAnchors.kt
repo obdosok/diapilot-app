@@ -51,6 +51,7 @@ const val ANCHOR_SOURCE = "anchor"
  */
 data class CarbAnchor(
     val conceptId: String,
+    /** The dish word, English; it names the anchor in the provenance string. */
     val label: String,
     val trueGrams: Double,
     val recordedGrams: Double,
@@ -68,7 +69,17 @@ data class CarbAnchor(
      * Null = no range check (the dish has no meaningful unit).
      */
     val perUnitRange: ClosedFloatingPointRange<Double>? = null,
+    /**
+     * The dish word in the other supported languages. The note's own text states
+     * the count ("beer ×2"), and the user writes it in their language, so the
+     * count is looked for under [label] and each of these.
+     */
+    val words: List<String> = emptyList(),
 ) {
+    /** The count the note's own text states for this dish, under any of its words. */
+    fun countIn(content: String): TextCount? =
+        (listOf(label) + words).firstNotNullOfOrNull { countFromNoteText(content, it) }
+
     val factor: Double get() = trueGrams / recordedGrams
 
     /** True when the anchor only stamps PROVENANCE — the recorded grams are already
@@ -84,15 +95,16 @@ data class CarbAnchor(
 val CARB_ANCHORS: List<CarbAnchor> = listOf(
     CarbAnchor(
         conceptId = "beer",
-        label = "пиво",
+        label = "beer",
+        words = listOf("пиво"),
         // PROVENANCE ONLY — the grams are already right and nothing is rescaled. A 0.5 L
         // wheat/dark bottle at 3.5–4 g/100 ml is 17.5–20 g, and the records read 18–20.
         // What this anchor buys is not a correction but the RIGHT to be treated as true
         // grams: it stops the pool from being blended with a recorded-gram prior.
         trueGrams = 18.0,
         recordedGrams = 18.0,
-        basis = "бутылка 0.5 л, пшеничное/тёмное, 3.5–4 г/100 мл ⇒ 17.5–20 г; " +
-            "записано 18–20, «пиво ×2» = две бутылки",
+        basis = "0.5 L bottle, wheat/dark, 3.5–4 g/100 ml ⇒ 17.5–20 g; " +
+            "recorded 18–20, “beer ×2” = two bottles",
         // The range does the excluding, and it lands exactly on the rows that should be
         // out: "beer, pistachios" and "beer and chips" notes are not beer alone; a couple
         // of other rows are unexplained; a non-alcoholic beer brand is a DIFFERENT dish
@@ -103,11 +115,12 @@ val CARB_ANCHORS: List<CarbAnchor> = listOf(
     ),
     CarbAnchor(
         conceptId = "smoothie",
-        label = "смузи",
+        label = "smoothie",
         trueGrams = 22.0,
         recordedGrams = 33.0,
-        basis = "200 г свежевыжатого сока двух апельсинов, жмых выброшен; " +
-            "CARB_PER_100G[juice]=11 ⇒ 22 г",
+        basis = "200 g of juice freshly squeezed from two oranges, pulp discarded; " +
+            "CARB_PER_100G[juice]=11 ⇒ 22 g",
+        words = listOf("смузи"),
     ),
 )
 
@@ -182,7 +195,7 @@ fun anchorRewrite(
     // for carrying a side dish.
     val ourGrams = anchoredOld ?: grams
     anchor.perUnitRange?.let { range ->
-        val units = countFromNoteText(content, anchor.label)?.count ?: 1
+        val units = anchor.countIn(content)?.count ?: 1
         if (ourGrams / units !in range) return null
     }
     val newEst = if (comps == null) round1(grams * anchor.factor)
@@ -209,7 +222,7 @@ internal fun rescaleComposition(analysis: String, anchor: CarbAnchor): String? {
     var changed = false
     val out = analysis.lineSequence().map { raw ->
         val line = raw.trim()
-        if (!line.startsWith("$COMPONENT_LINE_PREFIX:", ignoreCase = true)) return@map raw
+        if (!isMarkerLine(line, COMPONENT_LINE_PREFIX)) return@map raw
         // Re-parse THIS line alone so the component's name/count/portion come from the
         // production parser rather than from a second hand-rolled reading of the format.
         val c = parseComponents(line).singleOrNull() ?: return@map raw
@@ -224,7 +237,9 @@ internal fun rescaleComposition(analysis: String, anchor: CarbAnchor): String? {
         val scaled = round1(c.unitGrams * anchor.factor)
         if (scaled == round1(c.unitGrams)) return@map raw
         changed = true
-        sostavLine(c.name, c.count, scaled, c.portionGrams)
+        // Written back in the line's own form (older Russian marker stays Russian),
+        // so the rewrite changes the number and nothing else.
+        sostavLine(c.name, c.count, scaled, c.portionGrams, legacy = isLegacyCompositionLine(line))
     }.toList().joinToString("\n")
     return if (changed) out else null
 }

@@ -95,6 +95,12 @@ const val CLOSED_CAUSAL_EPISODE_VERSION_V1 = "closed-causal-episode-v42-activity
 
 fun isTrustedDosePurposeV1(purpose: String?): Boolean {
     val p = purpose?.trim().orEmpty()
+    val known = com.diapilot.core.analysis.BolusPurpose.of(p)
+    if (known != null) {
+        return known == com.diapilot.core.analysis.BolusPurpose.CORRECTION ||
+            known == com.diapilot.core.analysis.BolusPurpose.TOP_UP
+    }
+    // Free-form purposes stored by older builds: the Russian word stems.
     return p.contains("корр", ignoreCase = true) || p.contains("докол", ignoreCase = true)
 }
 

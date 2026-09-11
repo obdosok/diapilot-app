@@ -54,18 +54,33 @@
 
     <string name="analysis_overview_screen_daily_balance_title">Баланс по суткам</string>
     <string name="analysis_overview_screen_daily_balance_intro">углеводы × CS − единицы × ISF = изменение сахара за сутки. Граница суток 04:00, не полночь: в это время он спит и не ел, поэтому обе опорные точки берутся в покое.</string>
-    <string name="analysis_overview_screen_daily_balance_empty">Пока нечего показать: нужно хотя бы %1$d годных суток (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</string>
+    <plurals name="analysis_overview_screen_daily_balance_empty">
+        <item quantity="one">Пока нечего показать: нужно хотя бы %1$d годные сутки (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</item>
+        <item quantity="few">Пока нечего показать: нужно хотя бы %1$d годных суток (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</item>
+        <item quantity="many">Пока нечего показать: нужно хотя бы %1$d годных суток (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</item>
+        <item quantity="other">Пока нечего показать: нужно хотя бы %1$d годных суток (≥%2$d г углеводов, ≥%3$d ед инсулина и сахар на обеих границах).</item>
+    </plurals>
     <string name="analysis_overview_screen_daily_balance_col_day">сутки</string>
     <string name="analysis_overview_screen_daily_balance_col_carbs">углев</string>
     <string name="analysis_overview_screen_daily_balance_col_units">ед</string>
     <string name="analysis_overview_screen_daily_balance_col_delta">dСахар</string>
     <string name="analysis_overview_screen_daily_balance_col_g_per_u">г/ед</string>
-    <string name="analysis_overview_screen_daily_balance_median">Медиана за %1$d суток: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</string>
+    <plurals name="analysis_overview_screen_daily_balance_median">
+        <item quantity="one">Медиана за %1$d сутки: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</item>
+        <item quantity="few">Медиана за %1$d суток: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</item>
+        <item quantity="many">Медиана за %1$d суток: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</item>
+        <item quantity="other">Медиана за %1$d суток: ISF %2$s · размах %3$s…%4$s · CS %5$s ммоль/г</item>
+    </plurals>
     <string name="analysis_overview_screen_daily_balance_footnote">Это оценка АМПЛИТУДЫ и только её: за сутки все тайминги — очередь ккал, сито, форма инсулина — сокращаются из уравнения. Она не говорит, КОГДА что-то произошло, и не заменяет прогноз.</string>
 
     <string name="analysis_overview_screen_rescue_safety_title">Предотвращённые гипогликемии / rescue</string>
     <string name="analysis_overview_screen_rescue_safety_intro">Декстроза меняет исход. Поэтому отсутствие измеренной гипогликемии после неё не считается успешным прогнозом: такой эпизод цензурируется и входит в safety-метрику «потребовалось спасение».</string>
-    <string name="analysis_overview_screen_rescue_safety_summary">За 30 дней: rescue-событий %1$d; совместимы с предотвращённой гипогликемией %2$d.</string>
+    <plurals name="analysis_overview_screen_rescue_safety_summary">
+        <item quantity="one">За 30 дней: rescue-событие %1$d; совместимы с предотвращённой гипогликемией %2$d.</item>
+        <item quantity="few">За 30 дней: rescue-события %1$d; совместимы с предотвращённой гипогликемией %2$d.</item>
+        <item quantity="many">За 30 дней: rescue-событий %1$d; совместимы с предотвращённой гипогликемией %2$d.</item>
+        <item quantity="other">За 30 дней: rescue-события %1$d; совместимы с предотвращённой гипогликемией %2$d.</item>
+    </plurals>
     <string name="analysis_overview_screen_rescue_safety_row">%1$s · %2$s г · сахар %3$s · скорость %4$s ммоль/л/мин · bolus за 4 ч %5$s ед. Конечный исход причинно не оценивается без rescue.</string>
     <string name="analysis_overview_screen_rescue_safety_footnote">Это улучшает оценку безопасности и обнаруживает stacking/ошибку прогноза. Один такой смешанный эпизод не переобучает ISF или профиль отдельного укола.</string>
 

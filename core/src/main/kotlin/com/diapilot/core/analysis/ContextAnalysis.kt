@@ -16,13 +16,13 @@ import com.diapilot.core.collector.MealEvent
 /**
  * Notes that describe circumstances rather than food — never suggested as a
  * meal label. Mirrors the composer's starter tags + bolus intent tags.
+ * Every accepted spelling: the stored keys and each language's words
+ * (see [NoteTag], [BolusPurpose]).
  */
-val CONTEXT_TAGS: Set<String> = setOf(
-    "укол в живот", "укол в бедро", "укол в руку",
-    "недосып", "болею", "стресс", "алкоголь", "тренировка", "прогулка",
-    "новый сенсор", "новая ампула",
-    "коррекция", "на еду", "докол", "воздух", "фото",
-)
+val CONTEXT_TAGS: Set<String> =
+    NoteTag.formsOf(
+        NoteTag.entries.filter { it.group == NoteTagGroup.CONTEXT } + NoteTag.WORKOUT + NoteTag.WALK,
+    ) + BolusPurpose.ALL_FORMS
 
 /**
  * Is this note CONTEXT (incl. an activity bout), not food/free-form?
@@ -44,20 +44,54 @@ fun isContextNote(content: String): Boolean {
  */
 object SysLabels {
     /** Previous meal outlived its insulin — under-dose or late bolus signal. */
-    const val CONTINUATION = "продолжение еды"
+    const val CONTINUATION = "continuation"
 
-    /** Dawn phenomenon — a real rise, but not food. */
-    const val DAWN = "утренняя заря"
+    /** Dawn phenomenon — a real rise, but not food. Same key as [NoteTag.DAWN]. */
+    const val DAWN = "dawn"
 
     /** Adrenaline rise: intense exercise makes the liver dump glycogen.
      *  Real, explained, not food — never absorption to project forward. */
-    const val SPORT = "спорт/адреналин"
+    const val SPORT = "sport_adrenaline"
 
     /** An honest mystery: the rise is real, the cause unknown (fat tail from
      *  yesterday, basal shortfall, stress…). Kept, never fed to food models. */
-    const val UNKNOWN = "не знаю"
+    const val UNKNOWN = "unknown"
 
-    val ALL: Set<String> = setOf(CONTINUATION, DAWN, SPORT, UNKNOWN)
+    /** The stored keys. */
+    val KEYS: Set<String> = setOf(CONTINUATION, DAWN, SPORT, UNKNOWN)
+
+    /** Words people type for each key. RU are also the labels older builds stored. */
+    val WORDS: Map<LabelLanguage, Map<String, List<String>>> = mapOf(
+        LabelLanguage.EN to mapOf(
+            CONTINUATION to listOf("meal continued"),
+            DAWN to listOf("dawn phenomenon"),
+            SPORT to listOf("exercise/adrenaline"),
+            UNKNOWN to listOf("don't know"),
+        ),
+        LabelLanguage.RU to mapOf(
+            CONTINUATION to listOf("продолжение еды"),
+            DAWN to listOf("утренняя заря"),
+            SPORT to listOf("спорт/адреналин"),
+            UNKNOWN to listOf("не знаю"),
+        ),
+    )
+
+    private val BY_FORM: Map<String, String> = buildMap {
+        KEYS.forEach { put(it, it) }
+        WORDS.values.forEach { byKey -> byKey.forEach { (k, ws) -> ws.forEach { put(it.lowercase(), k) } } }
+    }
+
+    /**
+     * Every accepted spelling of a system label: the keys and each language's
+     * words, so `label in ALL` holds for a label stored by any build.
+     */
+    val ALL: Set<String> = BY_FORM.keys
+
+    /** The key [label] names, or null for an ordinary (dish) label. */
+    fun keyOf(label: String?): String? = label?.trim()?.lowercase()?.let(BY_FORM::get)
+
+    /** The stored form: a system label becomes its key, a dish name stays as it is. */
+    fun canonical(label: String): String = keyOf(label) ?: label
 }
 
 /**
@@ -70,7 +104,7 @@ fun continuationStats(
     labeled: List<com.diapilot.core.collector.LabeledMeal>,
     windowMs: Long = 5L * 3_600_000,
 ): List<Pair<String, Int>> {
-    val continuations = labeled.filter { it.labelName == SysLabels.CONTINUATION }
+    val continuations = labeled.filter { SysLabels.keyOf(it.labelName) == SysLabels.CONTINUATION }
     val foods = labeled.filter { it.labelName !in SysLabels.ALL }
     return continuations.mapNotNull { c ->
         foods.filter { it.event.onsetMs < c.event.onsetMs && c.event.onsetMs - it.event.onsetMs <= windowMs }
@@ -133,7 +167,7 @@ fun contextStats(
     val baseTir = 100.0 * r.count { it.mmol in lo..hi } / r.size
 
     return annotations
-        .filter { it.content.isNotBlank() && it.content.lowercase() != "фото" }
+        .filter { it.content.isNotBlank() && NoteTag.of(it.content) != NoteTag.PHOTO }
         .groupBy { it.content }
         .filter { it.value.size >= minCount }
         .mapNotNull { (tag, notes) ->

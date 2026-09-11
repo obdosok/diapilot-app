@@ -66,7 +66,7 @@ fun rescueEvents(
     tabletG: Double = DEXTROSE_TABLET_G,
 ): List<RescueEvent> =
     notes.asSequence()
-        .filter { it.tsMs in fromMs..toMs && it.content.startsWith(RESCUE_NOTE_PREFIX, ignoreCase = true) }
+        .filter { it.tsMs in fromMs..toMs && isRescueNote(it.content) }
         .sortedBy { it.tsMs }
         .map { n ->
             val g = n.estCarbs ?: tabletG

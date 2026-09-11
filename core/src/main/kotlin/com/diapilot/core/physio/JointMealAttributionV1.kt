@@ -1,7 +1,7 @@
 package com.diapilot.core.physio
 
 import com.diapilot.core.analysis.KernelPoint
-import com.diapilot.core.analysis.RESCUE_NOTE_PREFIX
+import com.diapilot.core.analysis.isRescueNote
 import com.diapilot.core.analysis.isFoodNote
 import com.diapilot.core.analysis.parseFoodNutrition
 import com.diapilot.core.analysis.parseFoodKineticsV2
@@ -50,8 +50,8 @@ fun groupDistributedIntakesV1(notes:List<Annotation>,gapMin:Long=DISTRIBUTED_INT
     fun isLongIntake(a:Annotation)=parseFoodKineticsV2(a.analysis).alcoholPresent
     val groups=mutableListOf<MutableList<Annotation>>()
     notes.filter(::isFoodNote).sortedBy{it.tsMs}.forEach{n->
-        val cur=groups.lastOrNull();val rescue=n.content.startsWith(RESCUE_NOTE_PREFIX,true)
-        val sameRescue=cur?.lastOrNull()?.content?.startsWith(RESCUE_NOTE_PREFIX,true)==rescue
+        val cur=groups.lastOrNull();val rescue=isRescueNote(n.content)
+        val sameRescue=cur?.lastOrNull()?.content?.let(::isRescueNote)==rescue
         val sameLong=cur?.lastOrNull()?.let(::isLongIntake)==true&&isLongIntake(n)
         val allowed=if(sameLong)gapMin else 45L
         if(cur!=null&&sameRescue&&n.tsMs-cur.last().tsMs<=allowed*60_000&&n.tsMs-cur.first().tsMs<=maxSpanMin*60_000)cur.add(n)
@@ -123,7 +123,7 @@ private data class ShapeSpec(
     val rescue:Boolean=false,
 )
 private fun shapeSpec(n:Annotation,config:JointAttributionConfigV1,asOfMs:Long):ShapeSpec {
-    if(n.content.trim().startsWith(RESCUE_NOTE_PREFIX,ignoreCase=true))
+    if(isRescueNote(n.content))
         return ShapeSpec(listOf(ShapePartV2(1.0,3.0,30.0)),10.0,0.0,0.0,0.0,true)
     val causalAnalysis=n.analysis.takeIf{n.analysisKnownAtMs?.let{known->known<=asOfMs}==true}
     val nutrition=parseFoodNutrition(causalAnalysis)

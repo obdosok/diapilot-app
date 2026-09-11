@@ -129,7 +129,7 @@ val FOOD_CONCEPTS: List<FoodConcept> = listOf(
     FoodConcept("nutella", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("нутелла")),
     FoodConcept("ice_cream", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("мороженое", "магнум", "пломбир")),
     FoodConcept("beer", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("пиво", "корона", "портер", "лагер", "эль")),
-    FoodConcept("dextrose", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("декстроза", "dextro", "dextrosa", "глюкоза")),
+    FoodConcept("dextrose", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("декстроза", "dextrose", "dextro", "dextrosa", "глюкоза")),
     FoodConcept("sugar", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("сахар", "мёд", "мед", "варенье")),
     FoodConcept("chips", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("чипсы")),
     // Nuts/seeds: few carbs, and what there is crawls behind the fat and fibre.

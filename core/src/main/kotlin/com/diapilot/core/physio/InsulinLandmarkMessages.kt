@@ -2,7 +2,7 @@ package com.diapilot.core.physio
 
 // Language-neutral messages about the insulin action curve. The profile reader,
 // the domain coercion and the ordering check report these; the app renders
-// them in the UI language (`com.example.diapilot.i18n.PhysioText`).
+// them in the UI language (`io.github.obdosok.diapilot.i18n.PhysioText`).
 
 /** The named points of an insulin action curve. */
 enum class InsulinLandmark {

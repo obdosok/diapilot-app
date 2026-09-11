@@ -73,7 +73,10 @@
     <string name="analysis_overview_screen_daily_balance_title">Daily balance</string>
     <string name="analysis_overview_screen_daily_balance_intro">carbs × CS − units × ISF = glucose change over the day. Day boundary 04:00, not midnight: that\'s when you\'re asleep and haven\'t eaten, so both reference points are taken at rest.</string>
     <!-- %1$d: minimum days needed; %2$d: minimum carbs (g); %3$d: minimum insulin (U). -->
-    <string name="analysis_overview_screen_daily_balance_empty">Nothing to show yet: at least %1$d valid days are needed (≥%2$d g carbs, ≥%3$d U insulin, and glucose at both boundaries).</string>
+    <plurals name="analysis_overview_screen_daily_balance_empty">
+        <item quantity="one">Nothing to show yet: at least %1$d valid day is needed (≥%2$d g carbs, ≥%3$d U insulin, and glucose at both boundaries).</item>
+        <item quantity="other">Nothing to show yet: at least %1$d valid days are needed (≥%2$d g carbs, ≥%3$d U insulin, and glucose at both boundaries).</item>
+    </plurals>
     <string name="analysis_overview_screen_daily_balance_col_day">day</string>
     <string name="analysis_overview_screen_daily_balance_col_carbs">carbs</string>
     <string name="analysis_overview_screen_daily_balance_col_units">U</string>
@@ -81,13 +84,19 @@
     <string name="analysis_overview_screen_daily_balance_col_g_per_u">g/U</string>
     <string name="analysis_overview_screen_daily_balance_col_isf" translatable="false">ISF</string>
     <!-- %1$d: days; %2$s: ISF; %3$s: spread low; %4$s: spread high; %5$s: carb sensitivity. Numbers are pre-formatted (Locale.ROOT) to keep the table's decimal points consistent regardless of language. -->
-    <string name="analysis_overview_screen_daily_balance_median">Median over %1$d days: ISF %2$s · range %3$s…%4$s · CS %5$s mmol/g</string>
+    <plurals name="analysis_overview_screen_daily_balance_median">
+        <item quantity="one">Median over %1$d day: ISF %2$s · range %3$s…%4$s · CS %5$s mmol/g</item>
+        <item quantity="other">Median over %1$d days: ISF %2$s · range %3$s…%4$s · CS %5$s mmol/g</item>
+    </plurals>
     <string name="analysis_overview_screen_daily_balance_footnote">This is an estimate of AMPLITUDE and only that: over a full day, all timings — the kcal queue, the sieve, the insulin shape — drop out of the equation. It does not say WHEN something happened, and it does not replace a forecast.</string>
 
     <string name="analysis_overview_screen_rescue_safety_title">Prevented hypos / rescue</string>
     <string name="analysis_overview_screen_rescue_safety_intro">Dextrose changes the outcome. So the absence of a measured hypo after it is not counted as a successful forecast: that episode is censored and counted in the safety metric “rescue needed”.</string>
     <!-- %1$d: rescue events in 30 days; %2$d: events compatible with a prevented hypo. -->
-    <string name="analysis_overview_screen_rescue_safety_summary">Over 30 days: %1$d rescue event(s); %2$d compatible with a prevented hypo.</string>
+    <plurals name="analysis_overview_screen_rescue_safety_summary">
+        <item quantity="one">Over 30 days: %1$d rescue event; %2$d compatible with a prevented hypo.</item>
+        <item quantity="other">Over 30 days: %1$d rescue events; %2$d compatible with a prevented hypo.</item>
+    </plurals>
     <!-- %1$s: date/time; %2$s: grams; %3$s: glucose at rescue or "?"; %4$s: slope or "?"; %5$s: active bolus units. -->
     <string name="analysis_overview_screen_rescue_safety_row">%1$s · %2$s g · glucose %3$s · rate %4$s mmol/L/min · bolus over 4h %5$s U. The final outcome isn\'t causally assessed without the rescue.</string>
     <string name="analysis_overview_screen_rescue_safety_footnote">This improves the safety estimate and catches stacking/forecast error. One such mixed episode does not retrain the ISF or a single injection\'s profile.</string>

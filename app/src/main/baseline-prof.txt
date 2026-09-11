@@ -26,17 +26,17 @@
 # Flags: H = hot, S = startup, P = post-startup.
 
 # ---- the state pass and the screens it fills ------------------------------
-HSPLcom/example/diapilot/MainState;->**(**)**
-HSPLcom/example/diapilot/MainActivity;->**(**)**
-HSPLcom/example/diapilot/TodayScreen*;->**(**)**
-HSPLcom/example/diapilot/LabelScreen*;->**(**)**
+HSPLio/github/obdosok/diapilot/MainState;->**(**)**
+HSPLio/github/obdosok/diapilot/MainActivity;->**(**)**
+HSPLio/github/obdosok/diapilot/TodayScreen*;->**(**)**
+HSPLio/github/obdosok/diapilot/LabelScreen*;->**(**)**
 
 # ---- the forecast itself --------------------------------------------------
-HSPLcom/example/diapilot/data/Forecaster;->**(**)**
-HSPLcom/example/diapilot/data/HybridShadow*;->**(**)**
-HSPLcom/example/diapilot/data/PhysioRuntime*;->**(**)**
-HSPLcom/example/diapilot/data/HybridRuntimeMetrics*;->**(**)**
-HSPLcom/example/diapilot/data/FoodSources*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/Forecaster;->**(**)**
+HSPLio/github/obdosok/diapilot/data/HybridShadow*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/PhysioRuntime*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/HybridRuntimeMetrics*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/FoodSources*;->**(**)**
 HSPLcom/diapilot/core/hybrid/HybridForecastEngine;->**(**)**
 HSPLcom/diapilot/core/hybrid/MealClusterKineticsV1*;->**(**)**
 HSPLcom/diapilot/core/physio/PhysioV1*;->**(**)**
@@ -44,19 +44,19 @@ HSPLcom/diapilot/core/twin/ForecastEngineKt;->**(**)**
 HSPLcom/diapilot/core/twin/Simulator*;->**(**)**
 
 # ---- the model the forecast reads -----------------------------------------
-HSPLcom/example/diapilot/data/TwinCache*;->**(**)**
-HSPLcom/example/diapilot/data/TwinSnapshot*;->**(**)**
-HSPLcom/example/diapilot/data/SqliteCollectorStore;->**(**)**
-HSPLcom/example/diapilot/data/MeterCalCache*;->**(**)**
-HSPLcom/example/diapilot/data/MinuteCalCache*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/TwinCache*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/TwinSnapshot*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/SqliteCollectorStore;->**(**)**
+HSPLio/github/obdosok/diapilot/data/MeterCalCache*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/MinuteCalCache*;->**(**)**
 
 # ---- the learning sidecar, which is what allocated 19 MB -------------------
-HSPLcom/example/diapilot/data/ClosedEpisodeRuntime*;->**(**)**
-HSPLcom/example/diapilot/data/Stage9EpisodeRuntime*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/ClosedEpisodeRuntime*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/Stage9EpisodeRuntime*;->**(**)**
 HSPLcom/diapilot/core/physio/ClosedCausalEpisodeV1*;->**(**)**
 HSPLcom/diapilot/core/physio/JointMealAttributionV1*;->**(**)**
 HSPLcom/diapilot/core/analysis/FoodCurve*;->**(**)**
 
 # ---- the alert path: it must never be the one waiting on the JIT ----------
-HSPLcom/example/diapilot/collect/HypoAlertNotifier*;->**(**)**
+HSPLio/github/obdosok/diapilot/collect/HypoAlertNotifier*;->**(**)**
 HSPLcom/diapilot/core/twin/HypoAlert*;->**(**)**

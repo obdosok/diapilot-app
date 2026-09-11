@@ -19,9 +19,8 @@ import com.diapilot.core.collector.Annotation
  * matched on the head before "·" (so "psyllium · 5 g" works). Fiber first —
  * the user's stated use case (psyllium before eating).
  */
-val ABSORPTION_SLOW_TAGS = setOf(
-    "псилиум", "псиллиум", "клетчатка", "жирное", "уксус", "белок первым",
-)
+val ABSORPTION_SLOW_TAGS: Set<String> =
+    NoteTag.formsOf(NoteTag.entries.filter { it.group == NoteTagGroup.ABSORPTION })
 
 /** [n=1] Population prior: a slowing modifier ~doubles time-to-peak. Learn
  *  per-dish from tagged-vs-untagged curves when enough repeats exist. */

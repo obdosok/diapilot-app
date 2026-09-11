@@ -26,8 +26,14 @@
     <string name="libre_ble_client_status_streaming">stream is up (packet %1$s)</string>
 
     <!-- FoodLibrary.kt -->
-    <string name="food_library_deconv_stats">%1$d observations of %2$d notes · censored %3$d%% · ttp median %4$.0f min · %5$.2f mmol/g</string>
-    <string name="food_library_deconv_stats_with_onset">%1$d observations of %2$d notes · censored %3$d%% · onset median %4$.0f min · ttp median %5$.0f min · %6$.2f mmol/g</string>
+    <plurals name="food_library_deconv_stats">
+        <item quantity="one">%1$d observation of %2$d notes · censored %3$d%% · ttp median %4$.0f min · %5$.2f mmol/g</item>
+        <item quantity="other">%1$d observations of %2$d notes · censored %3$d%% · ttp median %4$.0f min · %5$.2f mmol/g</item>
+    </plurals>
+    <plurals name="food_library_deconv_stats_with_onset">
+        <item quantity="one">%1$d observation of %2$d notes · censored %3$d%% · onset median %4$.0f min · ttp median %5$.0f min · %6$.2f mmol/g</item>
+        <item quantity="other">%1$d observations of %2$d notes · censored %3$d%% · onset median %4$.0f min · ttp median %5$.0f min · %6$.2f mmol/g</item>
+    </plurals>
     <string name="food_library_title">📚 Food library</string>
     <string name="food_library_add_product">＋ Product</string>
     <string name="food_library_search">Search</string>
@@ -40,7 +46,10 @@
         <item quantity="one">%1$s · %2$d meal · %3$.0f g total</item>
         <item quantity="other">%1$s · %2$d meals · %3$.0f g total</item>
     </plurals>
-    <string name="food_library_and_more">…and %1$d more</string>
+    <plurals name="food_library_and_more">
+        <item quantity="one">…and %1$d more</item>
+        <item quantity="other">…and %1$d more</item>
+    </plurals>
     <plurals name="food_library_concepts_title">
         <item quantity="one">🍱 Concepts: %1$d across %2$d record</item>
         <item quantity="other">🍱 Concepts: %1$d across %2$d records</item>
@@ -144,6 +153,9 @@
         <item quantity="other">already accepted (%1$d records)</item>
     </plurals>
     <string name="food_structure_acceptance_apply">Apply</string>
-    <string name="food_structure_acceptance_note_update">“%1$s”: %2$d records changed</string>
+    <plurals name="food_structure_acceptance_note_update">
+        <item quantity="one">“%1$s”: %2$d record changed</item>
+        <item quantity="other">“%1$s”: %2$d records changed</item>
+    </plurals>
     <string name="food_structure_acceptance_no_rows">The proposal did not load.</string>
 </resources>

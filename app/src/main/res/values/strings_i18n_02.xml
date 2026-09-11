@@ -153,7 +153,7 @@
     <string name="settings_screen_cloud_folder_configured">☁️ Cloud backup: %1$s · change</string>
     <string name="settings_screen_cloud_configured_fallback">configured</string>
     <string name="settings_screen_disable_cloud_copy">Turn off the cloud backup</string>
-    <string name="settings_screen_backup_hint">A full copy of all data (glucose, insulin, meals, labels) — to the Downloads folder. Plus an automatic daily copy (7 files, one per weekday, diapilot-auto-backup-N) — and to the cloud folder if one is chosen (point it at a Google Drive folder — Drive itself does the syncing, data goes nowhere but your own cloud). Restoring is the way to move to a new phone.</string>
+    <string name="settings_screen_backup_hint">A full copy of all data (glucose, insulin, meals, labels) — to the Downloads folder. Plus, when the switch above is on, an automatic daily copy (7 files, one per weekday, named after the app id: …-auto-backup-N) — and to the cloud folder if one is chosen (point it at a Google Drive folder — Drive itself does the syncing, data goes nowhere but your own cloud). Restoring is the way to move to a new phone.</string>
 
     <!-- Watch card -->
     <string name="settings_screen_watch_title">Watch</string>

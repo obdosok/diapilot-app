@@ -105,8 +105,8 @@ class CarbAnchorsTest {
         // An anchor whose basis cannot be written down is not an anchor. The string has
         // to say WHY, so a future reader can re-check it without this conversation.
         val p = rewrite("смузи", est = 33.0)!!.provenance
-        assertTrue(p, p.contains("200 г"))
-        assertTrue(p, p.contains("апельсин"))
+        assertTrue(p, p.contains("200 g"))
+        assertTrue(p, p.contains("orange"))
         assertTrue(p, p.startsWith("anchor:"))
     }
 

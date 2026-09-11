@@ -15,11 +15,21 @@
     <!-- BackupRestore.kt -->
     <string name="backup_restore_file_unavailable">файл недоступен</string>
     <string name="backup_restore_no_readings">в файле нет показаний глюкозы — это не копия DiaPilot?</string>
-    <string name="backup_restore_success">Восстановлено: %1$d показаний, %2$d уколов. Перезапускаю…</string>
+    <plurals name="backup_restore_success">
+        <item quantity="one">Восстановлено: %1$d показание, %2$d уколов. Перезапускаю…</item>
+        <item quantity="few">Восстановлено: %1$d показания, %2$d уколов. Перезапускаю…</item>
+        <item quantity="many">Восстановлено: %1$d показаний, %2$d уколов. Перезапускаю…</item>
+        <item quantity="other">Восстановлено: %1$d показания, %2$d уколов. Перезапускаю…</item>
+    </plurals>
     <string name="backup_restore_cloud_create_failed">не удалось создать файл в облачной папке</string>
 
     <!-- InsulinProfileRuntime.kt -->
-    <string name="insulin_profile_runtime_measured">измерено по %1$d уколам, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</string>
+    <plurals name="insulin_profile_runtime_measured">
+        <item quantity="one">измерено по %1$d уколу, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</item>
+        <item quantity="few">измерено по %1$d уколам, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</item>
+        <item quantity="many">измерено по %1$d уколам, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</item>
+        <item quantity="other">измерено по %1$d уколам, %2$d дней · старт %3$.0f · пик %4$.0f · активно до %5$.0f · конец %6$.0f мин</item>
+    </plurals>
     <string name="insulin_profile_runtime_arm_food_free"> · по уколам без действующей еды</string>
     <string name="insulin_profile_runtime_arm_mixed"> · по всем уколам (чистых пока мало)</string>
     <string name="insulin_profile_runtime_coerced"> · приведено к границам модели: %1$s</string>
@@ -80,12 +90,27 @@
     <string name="physio_tuning_section_curve_shape_explainer">Кривая разгоняется от «старта» до «полной скорости», держит максимум всю «фазу», потом спадает до «хвоста». Хвост несёт ровно пятую часть дозы. Стенд на его эпизодах даёт 28 · 40 · 30 · 165.</string>
     <string name="physio_tuning_section_label_isf">ISF, ммоль/ед</string>
     <string name="physio_tuning_section_label_kcal">ккал/ч</string>
-    <string name="physio_tuning_section_adaptive_pending">Адаптивный: ещё не посчитан (нужно ≥%1$d годных суток за %2$d дн)</string>
-    <string name="physio_tuning_section_adaptive_ready">Адаптивный: %1$.2f ммоль/ед · %2$d суток за %3$d дн</string>
+    <plurals name="physio_tuning_section_adaptive_pending">
+        <item quantity="one">Адаптивный: ещё не посчитан (нужно ≥%1$d годные сутки за %2$d дн)</item>
+        <item quantity="few">Адаптивный: ещё не посчитан (нужно ≥%1$d годных суток за %2$d дн)</item>
+        <item quantity="many">Адаптивный: ещё не посчитан (нужно ≥%1$d годных суток за %2$d дн)</item>
+        <item quantity="other">Адаптивный: ещё не посчитан (нужно ≥%1$d годных суток за %2$d дн)</item>
+    </plurals>
+    <plurals name="physio_tuning_section_adaptive_ready">
+        <item quantity="one">Адаптивный: %1$.2f ммоль/ед · %2$d сутки за %3$d дн</item>
+        <item quantity="few">Адаптивный: %1$.2f ммоль/ед · %2$d суток за %3$d дн</item>
+        <item quantity="many">Адаптивный: %1$.2f ммоль/ед · %2$d суток за %3$d дн</item>
+        <item quantity="other">Адаптивный: %1$.2f ммоль/ед · %2$d суток за %3$d дн</item>
+    </plurals>
     <string name="physio_tuning_section_isf_source_adaptive_note">Используется АДАПТИВНЫЙ (баланс суток). Сравните его с вашим числом: если два независимых измерителя сходятся, выбор мало что меняет. Систематическое смещение прогноза ISF не чинит.</string>
     <string name="physio_tuning_section_isf_source_manual_note">Используется ВАШЕ число из поля выше.</string>
     <string name="physio_tuning_section_isf_applied">Применён к модели: %1$.3f ммоль/ед</string>
-    <string name="physio_tuning_section_isf_alternative">Альтернатива — измеренный/адаптивный: %1$.3f (эпизодов %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</string>
+    <plurals name="physio_tuning_section_isf_alternative">
+        <item quantity="one">Альтернатива — измеренный/адаптивный: %1$.3f (эпизод %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</item>
+        <item quantity="few">Альтернатива — измеренный/адаптивный: %1$.3f (эпизода %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</item>
+        <item quantity="many">Альтернатива — измеренный/адаптивный: %1$.3f (эпизодов %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</item>
+        <item quantity="other">Альтернатива — измеренный/адаптивный: %1$.3f (эпизода %2$d). Ваше число закреплено и учитель его не трогает. Проверьте его на своей истории, прежде чем переключаться: выученное число может дать форму хуже и больше ложных тревог.</item>
+    </plurals>
     <string name="physio_tuning_section_switch_to_adaptive_button">Перейти на адаптивный</string>
     <string name="physio_tuning_section_pin_value_button">Закрепить его значение</string>
     <string name="physio_tuning_section_label_sieve">сито</string>
@@ -112,12 +137,22 @@
     <string name="physio_tuning_section_running_progress">Подбор «%1$s»: эпизод %2$d из %3$d</string>
     <string name="physio_tuning_section_running_hint">Можно уйти с вкладки — расчёт продолжается. Каждый эпизод это около двухсот прогонов модели, так что десять занимают минуту-две.</string>
     <string name="physio_tuning_section_describe_no_episodes">ни один эпизод не посчитался</string>
-    <string name="physio_tuning_section_describe_episodes_metric">%1$d эпизодов · %2$s</string>
+    <plurals name="physio_tuning_section_describe_episodes_metric">
+        <item quantity="one">%1$d эпизод · %2$s</item>
+        <item quantity="few">%1$d эпизода · %2$s</item>
+        <item quantity="many">%1$d эпизодов · %2$s</item>
+        <item quantity="other">%1$d эпизода · %2$s</item>
+    </plurals>
     <string name="physio_tuning_section_describe_isf">ISF %1$.2f  (%2$s)</string>
     <string name="physio_tuning_section_describe_insulin">инсулин %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
     <string name="physio_tuning_section_describe_full_speed_spread">полн. скорость по эпизодам %1$s</string>
     <string name="physio_tuning_section_describe_totals">%1$.0f ккал/ч · сито %2$.2f · типы %3$.2f · доверие %4$.2f</string>
-    <string name="physio_tuning_section_done_against_applied">Против применённого сейчас, на тех же %1$d эпизодах:</string>
+    <plurals name="physio_tuning_section_done_against_applied">
+        <item quantity="one">Против применённого сейчас, на том же %1$d эпизоде:</item>
+        <item quantity="few">Против применённого сейчас, на тех же %1$d эпизодах:</item>
+        <item quantity="many">Против применённого сейчас, на тех же %1$d эпизодах:</item>
+        <item quantity="other">Против применённого сейчас, на тех же %1$d эпизодах:</item>
+    </plurals>
     <string name="physio_tuning_section_done_shape_bias">форма %1$.2f -&gt; %2$.2f (%3$+.2f)   сдвиг %4$.2f -&gt; %5$.2f (%6$+.2f)</string>
     <string name="physio_tuning_section_outcome_both_better">Лучше по обоим — это редкий случай.</string>
     <string name="physio_tuning_section_outcome_shape_better">Форма лучше, сдвиг хуже: линия точнее следует за поворотами, но сидит дальше от факта.</string>

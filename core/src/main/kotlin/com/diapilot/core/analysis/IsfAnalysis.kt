@@ -251,7 +251,7 @@ fun detectIsfEpisodes(
         // mimics. A correction-tagged shot overrides those false onsets so the
         // clean correction can teach the kernel; the objective post-bolus-rise
         // guard below still rejects it if real unlogged food actually pushed BG up.
-        val trustedCorrection = cfg.trustCorrectionTag && b.purpose == "коррекция"
+        val trustedCorrection = cfg.trustCorrectionTag && BolusPurpose.of(b.purpose) == BolusPurpose.CORRECTION
         if (!trustedCorrection && detFood.any { it in cLo..cHi }) {
             reject(Reject.FOOD_IN_WINDOW, t0); continue
         }

@@ -16,9 +16,10 @@ package com.diapilot.core.analysis
 /** Actions the command parser is allowed to emit. */
 val COMMAND_ACTIONS = setOf("food", "meter", "bolus", "basal", "activity", "dextrose")
 
-/** Bolus purposes the UI knows how to render and train on. Stored tokens: they
- *  are written to the database as they are and never translated. */
-val BOLUS_PURPOSES = setOf("коррекция", "на еду", "докол", "воздух")
+/** Bolus purposes the UI knows how to render and train on: the stored keys of
+ *  [BolusPurpose]. A command may name one in any supported language
+ *  ([BolusPurpose.of]); it is stored as the key. */
+val BOLUS_PURPOSES: Set<String> = BolusPurpose.entries.map { it.key }.toSet()
 
 /** The physiological glucose range a meter command may carry, mmol/L. */
 val COMMAND_GLUCOSE_RANGE_MMOL = 1.0..35.0
@@ -80,7 +81,7 @@ fun validateCommandValues(
         "bolus" -> when {
             units == null -> CommandBlock.DoseMissing
             units > p.commandMaxBolusUnits -> CommandBlock.BolusAboveFuse(units, p.commandMaxBolusUnits)
-            purpose != null && purpose !in BOLUS_PURPOSES -> CommandBlock.UnknownPurpose(purpose)
+            purpose != null && BolusPurpose.of(purpose) == null -> CommandBlock.UnknownPurpose(purpose)
             else -> null
         }
         "basal" -> when {

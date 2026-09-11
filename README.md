@@ -116,9 +116,9 @@ DiaPilot --> widget, lock-screen chip, notifications
   - pushes to a companion server the user runs and configures (URL + token).
 - Cleartext HTTP is allowed only to loopback and one LAN host listed in
   `network_security_config.xml`.
-- The daily automatic backup is written to the public Downloads folder, on
-  purpose, so it survives an uninstall. Anything with access to Downloads can
-  read it.
+- The daily automatic backup, once switched on in Settings, is written to the
+  public Downloads folder, on purpose, so it survives an uninstall. Anything
+  with access to Downloads can read it.
 - Databases, exports, device dumps, settings exports and companion-server
   state are gitignored: medical data does not reach git.
 
@@ -146,6 +146,21 @@ toolchain resolver can download that JDK. Instrumented tests in
    Connect permissions (heart rate, sleep, steps), "draw over other apps" for
    the lock-screen chip, an Anthropic API key in the Chat tab, and a companion
    server URL and token in settings.
+4. Turn on in Settings what you use. Everything the app shares with the rest
+   of the phone is off until switched on:
+
+   | Switch | Shared resource | Default |
+   | --- | --- | --- |
+   | Watch → Watch face server | loopback port 29863 (watch face, `/api/v1/events`) | off |
+   | Data → Daily backup to Downloads | public Downloads folder | off |
+   | Libre 2 → Scan Libre 2 over NFC | the sensor over NFC, OOP2's broadcast reply | off |
+   | Libre 2 → own BLE link | the sensor's single BLE connection | off |
+
+   Reading xDrip's broadcast and web service and Health Connect needs no
+   switch: it is read-only. The applicationId is `io.github.obdosok.diapilot`,
+   and every name the app places outside its sandbox (FileProvider authority,
+   broadcast actions, backup file names) is derived from it, so a second build
+   with another applicationId installs next to this one without sharing data.
 
 ## Reference implementation
 

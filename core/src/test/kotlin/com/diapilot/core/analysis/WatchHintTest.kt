@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// The wording is rendered and tested in :app (com.example.diapilot.i18n.WatchHintTextTest).
+// The wording is rendered and tested in :app (io.github.obdosok.diapilot.i18n.WatchHintTextTest).
 class WatchHintTest {
     @Test
     fun predictedLowRemindsTheUsersOwnProtocol() {

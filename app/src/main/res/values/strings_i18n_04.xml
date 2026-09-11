@@ -15,11 +15,17 @@
     <!-- BackupRestore.kt -->
     <string name="backup_restore_file_unavailable">file not readable</string>
     <string name="backup_restore_no_readings">no glucose readings in the file — is this a DiaPilot copy?</string>
-    <string name="backup_restore_success">Restored: %1$d readings, %2$d doses. Restarting…</string>
+    <plurals name="backup_restore_success">
+        <item quantity="one">Restored: %1$d reading, %2$d doses. Restarting…</item>
+        <item quantity="other">Restored: %1$d readings, %2$d doses. Restarting…</item>
+    </plurals>
     <string name="backup_restore_cloud_create_failed">could not create the file in the cloud folder</string>
 
     <!-- InsulinProfileRuntime.kt -->
-    <string name="insulin_profile_runtime_measured">measured from %1$d doses, %2$d days · onset %3$.0f · peak %4$.0f · active until %5$.0f · end %6$.0f min</string>
+    <plurals name="insulin_profile_runtime_measured">
+        <item quantity="one">measured from %1$d dose, %2$d days · onset %3$.0f · peak %4$.0f · active until %5$.0f · end %6$.0f min</item>
+        <item quantity="other">measured from %1$d doses, %2$d days · onset %3$.0f · peak %4$.0f · active until %5$.0f · end %6$.0f min</item>
+    </plurals>
     <string name="insulin_profile_runtime_arm_food_free"> · from doses with no food active</string>
     <string name="insulin_profile_runtime_arm_mixed"> · from all doses (too few clean ones yet)</string>
     <string name="insulin_profile_runtime_coerced"> · coerced to the model bounds: %1$s</string>
@@ -80,12 +86,21 @@
     <string name="physio_tuning_section_curve_shape_explainer">The curve ramps up from “onset” to “full speed”, holds the maximum for the whole “phase”, then decays to “tail”. The tail carries exactly a fifth of the dose. On the bench\'s own episodes it comes out 28 · 40 · 30 · 165.</string>
     <string name="physio_tuning_section_label_isf">ISF, mmol/L per U</string>
     <string name="physio_tuning_section_label_kcal">kcal/h</string>
-    <string name="physio_tuning_section_adaptive_pending">Adaptive: not yet computed (needs ≥%1$d good days out of %2$d)</string>
-    <string name="physio_tuning_section_adaptive_ready">Adaptive: %1$.2f mmol/L per U · %2$d days out of %3$d</string>
+    <plurals name="physio_tuning_section_adaptive_pending">
+        <item quantity="one">Adaptive: not yet computed (needs ≥%1$d good day out of %2$d)</item>
+        <item quantity="other">Adaptive: not yet computed (needs ≥%1$d good days out of %2$d)</item>
+    </plurals>
+    <plurals name="physio_tuning_section_adaptive_ready">
+        <item quantity="one">Adaptive: %1$.2f mmol/L per U · %2$d day out of %3$d</item>
+        <item quantity="other">Adaptive: %1$.2f mmol/L per U · %2$d days out of %3$d</item>
+    </plurals>
     <string name="physio_tuning_section_isf_source_adaptive_note">Using ADAPTIVE (daily balance). Compare it with your own number: if two independent measures agree, the choice barely matters. It does not fix a systematic ISF forecast bias.</string>
     <string name="physio_tuning_section_isf_source_manual_note">Using YOUR number from the field above.</string>
     <string name="physio_tuning_section_isf_applied">Applied to the model: %1$.3f mmol/L per U</string>
-    <string name="physio_tuning_section_isf_alternative">Alternative — measured/adaptive: %1$.3f (%2$d episodes). Your number is pinned and the learner does not touch it. Check it against your own history before switching: the learned number may give a worse shape and more false alarms.</string>
+    <plurals name="physio_tuning_section_isf_alternative">
+        <item quantity="one">Alternative — measured/adaptive: %1$.3f (%2$d episode). Your number is pinned and the learner does not touch it. Check it against your own history before switching: the learned number may give a worse shape and more false alarms.</item>
+        <item quantity="other">Alternative — measured/adaptive: %1$.3f (%2$d episodes). Your number is pinned and the learner does not touch it. Check it against your own history before switching: the learned number may give a worse shape and more false alarms.</item>
+    </plurals>
     <string name="physio_tuning_section_switch_to_adaptive_button">Switch to adaptive</string>
     <string name="physio_tuning_section_pin_value_button">Pin its value</string>
     <string name="physio_tuning_section_label_sieve">sieve</string>
@@ -112,12 +127,18 @@
     <string name="physio_tuning_section_running_progress">Fitting “%1$s”: episode %2$d of %3$d</string>
     <string name="physio_tuning_section_running_hint">You can leave the tab — the calculation continues. Each episode is about two hundred model runs, so ten takes a minute or two.</string>
     <string name="physio_tuning_section_describe_no_episodes">not a single episode could be scored</string>
-    <string name="physio_tuning_section_describe_episodes_metric">%1$d episodes · %2$s</string>
+    <plurals name="physio_tuning_section_describe_episodes_metric">
+        <item quantity="one">%1$d episode · %2$s</item>
+        <item quantity="other">%1$d episodes · %2$s</item>
+    </plurals>
     <string name="physio_tuning_section_describe_isf">ISF %1$.2f  (%2$s)</string>
     <string name="physio_tuning_section_describe_insulin">insulin %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
     <string name="physio_tuning_section_describe_full_speed_spread">full speed across episodes %1$s</string>
     <string name="physio_tuning_section_describe_totals">%1$.0f kcal/h · sieve %2$.2f · types %3$.2f · trust %4$.2f</string>
-    <string name="physio_tuning_section_done_against_applied">Against what\'s applied now, on the same %1$d episodes:</string>
+    <plurals name="physio_tuning_section_done_against_applied">
+        <item quantity="one">Against what\'s applied now, on the same %1$d episode:</item>
+        <item quantity="other">Against what\'s applied now, on the same %1$d episodes:</item>
+    </plurals>
     <string name="physio_tuning_section_done_shape_bias">shape %1$.2f -&gt; %2$.2f (%3$+.2f)   bias %4$.2f -&gt; %5$.2f (%6$+.2f)</string>
     <string name="physio_tuning_section_outcome_both_better">Better on both — that\'s rare.</string>
     <string name="physio_tuning_section_outcome_shape_better">Shape better, bias worse: the line tracks turns more closely, but sits farther from the actual value.</string>

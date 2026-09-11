@@ -157,7 +157,7 @@
     <string name="settings_screen_cloud_folder_configured">☁️ Облачная копия: %1$s · сменить</string>
     <string name="settings_screen_cloud_configured_fallback">настроена</string>
     <string name="settings_screen_disable_cloud_copy">Отключить облачную копию</string>
-    <string name="settings_screen_backup_hint">Полная копия всех данных (глюкоза, инсулин, еда, разметка) — в папку Загрузки. Плюс автокопия раз в сутки (7 файлов по дням недели, diapilot-auto-backup-N) — и в облачную папку, если выбрана (укажи папку Google Диска — синхронизирует сам Диск, данные не уходят никуда, кроме твоего облака). Восстановление — путь переезда на новый телефон.</string>
+    <string name="settings_screen_backup_hint">Полная копия всех данных (глюкоза, инсулин, еда, разметка) — в папку Загрузки. Плюс, если переключатель выше включён, автокопия раз в сутки (7 файлов по дням недели, с идентификатором приложения в имени: …-auto-backup-N) — и в облачную папку, если выбрана (укажи папку Google Диска — синхронизирует сам Диск, данные не уходят никуда, кроме твоего облака). Восстановление — путь переезда на новый телефон.</string>
 
     <!-- Watch card -->
     <string name="settings_screen_watch_title">Часы</string>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Text for values computed in :core (language-neutral there), rendered by
-     com.example.diapilot.i18n.*Text. Russian in values-ru/strings_core.xml.
+     io.github.obdosok.diapilot.i18n.*Text. Russian in values-ru/strings_core.xml.
      Reserved prefixes: unit_ status_ watch_hint_ command_guard_ isf_
      libre_status_ trend_nuance_ regime_ health_reason_ insulin_landmark_
      insulin_ordering_ landmark_refusal_ landmark_rejection_ tail_refusal_

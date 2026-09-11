@@ -70,7 +70,7 @@ fun foodMemory(
     if (label in SysLabels.ALL) return null
     val meals = labeled.filter { it.labelName == label }.sortedByDescending { it.event.onsetMs }
     if (meals.isEmpty()) return null
-    val continuations = labeled.filter { it.labelName == SysLabels.CONTINUATION }
+    val continuations = labeled.filter { SysLabels.keyOf(it.labelName) == SysLabels.CONTINUATION }
 
     val episodes = meals.map { m ->
         val onset = m.event.onsetMs
@@ -82,7 +82,7 @@ fun foodMemory(
         // a continuation's paired bolus.
         val contPaired = myConts.mapNotNull { c -> c.event.bolusUnits?.let { c.event.onsetMs } }.toSet()
         val topUpShots = boluses.filter { b ->
-            b.purpose == "докол" &&
+            BolusPurpose.of(b.purpose) == BolusPurpose.TOP_UP &&
                 b.tsMs in (onset + 20 * 60_000)..(onset + EPISODE_WINDOW_MS) &&
                 myConts.none { c -> kotlin.math.abs(b.tsMs - c.event.onsetMs) < 45 * 60_000 && c.event.onsetMs in contPaired }
         }.sumOf { it.units }

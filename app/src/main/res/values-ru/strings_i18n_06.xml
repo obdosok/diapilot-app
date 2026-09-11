@@ -26,8 +26,18 @@
     <string name="libre_ble_client_status_streaming">поток идёт (пакет %1$s)</string>
 
     <!-- FoodLibrary.kt -->
-    <string name="food_library_deconv_stats">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</string>
-    <string name="food_library_deconv_stats_with_onset">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</string>
+    <plurals name="food_library_deconv_stats">
+        <item quantity="one">%1$d наблюдение из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</item>
+        <item quantity="few">%1$d наблюдения из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</item>
+        <item quantity="many">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</item>
+        <item quantity="other">%1$d наблюдения из %2$d заметок · цензур. %3$d%% · ttp медиана %4$.0f мин · %5$.2f ммоль/г</item>
+    </plurals>
+    <plurals name="food_library_deconv_stats_with_onset">
+        <item quantity="one">%1$d наблюдение из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</item>
+        <item quantity="few">%1$d наблюдения из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</item>
+        <item quantity="many">%1$d наблюдений из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</item>
+        <item quantity="other">%1$d наблюдения из %2$d заметок · цензур. %3$d%% · начало медиана %4$.0f мин · ttp медиана %5$.0f мин · %6$.2f ммоль/г</item>
+    </plurals>
     <string name="food_library_title">📚 Библиотека еды</string>
     <string name="food_library_add_product">＋ Продукт</string>
     <string name="food_library_search">Поиск</string>
@@ -44,7 +54,12 @@
         <item quantity="many">%1$s · %2$d приёмов · %3$.0f г всего</item>
         <item quantity="other">%1$s · %2$d приёма · %3$.0f г всего</item>
     </plurals>
-    <string name="food_library_and_more">…и ещё %1$d</string>
+    <plurals name="food_library_and_more">
+        <item quantity="one">…и ещё %1$d</item>
+        <item quantity="few">…и ещё %1$d</item>
+        <item quantity="many">…и ещё %1$d</item>
+        <item quantity="other">…и ещё %1$d</item>
+    </plurals>
     <plurals name="food_library_concepts_title">
         <item quantity="one">🍱 Концепты: %1$d на %2$d запись</item>
         <item quantity="few">🍱 Концепты: %1$d на %2$d записи</item>
@@ -160,6 +175,11 @@
         <item quantity="other">уже принято (%1$d записи)</item>
     </plurals>
     <string name="food_structure_acceptance_apply">Применить</string>
-    <string name="food_structure_acceptance_note_update">«%1$s»: изменено записей %2$d</string>
+    <plurals name="food_structure_acceptance_note_update">
+        <item quantity="one">«%1$s»: изменена %2$d запись</item>
+        <item quantity="few">«%1$s»: изменено %2$d записи</item>
+        <item quantity="many">«%1$s»: изменено записей %2$d</item>
+        <item quantity="other">«%1$s»: изменено %2$d записи</item>
+    </plurals>
     <string name="food_structure_acceptance_no_rows">Предложение не загрузилось.</string>
 </resources>

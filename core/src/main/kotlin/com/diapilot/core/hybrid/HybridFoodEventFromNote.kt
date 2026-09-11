@@ -1,6 +1,6 @@
 package com.diapilot.core.hybrid
 
-import com.diapilot.core.analysis.RESCUE_NOTE_PREFIX
+import com.diapilot.core.analysis.isRescueNote
 import com.diapilot.core.analysis.hasCanonicalComposition
 import com.diapilot.core.analysis.mealConceptComponents
 import com.diapilot.core.analysis.parseFoodKineticsV2
@@ -43,6 +43,6 @@ fun hybridFoodEventFromNote(
         fatG = nutrition.fatG,
         macroProvenance = analysis?.let { "annotation_analysis_v1" },
         kineticFeatures = parseFoodKineticsV2(analysis, nutrition.proteinG, nutrition.fatG),
-        rescueTreatment = text.trim().startsWith(RESCUE_NOTE_PREFIX, ignoreCase = true),
+        rescueTreatment = isRescueNote(text),
     )
 }

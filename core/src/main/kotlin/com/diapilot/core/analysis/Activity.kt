@@ -11,8 +11,9 @@ import com.diapilot.core.collector.Annotation
 import com.diapilot.core.collector.HrPoint
 import com.diapilot.core.collector.StepBucket
 
-/** Notes the user logs to mean "I exercised" — a manual activity bout. */
-val ACTIVITY_TAGS = setOf("прогулка", "тренировка", "спорт", "зал", "бег", "велосипед", "walk", "workout")
+/** Notes the user logs to mean "I exercised" — a manual activity bout. Every
+ *  accepted spelling: the stored keys and each language's words. */
+val ACTIVITY_TAGS: Set<String> = NoteTag.formsOf(NoteTag.entries.filter { it.group == NoteTagGroup.ACTIVITY })
 
 /**
  * Manual activity from tagged notes — a walk/workout the user logged by hand,
@@ -35,7 +36,7 @@ fun activityWindowsFromNotes(
     val txt = n.content.trim().lowercase()
     val head = txt.substringBefore('·').trim()
     if (head !in ACTIVITY_TAGS) return@mapNotNull null
-    val durMin = Regex("""(\d+)\s*мин""").find(txt)
+    val durMin = ACTIVITY_MINUTES_REGEX.find(txt)
         ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(5, 360)
         ?: defaultMin
     ActivityWindow(n.tsMs, n.tsMs + durMin * 60_000L, durMin)
