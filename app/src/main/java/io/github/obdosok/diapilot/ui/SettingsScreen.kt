@@ -1237,6 +1237,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     },
                     label = { Text(stringResource(R.string.settings_screen_companion_token_label)) },
                     singleLine = true,
+                    // Masked, and a password keyboard: no suggestions, and the
+                    // IME does not learn the token into its dictionary.
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(

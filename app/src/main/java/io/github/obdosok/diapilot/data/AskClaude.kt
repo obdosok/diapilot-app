@@ -31,7 +31,6 @@ import java.util.Locale
  */
 object AskClaude {
 
-    const val PREF_API_KEY = "anthropic_api_key"
     private const val MODEL = "claude-opus-4-8"
 
     data class ChatMsg(val role: String, val text: String)  // role: user | assistant
@@ -101,14 +100,14 @@ ${LlmLanguage.replyInstruction(context)}"""
         }
     }
 
+    /** The user's key, encrypted at rest; see [SecretStore]. Never logged,
+     *  never part of a prompt — it travels only as the `x-api-key` header. */
     fun apiKey(context: Context): String? =
-        context.getSharedPreferences(TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE)
-            .getString(PREF_API_KEY, null)?.takeIf { it.isNotBlank() }
+        Secrets.store(context).get(SecretStore.Secret.ANTHROPIC_API_KEY)
 
-    fun saveApiKey(context: Context, key: String) {
-        context.getSharedPreferences(TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE)
-            .edit().putString(PREF_API_KEY, key.trim()).apply()
-    }
+    /** False when the key could not be stored securely; nothing is saved then. */
+    fun saveApiKey(context: Context, key: String): Boolean =
+        Secrets.store(context).set(SecretStore.Secret.ANTHROPIC_API_KEY, key)
 
     /** Compact, LLM-friendly summary of the user's data. Recomputed per question. */
     fun buildContext(context: Context, store: CollectorStore): String {

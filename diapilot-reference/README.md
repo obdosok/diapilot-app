@@ -32,8 +32,10 @@ python -m python_core review export.sqlite --window-days 90
 - `python_core/analysis.py` — ISF aggregates, confidence levels
 - `python_core/report.py` — ISF report + charts
 - `python_core/twin/` — digital twin (kernel G(τ), simulator, experiment, report)
-- `python_core/advisor.py` — correction calculator + retrospective review
-- `python_core/cli.py` — CLI (analyze / twin / suggest / review)
+- `python_core/cli.py` — CLI (analyze / twin / suggest / review). A
+  research-era correction advisor existed at this stage; it is deliberately
+  excluded from this publication, and the Android app never had one — the app
+  does not propose doses.
 - `tests/` — 30 contract tests + synthetic database generator
 
 ## Specifications

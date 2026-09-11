@@ -242,12 +242,13 @@ object Settings {
         prefs(context).edit()
             .putString("companion_url", v?.trim()?.trimEnd('/')?.ifEmpty { null }).apply()
 
+    /** Encrypted at rest; see [SecretStore]. Sent only as the Authorization header. */
     fun companionToken(context: Context): String? =
-        prefs(context).getString("companion_token", null)
+        Secrets.store(context).get(SecretStore.Secret.COMPANION_TOKEN)
 
-    fun setCompanionToken(context: Context, v: String?) =
-        prefs(context).edit()
-            .putString("companion_token", v?.trim()?.ifEmpty { null }).apply()
+    /** False when the token could not be stored securely; nothing is saved then. */
+    fun setCompanionToken(context: Context, v: String?): Boolean =
+        Secrets.store(context).set(SecretStore.Secret.COMPANION_TOKEN, v)
 
     /** The user's own pre-agreed hypo first step ("10 g soka") - reminded
      *  verbatim on predicted lows; the app never computes rescue carbs. */

@@ -29,7 +29,7 @@ once.
 |---|---|---|
 | POST | `/api/push` (Bearer) | status snapshot from the phone |
 | POST | `/api/backup` (Bearer, multipart `file`) | daily database backup (rotates 14 files) |
-| GET | `/api/latest?token=` | latest snapshot (feeds the page) |
+| GET | `/api/latest` (Bearer) | latest snapshot (feeds the page) |
 | GET | `/` | dashboard |
 
 ## Deployment (this is medical data — your own machines only)

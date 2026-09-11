@@ -1,19 +1,46 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    System backup and device-to-device transfer rules, Android 12+ (API 31+).
+
+    Nothing leaves the device through the system: not the preferences (they hold
+    the Anthropic API key and the companion token, encrypted with an
+    AndroidKeyStore key that never leaves this phone, so a copy would be useless
+    elsewhere anyway), not the medical database, not the photos. The app has its
+    own explicit backup and restore in Settings, started by the user, to a
+    destination the user picks.
+
+    Why the rules are needed although the manifest sets allowBackup="false":
+    - cloud-backup: allowBackup="false" already disables it on every API level.
+      The excludes are a second line in case that attribute is ever flipped.
+    - device-transfer: for an app targeting API 31+, allowBackup="false" no
+      longer stops device-to-device migration on Android 12+. Only these rules
+      do. See developer.android.com/about/versions/12/behavior-changes-12#backup-restore
+
+    Every domain is listed: "root" covers files, databases and preferences, but
+    not external storage or device-protected storage.
+    Below API 31 this file is not read; see backup_rules.xml.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

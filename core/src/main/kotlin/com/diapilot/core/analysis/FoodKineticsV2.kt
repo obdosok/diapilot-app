@@ -21,38 +21,53 @@ data class FoodKineticFeaturesV2(
     val confidence: Double = 0.25,
     val provenance: String = "derived-unknown-v2",
     val alcoholPresent: Boolean = false,
-    val proteinG:Double? = null,
-    val fatG:Double? = null,
+    val proteinG: Double? = null,
+    val fatG: Double? = null,
 ) {
     init {
-        require(listOf(fastFraction,mediumFraction,slowFraction,confidence).all { it.isFinite() })
+        require(
+            listOf(fastFraction, mediumFraction, slowFraction, confidence).all { it.isFinite() }
+        )
         require(fastFraction >= 0 && mediumFraction >= 0 && slowFraction >= 0)
         require(fastFraction + mediumFraction + slowFraction > 0)
         require(confidence in 0.0..1.0)
         require(fiberG == null || fiberG.isFinite() && fiberG >= 0)
-        require(proteinG==null||proteinG.isFinite()&&proteinG>=0)
-        require(fatG==null||fatG.isFinite()&&fatG>=0)
+        require(proteinG == null || proteinG.isFinite() && proteinG >= 0)
+        require(fatG == null || fatG.isFinite() && fatG >= 0)
         require(provenance.isNotBlank())
     }
-    fun normalized():FoodKineticFeaturesV2 {
-        val sum=fastFraction+mediumFraction+slowFraction
-        return copy(fastFraction=fastFraction/sum,mediumFraction=mediumFraction/sum,slowFraction=slowFraction/sum)
+
+    fun normalized(): FoodKineticFeaturesV2 {
+        val sum = fastFraction + mediumFraction + slowFraction
+        return copy(
+            fastFraction = fastFraction / sum,
+            mediumFraction = mediumFraction / sum,
+            slowFraction = slowFraction / sum
+        )
     }
-    fun identity():String=normalized().let {
-        "${it.fastFraction}:${it.mediumFraction}:${it.slowFraction}:${it.physicalForm}:${it.fiberG}:${it.confidence}:${it.provenance}:${it.alcoholPresent}:${it.proteinG}:${it.fatG}"
-    }
+
+    fun identity(): String =
+        normalized().let {
+            "${it.fastFraction}:${it.mediumFraction}:${it.slowFraction}:${it.physicalForm}:${it.fiberG}:${it.confidence}:${it.provenance}:${it.alcoholPresent}:${it.proteinG}:${it.fatG}"
+        }
 }
 
-fun foodKineticsLineV2(v:FoodKineticFeaturesV2):String {
-    val n=v.normalized()
-    fun d(x:Double)=String.format(java.util.Locale.ROOT,"%.4f",x)
+fun foodKineticsLineV2(v: FoodKineticFeaturesV2): String {
+    val n = v.normalized()
+    fun d(x: Double) = String.format(java.util.Locale.ROOT, "%.4f", x)
     return buildList {
-        add("fast=${d(n.fastFraction)}");add("medium=${d(n.mediumFraction)}");add("slow=${d(n.slowFraction)}")
-        add("form=${n.physicalForm.name}");n.fiberG?.let{add("fiber=${d(it)}")}
-        add("confidence=${d(n.confidence)}");add("source=${n.provenance.replace(';','_').replace('=','_')}")
-        add("alcohol=${n.alcoholPresent}")
-        n.proteinG?.let{add("protein=${d(it)}")};n.fatG?.let{add("fat=${d(it)}")}
-    }.joinToString(";",prefix="$FOOD_KINETICS_PREFIX_V2: ")
+            add("fast=${d(n.fastFraction)}");
+            add("medium=${d(n.mediumFraction)}");
+            add("slow=${d(n.slowFraction)}")
+            add("form=${n.physicalForm.name}");
+            n.fiberG?.let { add("fiber=${d(it)}") }
+            add("confidence=${d(n.confidence)}");
+            add("source=${n.provenance.replace(';','_').replace('=','_')}")
+            add("alcohol=${n.alcoholPresent}")
+            n.proteinG?.let { add("protein=${d(it)}") };
+            n.fatG?.let { add("fat=${d(it)}") }
+        }
+        .joinToString(";", prefix = "$FOOD_KINETICS_PREFIX_V2: ")
 }
 
 const val ALCOHOL_LINE_PREFIX_V2 = "META_ALCOHOL"
@@ -72,24 +87,51 @@ const val ALCOHOL_LINE_PREFIX_V2 = "META_ALCOHOL"
  * not know in order to carry a fact we do know would mark the record as
  * structurally described when it is not, and that provenance is load-bearing.
  */
-fun parseAlcoholPresentV2(analysis:String?):Boolean {
-    val line=analysis?.lineSequence()?.lastOrNull{it.trim().startsWith("$ALCOHOL_LINE_PREFIX_V2:",true)}?:return false
-    return line.substringAfter(':').trim().lowercase() in setOf("true","1","да","yes")
+fun parseAlcoholPresentV2(analysis: String?): Boolean {
+    val line =
+        analysis?.lineSequence()?.lastOrNull {
+            it.trim().startsWith("$ALCOHOL_LINE_PREFIX_V2:", true)
+        } ?: return false
+    return line.substringAfter(':').trim().lowercase() in setOf("true", "1", "да", "yes")
 }
 
-private fun explicitFoodKineticsV2(analysis:String):FoodKineticFeaturesV2? {
-    val line=analysis.lineSequence().lastOrNull{it.trim().startsWith("$FOOD_KINETICS_PREFIX_V2:",true)}?:return null
-    val fields=line.substringAfter(':').split(';').mapNotNull{part->
-        val i=part.indexOf('=');if(i<=0)null else part.substring(0,i).trim().lowercase() to part.substring(i+1).trim()
-    }.toMap()
-    fun d(k:String)=fields[k]?.replace(',','.')?.toDoubleOrNull()
-    val fast=d("fast")?:return null;val medium=d("medium")?:return null;val slow=d("slow")?:return null
-    return runCatching { FoodKineticFeaturesV2(
-        fastFraction=fast,mediumFraction=medium,slowFraction=slow,
-        physicalForm=fields["form"]?.let{FoodPhysicalFormV2.valueOf(it.uppercase())}?:FoodPhysicalFormV2.UNKNOWN,
-        fiberG=d("fiber"),confidence=d("confidence")?.coerceIn(0.0,1.0)?:.25,provenance=fields["source"]?:"stored-v2",
-        alcoholPresent=fields["alcohol"]?.toBooleanStrictOrNull()?:false,proteinG=d("protein"),fatG=d("fat"),
-    ).normalized() }.getOrNull()
+private fun explicitFoodKineticsV2(analysis: String): FoodKineticFeaturesV2? {
+    val line =
+        analysis.lineSequence().lastOrNull {
+            it.trim().startsWith("$FOOD_KINETICS_PREFIX_V2:", true)
+        } ?: return null
+    val fields =
+        line
+            .substringAfter(':')
+            .split(';')
+            .mapNotNull { part ->
+                val i = part.indexOf('=');
+                if (i <= 0) null
+                else part.substring(0, i).trim().lowercase() to part.substring(i + 1).trim()
+            }
+            .toMap()
+    fun d(k: String) = fields[k]?.replace(',', '.')?.toDoubleOrNull()
+    val fast = d("fast") ?: return null;
+    val medium = d("medium") ?: return null;
+    val slow = d("slow") ?: return null
+    return runCatching {
+        FoodKineticFeaturesV2(
+                fastFraction = fast,
+                mediumFraction = medium,
+                slowFraction = slow,
+                physicalForm =
+                    fields["form"]?.let { FoodPhysicalFormV2.valueOf(it.uppercase()) }
+                        ?: FoodPhysicalFormV2.UNKNOWN,
+                fiberG = d("fiber"),
+                confidence = d("confidence")?.coerceIn(0.0, 1.0) ?: .25,
+                provenance = fields["source"] ?: "stored-v2",
+                alcoholPresent = fields["alcohol"]?.toBooleanStrictOrNull() ?: false,
+                proteinG = d("protein"),
+                fatG = d("fat"),
+            )
+            .normalized()
+    }
+        .getOrNull()
 }
 
 /**
@@ -169,67 +211,156 @@ fun capFastForFat(
     )
 }
 
-private data class MetaSpeed(val speed:CarbSpeed,val confidence:Double)
+private data class MetaSpeed(val speed: CarbSpeed, val confidence: Double)
 
 /** Read the component-level structured tool output already stored in META. */
-private fun componentSpeedMeta(analysis:String):Map<String,MetaSpeed> {
-    val line=analysis.lineSequence().lastOrNull{isMarkerLine(it,META_LINE_PREFIX)}?:return emptyMap()
-    return line.substringAfter(':').split(';').mapNotNull { raw ->
-        val name=normalizeFoodName(raw.substringBefore('[').trim());if(name.isBlank())return@mapNotNull null
-        val body=raw.substringAfter('[',"").substringBeforeLast(']',"").lowercase()
-        val speed=when { Regex("(?:^|[^a-z])fast(?:$|[^a-z])").containsMatchIn(body)->CarbSpeed.FAST
-            Regex("(?:^|[^a-z])slow(?:$|[^a-z])").containsMatchIn(body)->CarbSpeed.SLOW
-            Regex("(?:^|[^a-z])med(?:$|[^a-z])").containsMatchIn(body)->CarbSpeed.MED
-            else->return@mapNotNull null }
-        val confidence=Regex("conf\\s+([0-9]+(?:[.,][0-9]+)?)").find(body)?.groupValues?.get(1)
-            ?.replace(',','.')?.toDoubleOrNull()?.coerceIn(0.0,1.0)?:.45
-        name to MetaSpeed(speed,confidence)
-    }.toMap()
+private fun componentSpeedMeta(analysis: String): Map<String, MetaSpeed> {
+    val line =
+        analysis.lineSequence().lastOrNull { isMarkerLine(it, META_LINE_PREFIX) }
+            ?: return emptyMap()
+    return line
+        .substringAfter(':')
+        .split(';')
+        .mapNotNull { raw ->
+            val name = normalizeFoodName(raw.substringBefore('[').trim());
+            if (name.isBlank()) return@mapNotNull null
+            val body = raw.substringAfter('[', "").substringBeforeLast(']', "").lowercase()
+            val speed =
+                when {
+                    Regex("(?:^|[^a-z])fast(?:$|[^a-z])").containsMatchIn(body) -> CarbSpeed.FAST
+                    Regex("(?:^|[^a-z])slow(?:$|[^a-z])").containsMatchIn(body) -> CarbSpeed.SLOW
+                    Regex("(?:^|[^a-z])med(?:$|[^a-z])").containsMatchIn(body) -> CarbSpeed.MED
+                    else -> return@mapNotNull null
+                }
+            val confidence =
+                Regex("conf\\s+([0-9]+(?:[.,][0-9]+)?)")
+                    .find(body)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.replace(',', '.')
+                    ?.toDoubleOrNull()
+                    ?.coerceIn(0.0, 1.0) ?: .45
+            name to MetaSpeed(speed, confidence)
+        }
+        .toMap()
 }
 
 /**
  * Prefer explicit V2 facts, then component-level LLM facts. GI is a numeric
  * fallback. No title, ingredient name or language dictionary is consulted.
  */
-fun parseFoodKineticsV2(analysis:String?,proteinG:Double?=null,fatG:Double?=null):FoodKineticFeaturesV2 {
-    if(analysis.isNullOrBlank()) return FoodKineticFeaturesV2(.20,.60,.20,confidence=.15)
+fun parseFoodKineticsV2(
+    analysis: String?,
+    proteinG: Double? = null,
+    fatG: Double? = null
+): FoodKineticFeaturesV2 {
+    if (analysis.isNullOrBlank()) return FoodKineticFeaturesV2(.20, .60, .20, confidence = .15)
     // The alcohol line is orthogonal to how carb speed was established, so it
     // rides along every branch below instead of only the explicit one.
-    val alcohol=parseAlcoholPresentV2(analysis)
+    val alcohol = parseAlcoholPresentV2(analysis)
     // Both post-processing steps ride every branch below. The fat guard is
     // applied HERE rather than at write time so that notes already stored are
     // governed by it too — the branch that returns them (`explicitFoodKineticsV2`)
     // returns early, and a guard placed anywhere else would silently miss the
     // entire existing corpus, which is exactly the case it was measured on.
-    fun withAlcohol(v:FoodKineticFeaturesV2)=
-        capFastForFat(if(alcohol) v.copy(alcoholPresent=true) else v, fatG)
-    explicitFoodKineticsV2(analysis)?.let{return withAlcohol(it)}
-    val meta=componentSpeedMeta(analysis);val components=parseComponentsEstimate(analysis)
-    var fast=0.0;var medium=0.0;var slow=0.0;var total=0.0;var confidenceMass=0.0
-    components.forEach{(raw,grams)->
-        if(grams<=0)return@forEach
-        val m=meta[normalizeFoodName(raw)]?:return@forEach
-        when(m.speed){CarbSpeed.FAST->fast+=grams;CarbSpeed.MED->medium+=grams;CarbSpeed.SLOW->slow+=grams;else->Unit}
-        total+=grams;confidenceMass+=grams*m.confidence
+    fun withAlcohol(v: FoodKineticFeaturesV2) =
+        capFastForFat(if (alcohol) v.copy(alcoholPresent = true) else v, fatG)
+    explicitFoodKineticsV2(analysis)?.let {
+        return withAlcohol(it)
     }
-    if(total>0)return withAlcohol(FoodKineticFeaturesV2(fast,medium,slow,confidence=(confidenceMass/total).coerceIn(.1,.9),provenance="component-tool-v2").normalized())
-    val gi=parseGiEstimate(analysis)
-    if(gi!=null){val fractions=when{gi>=70->Triple(.70,.25,.05);gi<=45->Triple(.10,.35,.55);else->Triple(.25,.60,.15)}
-        return withAlcohol(FoodKineticFeaturesV2(fractions.first,fractions.second,fractions.third,confidence=.30,provenance="numeric-gi-v2"))}
+    val meta = componentSpeedMeta(analysis);
+    val components = parseComponentsEstimate(analysis)
+    var fast = 0.0;
+    var medium = 0.0;
+    var slow = 0.0;
+    var total = 0.0;
+    var confidenceMass = 0.0
+    components.forEach { (raw, grams) ->
+        if (grams <= 0) return@forEach
+        val m = meta[normalizeFoodName(raw)] ?: return@forEach
+        when (m.speed) {
+            CarbSpeed.FAST -> fast += grams;
+            CarbSpeed.MED -> medium += grams;
+            CarbSpeed.SLOW -> slow += grams;
+            else -> Unit
+        }
+        total += grams;
+        confidenceMass += grams * m.confidence
+    }
+    if (total > 0)
+        return withAlcohol(
+            FoodKineticFeaturesV2(
+                    fast,
+                    medium,
+                    slow,
+                    confidence = (confidenceMass / total).coerceIn(.1, .9),
+                    provenance = "component-tool-v2"
+                )
+                .normalized()
+        )
+    val gi = parseGiEstimate(analysis)
+    if (gi != null) {
+        val fractions =
+            when {
+                gi >= 70 -> Triple(.70, .25, .05);
+                gi <= 45 -> Triple(.10, .35, .55);
+                else -> Triple(.25, .60, .15)
+            }
+        return withAlcohol(
+            FoodKineticFeaturesV2(
+                fractions.first,
+                fractions.second,
+                fractions.third,
+                confidence = .30,
+                provenance = "numeric-gi-v2"
+            )
+        )
+    }
     // Macros deliberately do not invent carb speed. They are consumed by the
     // continuous timing adapter; keep the neutral mixture here.
-    val macroKnown=proteinG!=null||fatG!=null
-    return withAlcohol(FoodKineticFeaturesV2(.20,.60,.20,confidence=if(macroKnown).22 else .15,provenance=if(macroKnown)"macro-neutral-v2" else "unknown-neutral-v2"))
+    val macroKnown = proteinG != null || fatG != null
+    return withAlcohol(
+        FoodKineticFeaturesV2(
+            .20,
+            .60,
+            .20,
+            confidence = if (macroKnown) .22 else .15,
+            provenance = if (macroKnown) "macro-neutral-v2" else "unknown-neutral-v2"
+        )
+    )
 }
 
 /** Build the stored whole-meal feature line from validated tool output. */
-fun kineticsFromStructuredFoodV2(a:FoodAnalysisOut):FoodKineticFeaturesV2 {
-    var fast=0.0;var medium=0.0;var slow=0.0;var total=0.0;var confidenceMass=0.0
-    a.components.forEach{c->val grams=max(0.0,c.carbsPerUnit*c.count);if(grams<=0)return@forEach
-        when(c.speed?.uppercase()){ "FAST"->fast+=grams;"SLOW"->slow+=grams;else->medium+=grams }
-        total+=grams;confidenceMass+=grams*(c.confidence?:.35)}
-    if(total<=0){fast=.2;medium=.6;slow=.2;total=1.0;confidenceMass=.2}
-    return FoodKineticFeaturesV2(fast/total,medium/total,slow/total,a.physicalForm,a.totalFiberG,
+fun kineticsFromStructuredFoodV2(a: FoodAnalysisOut): FoodKineticFeaturesV2 {
+    var fast = 0.0;
+    var medium = 0.0;
+    var slow = 0.0;
+    var total = 0.0;
+    var confidenceMass = 0.0
+    a.components.forEach { c ->
+        val grams = max(0.0, c.carbsPerUnit * c.count);
+        if (grams <= 0) return@forEach
+        when (c.speed?.uppercase()) {
+            "FAST" -> fast += grams;
+            "SLOW" -> slow += grams;
+            else -> medium += grams
+        }
+        total += grams;
+        confidenceMass += grams * (c.confidence ?: .35)
+    }
+    if (total <= 0) {
+        fast = .2;
+        medium = .6;
+        slow = .2;
+        total = 1.0;
+        confidenceMass = .2
+    }
+    return FoodKineticFeaturesV2(
+        fast / total,
+        medium / total,
+        slow / total,
+        a.physicalForm,
+        a.totalFiberG,
         // v3: the tool's `speed` and `physical_form` descriptions
         // changed materially (carb speed decoupled from fat; a deterministic
         // form ladder), so a note parsed after this point answers a different
@@ -240,5 +371,10 @@ fun kineticsFromStructuredFoodV2(a:FoodAnalysisOut):FoodKineticFeaturesV2 {
         // it had to guess (assumptions) instead of assuming silently — the
         // wholegrain-bread class of error becomes a question, not a silent 61%
         // shift into FAST. A different generation of answers, hence a new tag.
-        (confidenceMass/total).coerceIn(.05,.95),"llm-structured-v4",a.alcoholPresent,a.totalProteinG,a.totalFatG)
+        (confidenceMass / total).coerceIn(.05, .95),
+        "llm-structured-v4",
+        a.alcoholPresent,
+        a.totalProteinG,
+        a.totalFatG
+    )
 }

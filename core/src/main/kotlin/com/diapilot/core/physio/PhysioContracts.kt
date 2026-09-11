@@ -37,14 +37,21 @@ data class PhysioBoundsV1(
 
 enum class ImplementationStatusV1 { EXECUTABLE, MEASUREMENT_PATH_MISSING }
 enum class EstimatorFamilyV1 { STATE_ISF, TIMING_KERNEL, BACKGROUND, SENSOR_QUALITY }
-enum class ParameterTargetV1(val unit:String,val displayReference:Double) {
-    GLOBAL_CS_SCALE("fraction",1.0),
-    ISF_MULTIPLIER("fraction",1.0),
-    EFFECTIVE_RESPONSE_ONLY("fraction",1.0),
-    INSULIN_ONSET("minute",30.0), INSULIN_PEAK("minute",60.0), INSULIN_TAIL("minute",180.0), INSULIN_POTENCY("fraction",1.0),
-    FOOD_ONSET("minute",60.0), FOOD_PEAK("minute",120.0), FOOD_TAIL("minute",240.0),
-    BACKGROUND_RATE("mmol/L/hour",.5), BASAL_MISMATCH("fraction",1.0),
-    SENSOR_BIAS("mmol/L",1.0), SENSOR_PROCESS_VARIANCE("fraction",1.0),
+enum class ParameterTargetV1(val unit: String, val displayReference: Double) {
+    GLOBAL_CS_SCALE("fraction", 1.0),
+    ISF_MULTIPLIER("fraction", 1.0),
+    EFFECTIVE_RESPONSE_ONLY("fraction", 1.0),
+    INSULIN_ONSET("minute", 30.0),
+    INSULIN_PEAK("minute", 60.0),
+    INSULIN_TAIL("minute", 180.0),
+    INSULIN_POTENCY("fraction", 1.0),
+    FOOD_ONSET("minute", 60.0),
+    FOOD_PEAK("minute", 120.0),
+    FOOD_TAIL("minute", 240.0),
+    BACKGROUND_RATE("mmol/L/hour", .5),
+    BASAL_MISMATCH("fraction", 1.0),
+    SENSOR_BIAS("mmol/L", 1.0),
+    SENSOR_PROCESS_VARIANCE("fraction", 1.0),
 }
 /**
  * The two background coefficients PHYSIO zeroes, governed as a BASE parameter.
@@ -232,30 +239,55 @@ enum class ApplicationPolicyV1 {
 }
 
 sealed interface EffectPayloadV1 {
-    val target:ParameterTargetV1
-    val median:Double
-    val low:Double
-    val high:Double
-    data class Fraction(override val target:ParameterTargetV1,override val median:Double,override val low:Double,override val high:Double):EffectPayloadV1 {
-        init { require(target.unit=="fraction" && low<=median&&median<=high) }
+    val target: ParameterTargetV1
+    val median: Double
+    val low: Double
+    val high: Double
+    data class Fraction(
+        override val target: ParameterTargetV1,
+        override val median: Double,
+        override val low: Double,
+        override val high: Double
+    ) : EffectPayloadV1 {
+        init { require(target.unit == "fraction" && low <= median && median <= high) }
     }
-    data class Minutes(override val target:ParameterTargetV1,override val median:Double,override val low:Double,override val high:Double):EffectPayloadV1 {
-        init { require(target.unit=="minute" && low<=median&&median<=high) }
+    data class Minutes(
+        override val target: ParameterTargetV1,
+        override val median: Double,
+        override val low: Double,
+        override val high: Double
+    ) : EffectPayloadV1 {
+        init { require(target.unit == "minute" && low <= median && median <= high) }
     }
-    data class Rate(override val target:ParameterTargetV1,override val median:Double,override val low:Double,override val high:Double):EffectPayloadV1 {
-        init { require(target.unit=="mmol/L/hour" && low<=median&&median<=high) }
+    data class Rate(
+        override val target: ParameterTargetV1,
+        override val median: Double,
+        override val low: Double,
+        override val high: Double
+    ) : EffectPayloadV1 {
+        init { require(target.unit == "mmol/L/hour" && low <= median && median <= high) }
     }
-    data class Bias(override val target:ParameterTargetV1,override val median:Double,override val low:Double,override val high:Double):EffectPayloadV1 {
-        init { require(target.unit=="mmol/L" && low<=median&&median<=high) }
+    data class Bias(
+        override val target: ParameterTargetV1,
+        override val median: Double,
+        override val low: Double,
+        override val high: Double
+    ) : EffectPayloadV1 {
+        init { require(target.unit == "mmol/L" && low <= median && median <= high) }
     }
 }
 
-fun EffectPayloadV1.scaled(scale:Double):EffectPayloadV1=when(this){
-    is EffectPayloadV1.Fraction->copy(median=median*scale,low=low*scale,high=high*scale)
-    is EffectPayloadV1.Minutes->copy(median=median*scale,low=low*scale,high=high*scale)
-    is EffectPayloadV1.Rate->copy(median=median*scale,low=low*scale,high=high*scale)
-    is EffectPayloadV1.Bias->copy(median=median*scale,low=low*scale,high=high*scale)
-}
+fun EffectPayloadV1.scaled(scale: Double): EffectPayloadV1 =
+    when (this) {
+        is EffectPayloadV1.Fraction ->
+            copy(median = median * scale, low = low * scale, high = high * scale)
+        is EffectPayloadV1.Minutes ->
+            copy(median = median * scale, low = low * scale, high = high * scale)
+        is EffectPayloadV1.Rate ->
+            copy(median = median * scale, low = low * scale, high = high * scale)
+        is EffectPayloadV1.Bias ->
+            copy(median = median * scale, low = low * scale, high = high * scale)
+    }
 enum class SourceFieldV1 {
     STEPS, SLEEP_SESSION, CGM, BOLUS, BASAL, FOOD_MACROS, INTAKE_DURATION, CARB_EVIDENCE,
     ALCOHOL_EVIDENCE, SENSOR_SOURCE, INSULIN_PRODUCT, INJECTION_SITE, CARTRIDGE_EVENT,
@@ -279,81 +311,239 @@ enum class ExposurePredicateV1 {
     ANY_MEAL,
 }
 
-fun executableHypothesisSpecV1(id: String, target: String, practical: Double): ExecutableHypothesisSpecV1 {
+fun executableHypothesisSpecV1(
+    id: String,
+    target: String,
+    practical: Double
+): ExecutableHypothesisSpecV1 {
     val commonExclusions = setOf("future knownAt", "sensor gap", "overlapping unmodelled event")
-    val route = when (id) {
-        "global_cs" -> listOf(SourceFieldV1.CARB_EVIDENCE,SourceFieldV1.CGM,SourceFieldV1.BOLUS,SourceFieldV1.BASAL) to ExposurePredicateV1.HIGH_PROTEIN to EstimatorFamilyV1.BACKGROUND to KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
-        // The second amplitude route. Same source fields as `global_cs` — it is
-        // the same parameter — but the exposure is EVERY logged meal rather than
-        // an isolated one, which is the whole difference between the two.
-        "activity_same_isf", "activity_same_effective" -> listOf(SourceFieldV1.STEPS, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to ExposurePredicateV1.SAME_DAY_ACTIVITY to EstimatorFamilyV1.STATE_ISF to KnownAtRuleV1.COLLECTION_TIME
-        "activity_previous_isf", "activity_previous_effective" -> listOf(SourceFieldV1.STEPS, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to ExposurePredicateV1.PREVIOUS_DAY_ACTIVITY to EstimatorFamilyV1.STATE_ISF to KnownAtRuleV1.COLLECTION_TIME
-        "sleep_isf", "sleep_background" -> listOf(SourceFieldV1.SLEEP_SESSION, SourceFieldV1.CGM) to ExposurePredicateV1.SHORT_SLEEP to (if (id.endsWith("background")) EstimatorFamilyV1.BACKGROUND else EstimatorFamilyV1.STATE_ISF) to KnownAtRuleV1.COLLECTION_TIME
-        // Inert filler predicate — see the contract's own note. This row is not
-        // in the registry, so nothing ever evaluates it.
-        ZeroedBackgroundCoefficientsContractV1.ID -> listOf(SourceFieldV1.CGM,SourceFieldV1.SLEEP_SESSION,SourceFieldV1.BASAL,SourceFieldV1.BOLUS) to ExposurePredicateV1.SHORT_SLEEP to EstimatorFamilyV1.BACKGROUND to KnownAtRuleV1.COLLECTION_TIME
-        "hypo_0_4_isf", "hypo_0_4_effective" -> listOf(SourceFieldV1.CGM) to ExposurePredicateV1.HYPO_0_4H to EstimatorFamilyV1.STATE_ISF to KnownAtRuleV1.COLLECTION_TIME
-        "hypo_4_12_isf", "hypo_4_12_effective" -> listOf(SourceFieldV1.CGM) to ExposurePredicateV1.HYPO_4_12H to EstimatorFamilyV1.STATE_ISF to KnownAtRuleV1.COLLECTION_TIME
-        "hypo_night_isf", "hypo_night_effective", "hepatic_hypo" -> listOf(SourceFieldV1.CGM) to ExposurePredicateV1.PREVIOUS_NIGHT_HYPO to (if (id=="hepatic_hypo") EstimatorFamilyV1.BACKGROUND else EstimatorFamilyV1.STATE_ISF) to KnownAtRuleV1.COLLECTION_TIME
-        "glucose_level_isf" -> listOf(SourceFieldV1.CGM,SourceFieldV1.BOLUS) to ExposurePredicateV1.HIGH_STARTING_GLUCOSE to EstimatorFamilyV1.STATE_ISF to KnownAtRuleV1.COLLECTION_TIME
-        "dose_tail" -> listOf(SourceFieldV1.BOLUS,SourceFieldV1.CGM) to ExposurePredicateV1.LARGE_BOLUS to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "tod_peak","tod_onset","tod_tail" -> listOf(SourceFieldV1.BOLUS,SourceFieldV1.CGM) to ExposurePredicateV1.TIME_OF_DAY to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "insulin_product_kinetics" -> listOf(SourceFieldV1.INSULIN_PRODUCT,SourceFieldV1.CGM,SourceFieldV1.BOLUS) to ExposurePredicateV1.PRODUCT_CHANGE to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "protein_absorption" -> listOf(SourceFieldV1.FOOD_MACROS,SourceFieldV1.CGM) to ExposurePredicateV1.HIGH_PROTEIN to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.ANNOTATION_ANALYSIS_KNOWN_AT
-        "fat_absorption" -> listOf(SourceFieldV1.FOOD_MACROS,SourceFieldV1.CGM) to ExposurePredicateV1.HIGH_FAT to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.ANNOTATION_ANALYSIS_KNOWN_AT
-        "duration_absorption" -> listOf(SourceFieldV1.INTAKE_DURATION,SourceFieldV1.CGM) to ExposurePredicateV1.LONG_INTAKE to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
-        "alcohol_background" -> listOf(SourceFieldV1.ALCOHOL_EVIDENCE,SourceFieldV1.CGM) to ExposurePredicateV1.ALCOHOL_PRESENT to EstimatorFamilyV1.BACKGROUND to KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
-        "basal_background" -> listOf(SourceFieldV1.BASAL,SourceFieldV1.INSULIN_PRODUCT,SourceFieldV1.CGM) to ExposurePredicateV1.BASAL_AGE_MISMATCH to EstimatorFamilyV1.BACKGROUND to KnownAtRuleV1.EVENT_KNOWN_AT
-        "sensor_epoch","sensor_bias" -> listOf(SourceFieldV1.SENSOR_SOURCE,SourceFieldV1.CGM) to ExposurePredicateV1.SENSOR_EPOCH_CHANGE to EstimatorFamilyV1.SENSOR_QUALITY to KnownAtRuleV1.COLLECTION_TIME
-        "sensor_compression_lag" -> listOf(SourceFieldV1.CGM) to ExposurePredicateV1.SENSOR_ANOMALY to EstimatorFamilyV1.SENSOR_QUALITY to KnownAtRuleV1.COLLECTION_TIME
-        "cartridge_kinetics" -> listOf(SourceFieldV1.CARTRIDGE_EVENT,SourceFieldV1.CGM,SourceFieldV1.BOLUS) to ExposurePredicateV1.CARTRIDGE_AGE_OR_CHANGE to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "injection_site" -> listOf(SourceFieldV1.INJECTION_SITE,SourceFieldV1.CGM,SourceFieldV1.BOLUS) to ExposurePredicateV1.INJECTION_SITE_CHANGE to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "cartridge_heat" -> listOf(SourceFieldV1.WEATHER_EXPOSURE,SourceFieldV1.CARTRIDGE_EVENT,SourceFieldV1.CGM) to ExposurePredicateV1.HEAT_EXPOSURE_WITH_CARTRIDGE_CONTEXT to EstimatorFamilyV1.TIMING_KERNEL to KnownAtRuleV1.EVENT_KNOWN_AT
-        "stress_illness_background" -> listOf(SourceFieldV1.STRESS_ILLNESS,SourceFieldV1.CGM) to ExposurePredicateV1.STRESS_OR_ILLNESS to EstimatorFamilyV1.BACKGROUND to KnownAtRuleV1.EVENT_KNOWN_AT
-        else -> error("Every preregistered hypothesis must have an executable specification: $id")
-    }
+    val route =
+        when (id) {
+            "global_cs" ->
+                listOf(
+                    SourceFieldV1.CARB_EVIDENCE,
+                    SourceFieldV1.CGM,
+                    SourceFieldV1.BOLUS,
+                    SourceFieldV1.BASAL
+                ) to
+                    ExposurePredicateV1.HIGH_PROTEIN to
+                    EstimatorFamilyV1.BACKGROUND to
+                    KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
+            // The second amplitude route. Same source fields as `global_cs` — it is
+            // the same parameter — but the exposure is EVERY logged meal rather than
+            // an isolated one, which is the whole difference between the two.
+            "activity_same_isf",
+            "activity_same_effective" ->
+                listOf(SourceFieldV1.STEPS, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.SAME_DAY_ACTIVITY to
+                    EstimatorFamilyV1.STATE_ISF to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "activity_previous_isf",
+            "activity_previous_effective" ->
+                listOf(SourceFieldV1.STEPS, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.PREVIOUS_DAY_ACTIVITY to
+                    EstimatorFamilyV1.STATE_ISF to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "sleep_isf",
+            "sleep_background" ->
+                listOf(SourceFieldV1.SLEEP_SESSION, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.SHORT_SLEEP to
+                    (if (id.endsWith("background")) EstimatorFamilyV1.BACKGROUND
+                    else EstimatorFamilyV1.STATE_ISF) to
+                    KnownAtRuleV1.COLLECTION_TIME
+            // Inert filler predicate — see the contract's own note. This row is not
+            // in the registry, so nothing ever evaluates it.
+            ZeroedBackgroundCoefficientsContractV1.ID ->
+                listOf(
+                    SourceFieldV1.CGM,
+                    SourceFieldV1.SLEEP_SESSION,
+                    SourceFieldV1.BASAL,
+                    SourceFieldV1.BOLUS
+                ) to
+                    ExposurePredicateV1.SHORT_SLEEP to
+                    EstimatorFamilyV1.BACKGROUND to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "hypo_0_4_isf",
+            "hypo_0_4_effective" ->
+                listOf(SourceFieldV1.CGM) to
+                    ExposurePredicateV1.HYPO_0_4H to
+                    EstimatorFamilyV1.STATE_ISF to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "hypo_4_12_isf",
+            "hypo_4_12_effective" ->
+                listOf(SourceFieldV1.CGM) to
+                    ExposurePredicateV1.HYPO_4_12H to
+                    EstimatorFamilyV1.STATE_ISF to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "hypo_night_isf",
+            "hypo_night_effective",
+            "hepatic_hypo" ->
+                listOf(SourceFieldV1.CGM) to
+                    ExposurePredicateV1.PREVIOUS_NIGHT_HYPO to
+                    (if (id == "hepatic_hypo") EstimatorFamilyV1.BACKGROUND
+                    else EstimatorFamilyV1.STATE_ISF) to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "glucose_level_isf" ->
+                listOf(SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.HIGH_STARTING_GLUCOSE to
+                    EstimatorFamilyV1.STATE_ISF to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "dose_tail" ->
+                listOf(SourceFieldV1.BOLUS, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.LARGE_BOLUS to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "tod_peak",
+            "tod_onset",
+            "tod_tail" ->
+                listOf(SourceFieldV1.BOLUS, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.TIME_OF_DAY to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "insulin_product_kinetics" ->
+                listOf(SourceFieldV1.INSULIN_PRODUCT, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.PRODUCT_CHANGE to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "protein_absorption" ->
+                listOf(SourceFieldV1.FOOD_MACROS, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.HIGH_PROTEIN to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.ANNOTATION_ANALYSIS_KNOWN_AT
+            "fat_absorption" ->
+                listOf(SourceFieldV1.FOOD_MACROS, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.HIGH_FAT to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.ANNOTATION_ANALYSIS_KNOWN_AT
+            "duration_absorption" ->
+                listOf(SourceFieldV1.INTAKE_DURATION, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.LONG_INTAKE to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
+            "alcohol_background" ->
+                listOf(SourceFieldV1.ALCOHOL_EVIDENCE, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.ALCOHOL_PRESENT to
+                    EstimatorFamilyV1.BACKGROUND to
+                    KnownAtRuleV1.EVIDENCE_REVISION_KNOWN_AT
+            "basal_background" ->
+                listOf(SourceFieldV1.BASAL, SourceFieldV1.INSULIN_PRODUCT, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.BASAL_AGE_MISMATCH to
+                    EstimatorFamilyV1.BACKGROUND to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "sensor_epoch",
+            "sensor_bias" ->
+                listOf(SourceFieldV1.SENSOR_SOURCE, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.SENSOR_EPOCH_CHANGE to
+                    EstimatorFamilyV1.SENSOR_QUALITY to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "sensor_compression_lag" ->
+                listOf(SourceFieldV1.CGM) to
+                    ExposurePredicateV1.SENSOR_ANOMALY to
+                    EstimatorFamilyV1.SENSOR_QUALITY to
+                    KnownAtRuleV1.COLLECTION_TIME
+            "cartridge_kinetics" ->
+                listOf(SourceFieldV1.CARTRIDGE_EVENT, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.CARTRIDGE_AGE_OR_CHANGE to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "injection_site" ->
+                listOf(SourceFieldV1.INJECTION_SITE, SourceFieldV1.CGM, SourceFieldV1.BOLUS) to
+                    ExposurePredicateV1.INJECTION_SITE_CHANGE to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "cartridge_heat" ->
+                listOf(
+                    SourceFieldV1.WEATHER_EXPOSURE,
+                    SourceFieldV1.CARTRIDGE_EVENT,
+                    SourceFieldV1.CGM
+                ) to
+                    ExposurePredicateV1.HEAT_EXPOSURE_WITH_CARTRIDGE_CONTEXT to
+                    EstimatorFamilyV1.TIMING_KERNEL to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            "stress_illness_background" ->
+                listOf(SourceFieldV1.STRESS_ILLNESS, SourceFieldV1.CGM) to
+                    ExposurePredicateV1.STRESS_OR_ILLNESS to
+                    EstimatorFamilyV1.BACKGROUND to
+                    KnownAtRuleV1.EVENT_KNOWN_AT
+            else ->
+                error("Every preregistered hypothesis must have an executable specification: $id")
+        }
     val sources = route.first.first.first
     val predicate = route.first.first.second
     val family = route.first.second
     val knownAt = route.second
-    val parameterTarget=when(id){
-        "global_cs"->ParameterTargetV1.GLOBAL_CS_SCALE
-        "activity_same_isf","activity_previous_isf","sleep_isf","hypo_0_4_isf","hypo_4_12_isf","hypo_night_isf","glucose_level_isf"->ParameterTargetV1.ISF_MULTIPLIER
-        "activity_same_effective","activity_previous_effective","hypo_0_4_effective","hypo_4_12_effective","hypo_night_effective"->ParameterTargetV1.EFFECTIVE_RESPONSE_ONLY
-        "dose_tail"->ParameterTargetV1.INSULIN_TAIL
-        "tod_peak"->ParameterTargetV1.INSULIN_PEAK
-        "tod_onset"->ParameterTargetV1.INSULIN_ONSET
-        "tod_tail"->ParameterTargetV1.INSULIN_TAIL
-        "insulin_product_kinetics"->ParameterTargetV1.INSULIN_POTENCY
-        "protein_absorption"->ParameterTargetV1.FOOD_TAIL
-        "fat_absorption"->ParameterTargetV1.FOOD_PEAK
-        "duration_absorption"->ParameterTargetV1.FOOD_ONSET
-        "basal_background"->ParameterTargetV1.BASAL_MISMATCH
-        "sensor_epoch","sensor_compression_lag"->ParameterTargetV1.SENSOR_PROCESS_VARIANCE
-        "sensor_bias"->ParameterTargetV1.SENSOR_BIAS
-        "cartridge_kinetics","injection_site","cartridge_heat"->ParameterTargetV1.INSULIN_POTENCY
-        else->ParameterTargetV1.BACKGROUND_RATE
-    }
-    val policy=when {
-        parameterTarget==ParameterTargetV1.EFFECTIVE_RESPONSE_ONLY->ApplicationPolicyV1.ATTRIBUTION_ONLY
-        parameterTarget==ParameterTargetV1.SENSOR_PROCESS_VARIANCE->ApplicationPolicyV1.UNCERTAINTY_ONLY
-        else->ApplicationPolicyV1.MEDIAN
-    }
-    val base=ExecutableHypothesisSpecV1(sources.toSet(), knownAt, predicate, family, target, parameterTarget, policy, commonExclusions,
-        practicalBoundPercent=practical,implementationStatus=ImplementationStatusV1.EXECUTABLE)
-    return if(id==ZeroedBackgroundCoefficientsContractV1.ID)base.copy(
-        outcomeTarget="background coefficients measured on quiet segments",parameterTarget=ParameterTargetV1.BACKGROUND_RATE,
-        applicationPolicy=ApplicationPolicyV1.MEASURED_BASE,
-        // Segments and DAYS, because the danger here is the day-state confound:
-        // twenty days is where one anomalous day can no longer move the median,
-        // and a hundred non-overlapping 30-minute segments is ~50 hours of quiet
-        // observation. Both far below what the corpus already holds (366/35) and
-        // far above the generic 8/5 default, which would gate on nothing.
-        minimumIndependentEpisodes=100,minimumIndependentDays=20,
-        // Inert: there is no percent to cap or to ramp. decayHalfLifeDays feeds
-        // `demoteIfStale`, whose cliff is three half-lives — thirty days here.
-        maxMedianEffectPercent=10.0,decayHalfLifeDays=10.0,rampInDays=1,
-    ) else base
+    val parameterTarget =
+        when (id) {
+            "global_cs" -> ParameterTargetV1.GLOBAL_CS_SCALE
+            "activity_same_isf",
+            "activity_previous_isf",
+            "sleep_isf",
+            "hypo_0_4_isf",
+            "hypo_4_12_isf",
+            "hypo_night_isf",
+            "glucose_level_isf" -> ParameterTargetV1.ISF_MULTIPLIER
+            "activity_same_effective",
+            "activity_previous_effective",
+            "hypo_0_4_effective",
+            "hypo_4_12_effective",
+            "hypo_night_effective" -> ParameterTargetV1.EFFECTIVE_RESPONSE_ONLY
+            "dose_tail" -> ParameterTargetV1.INSULIN_TAIL
+            "tod_peak" -> ParameterTargetV1.INSULIN_PEAK
+            "tod_onset" -> ParameterTargetV1.INSULIN_ONSET
+            "tod_tail" -> ParameterTargetV1.INSULIN_TAIL
+            "insulin_product_kinetics" -> ParameterTargetV1.INSULIN_POTENCY
+            "protein_absorption" -> ParameterTargetV1.FOOD_TAIL
+            "fat_absorption" -> ParameterTargetV1.FOOD_PEAK
+            "duration_absorption" -> ParameterTargetV1.FOOD_ONSET
+            "basal_background" -> ParameterTargetV1.BASAL_MISMATCH
+            "sensor_epoch",
+            "sensor_compression_lag" -> ParameterTargetV1.SENSOR_PROCESS_VARIANCE
+            "sensor_bias" -> ParameterTargetV1.SENSOR_BIAS
+            "cartridge_kinetics",
+            "injection_site",
+            "cartridge_heat" -> ParameterTargetV1.INSULIN_POTENCY
+            else -> ParameterTargetV1.BACKGROUND_RATE
+        }
+    val policy =
+        when {
+            parameterTarget == ParameterTargetV1.EFFECTIVE_RESPONSE_ONLY ->
+                ApplicationPolicyV1.ATTRIBUTION_ONLY
+            parameterTarget == ParameterTargetV1.SENSOR_PROCESS_VARIANCE ->
+                ApplicationPolicyV1.UNCERTAINTY_ONLY
+            else -> ApplicationPolicyV1.MEDIAN
+        }
+    val base =
+        ExecutableHypothesisSpecV1(
+            sources.toSet(),
+            knownAt,
+            predicate,
+            family,
+            target,
+            parameterTarget,
+            policy,
+            commonExclusions,
+            practicalBoundPercent = practical,
+            implementationStatus = ImplementationStatusV1.EXECUTABLE
+        )
+    return if (id == ZeroedBackgroundCoefficientsContractV1.ID)
+        base.copy(
+            outcomeTarget = "background coefficients measured on quiet segments",
+            parameterTarget = ParameterTargetV1.BACKGROUND_RATE,
+            applicationPolicy = ApplicationPolicyV1.MEASURED_BASE,
+            // Segments and DAYS, because the danger here is the day-state confound:
+            // twenty days is where one anomalous day can no longer move the median,
+            // and a hundred non-overlapping 30-minute segments is ~50 hours of quiet
+            // observation. Both far below what the corpus already holds (366/35) and
+            // far above the generic 8/5 default, which would gate on nothing.
+            minimumIndependentEpisodes = 100,
+            minimumIndependentDays = 20,
+            // Inert: there is no percent to cap or to ramp. decayHalfLifeDays feeds
+            // `demoteIfStale`, whose cliff is three half-lives — thirty days here.
+            maxMedianEffectPercent = 10.0,
+            decayHalfLifeDays = 10.0,
+            rampInDays = 1,
+        )
+    else base
 }
 enum class PromotionStageV1 {
     DESCRIPTIVE_ONLY, UNCERTAINTY_ELIGIBLE, SHADOW_CANDIDATE, PROSPECTIVE_STABLE,

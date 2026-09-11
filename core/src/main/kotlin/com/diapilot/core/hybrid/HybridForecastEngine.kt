@@ -9,7 +9,11 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-data class HybridInsulinLandmarks(val onsetMin:Double,val ratePeakMin:Double,val effectEndMin:Double)
+data class HybridInsulinLandmarks(
+    val onsetMin: Double,
+    val ratePeakMin: Double,
+    val effectEndMin: Double
+)
 
 /**
  * Pure Kotlin port of the v11 causal runtime.
@@ -243,14 +247,15 @@ class HybridForecastEngine(
     private data class FoodTimingKey(
         val text: String,
         val components: Map<String, Double>,
-        val carbsG:Double,
+        val carbsG: Double,
         val durationMin: Double,
         val proteinG: Double?,
         val fatG: Double?,
-        val kineticsIdentity:String?,
-        val rescueTreatment:Boolean,
-        val recipeKey:String?,
+        val kineticsIdentity: String?,
+        val rescueTreatment: Boolean,
+        val recipeKey: String?,
     )
+
     private val foodTimingCache = HashMap<FoodTimingKey, HybridFoodTiming>()
     private val clusterMemberCache = HashMap<HybridFoodEvent, MealClusterMemberV1>()
 
@@ -283,15 +288,18 @@ class HybridForecastEngine(
      */
     private val featureShapesCache =
         java.util.IdentityHashMap<HybridFoodEvent, List<Pair<Double, HybridShape>>?>()
-    private data class ClusterMassKey(val members:List<String>,val atMs:Long)
-    private val clusterMassCache=HashMap<ClusterMassKey,Map<String,Double>>()
+
+    private data class ClusterMassKey(val members: List<String>, val atMs: Long)
+
+    private val clusterMassCache = HashMap<ClusterMassKey, Map<String, Double>>()
     /*
      * Segmentation is an invariant of the immutable food list, not of a time
      * sample.  The old code rebuilt it for every food × forecast tick.  Keep
      * the cache local to one engine so it cannot survive a model change or
      * leak a later meal into another causal snapshot.
      */
-    private val mealSegmentsCache=HashMap<List<HybridFoodEvent>,List<List<HybridFoodEvent>>>()
+    private val mealSegmentsCache = HashMap<List<HybridFoodEvent>, List<List<HybridFoodEvent>>>()
+
     private fun glucoseAtOrBefore(
         history: List<HybridGlucosePoint>,
         tsMs: Long,
@@ -320,18 +328,20 @@ class HybridForecastEngine(
         return (1.0 - doseTail) * short + doseTail * tail
     }
 
-    private fun insulinCdf(event:HybridBolusEvent,ageMin:Double):Double {
-        if(event.onsetOffsetMin==0.0&&event.peakOffsetMin==0.0&&event.tailOffsetMin==0.0)return insulinCdf(ageMin,event.units)
-        val p=model.insulin
-        val a0=(p.onsetMin+event.onsetOffsetMin).coerceIn(0.0,60.0)
-        val a1=(p.peakMin+event.peakOffsetMin).coerceIn(a0+1.0,180.0)
-        val a2=(p.tailDurationMin+event.tailOffsetMin).coerceIn(a1+1.0,600.0)
-        val baseAge=when{
-            ageMin<=a0->if(a0<=0.0)ageMin else ageMin*p.onsetMin/a0
-            ageMin<=a1->p.onsetMin+(ageMin-a0)*(p.peakMin-p.onsetMin)/(a1-a0)
-            else->p.peakMin+(ageMin-a1)*(p.tailDurationMin-p.peakMin)/(a2-a1)
-        }
-        return insulinCdf(baseAge,event.units)
+    private fun insulinCdf(event: HybridBolusEvent, ageMin: Double): Double {
+        if (event.onsetOffsetMin == 0.0 && event.peakOffsetMin == 0.0 && event.tailOffsetMin == 0.0)
+            return insulinCdf(ageMin, event.units)
+        val p = model.insulin
+        val a0 = (p.onsetMin + event.onsetOffsetMin).coerceIn(0.0, 60.0)
+        val a1 = (p.peakMin + event.peakOffsetMin).coerceIn(a0 + 1.0, 180.0)
+        val a2 = (p.tailDurationMin + event.tailOffsetMin).coerceIn(a1 + 1.0, 600.0)
+        val baseAge =
+            when {
+                ageMin <= a0 -> if (a0 <= 0.0) ageMin else ageMin * p.onsetMin / a0
+                ageMin <= a1 -> p.onsetMin + (ageMin - a0) * (p.peakMin - p.onsetMin) / (a1 - a0)
+                else -> p.peakMin + (ageMin - a1) * (p.tailDurationMin - p.peakMin) / (a2 - a1)
+            }
+        return insulinCdf(baseAge, event.units)
     }
 
     /**
@@ -350,30 +360,43 @@ class HybridForecastEngine(
      * deconvolution and the chart: onset/peak/tail can no longer be described
      * by [HybridInsulinParams] while another empirical curve is subtracted.
      */
-    fun insulinKernelPoints(units:Double=1.0,stepMin:Double=5.0):List<KernelPoint> {
-        require(units>0.0&&stepMin>0.0)
-        val p=model.insulin
-        val count=kotlin.math.ceil(p.tailDurationMin/stepMin).toInt()
-        return (0..count).map{i->
-            val minute=minOf(i*stepMin,p.tailDurationMin)
-            val cdf=insulinCdf(minute,units)
-            KernelPoint(
-                minute,-p.isf*cdf,
-                -p.isfHigh*cdf,-p.isfLow*cdf,0,
-            )
-        }.distinctBy{it.tauMin}
+    fun insulinKernelPoints(units: Double = 1.0, stepMin: Double = 5.0): List<KernelPoint> {
+        require(units > 0.0 && stepMin > 0.0)
+        val p = model.insulin
+        val count = kotlin.math.ceil(p.tailDurationMin / stepMin).toInt()
+        return (0..count)
+            .map { i ->
+                val minute = minOf(i * stepMin, p.tailDurationMin)
+                val cdf = insulinCdf(minute, units)
+                KernelPoint(
+                    minute,
+                    -p.isf * cdf,
+                    -p.isfHigh * cdf,
+                    -p.isfLow * cdf,
+                    0,
+                )
+            }
+            .distinctBy { it.tauMin }
     }
 
     /** Observable landmarks of the exact CDF, including empirical knots when
      * present. UI text must use these rather than stale parametric fields. */
-    fun insulinLandmarks(units:Double=model.insulin.tailReferenceUnits):HybridInsulinLandmarks {
-        val p=model.insulin
-        if(p.actionCdfKnots.isEmpty())return HybridInsulinLandmarks(p.onsetMin,p.peakMin,p.tailDurationMin)
-        val samples=(0..kotlin.math.ceil(p.tailDurationMin).toInt()).map{it.toDouble() to insulinCdf(it.toDouble(),units)}
-        val onset=samples.firstOrNull{it.second>=.01}?.first?:p.onsetMin
-        val peak=samples.zipWithNext().maxByOrNull{(a,b)->b.second-a.second}?.let{(a,b)->(a.first+b.first)/2}?:p.peakMin
-        val end=samples.firstOrNull{it.second>=.99}?.first?:p.tailDurationMin
-        return HybridInsulinLandmarks(onset,peak,end)
+    fun insulinLandmarks(units: Double = model.insulin.tailReferenceUnits): HybridInsulinLandmarks {
+        val p = model.insulin
+        if (p.actionCdfKnots.isEmpty())
+            return HybridInsulinLandmarks(p.onsetMin, p.peakMin, p.tailDurationMin)
+        val samples =
+            (0..kotlin.math.ceil(p.tailDurationMin).toInt()).map {
+                it.toDouble() to insulinCdf(it.toDouble(), units)
+            }
+        val onset = samples.firstOrNull { it.second >= .01 }?.first ?: p.onsetMin
+        val peak =
+            samples
+                .zipWithNext()
+                .maxByOrNull { (a, b) -> b.second - a.second }
+                ?.let { (a, b) -> (a.first + b.first) / 2 } ?: p.peakMin
+        val end = samples.firstOrNull { it.second >= .99 }?.first ?: p.tailDurationMin
+        return HybridInsulinLandmarks(onset, peak, end)
     }
 
     fun hypotheticalInsulinDelta(
@@ -493,17 +516,28 @@ class HybridForecastEngine(
     }
 
     private fun foodCdfInstant(event: HybridFoodEvent, ageMin: Double): Double {
-        if(event.rescueTreatment)
-            return triangularCdf(ageMin,10.0,15.0,30.0)
+        if (event.rescueTreatment) return triangularCdf(ageMin, 10.0, 15.0, 30.0)
         val food = model.food
         val mixture = physioFeatureShapes(event)
-        if (mixture != null) return mixture.sumOf { (weight, shape) ->
-            weight * triangularCdf(
-                ageMin, shape.delayMin, shape.delayMin + shape.peakMin, shape.delayMin + shape.durationMin,
-            )
-        }.coerceIn(0.0, 1.0)
+        if (mixture != null)
+            return mixture
+                .sumOf { (weight, shape) ->
+                    weight *
+                        triangularCdf(
+                            ageMin,
+                            shape.delayMin,
+                            shape.delayMin + shape.peakMin,
+                            shape.delayMin + shape.durationMin,
+                        )
+                }
+                .coerceIn(0.0, 1.0)
         val shape = physioMacroShape(event)
-        return triangularCdf(ageMin, shape.delayMin, shape.delayMin + shape.peakMin, shape.delayMin + shape.durationMin)
+        return triangularCdf(
+            ageMin,
+            shape.delayMin,
+            shape.delayMin + shape.peakMin,
+            shape.delayMin + shape.durationMin
+        )
     }
 
     /** The queue rate this event is entitled to. Identical to the shipped
@@ -525,12 +559,15 @@ class HybridForecastEngine(
 
     /** Standalone curve with the same mass-throughput prior used by clusters. */
     fun foodCdf(event: HybridFoodEvent, ageMin: Double): Double {
-        if(event.rescueTreatment)
-            return rawFoodCdf(event,ageMin)
-        val at=event.tsMs+(ageMin.coerceAtLeast(0.0)*MINUTE_MS).toLong()
-        val member=CarbAppearanceMemberV1("${event.tsMs}:${event.carbsG}",event.tsMs,event.carbsG)
-        return throughputLimitedFractionsV1(listOf(member),at,{_,t->rawFoodCdf(event,(t-event.tsMs)/MINUTE_MS.toDouble())},
-            gramsPerHour=queueRate(event))[member.id]?:0.0
+        if (event.rescueTreatment) return rawFoodCdf(event, ageMin)
+        val at = event.tsMs + (ageMin.coerceAtLeast(0.0) * MINUTE_MS).toLong()
+        val member = CarbAppearanceMemberV1("${event.tsMs}:${event.carbsG}", event.tsMs, event.carbsG)
+        return throughputLimitedFractionsV1(
+            listOf(member),
+            at,
+            { _, t -> rawFoodCdf(event, (t - event.tsMs) / MINUTE_MS.toDouble()) },
+            gramsPerHour = queueRate(event)
+        )[member.id] ?: 0.0
     }
 
     /**
@@ -566,35 +603,57 @@ class HybridForecastEngine(
             else -> (1.0 - foodCdf(event, ageMin)).coerceIn(0.0, 1.0)
         }
 
-    private fun clusterMember(event:HybridFoodEvent):MealClusterMemberV1 =
-        clusterMemberCache.getOrPut(event){
-            val timing=rawFoodTiming(event);val k=event.kineticFeatures
+    private fun clusterMember(event: HybridFoodEvent): MealClusterMemberV1 =
+        clusterMemberCache.getOrPut(event) {
+            val timing = rawFoodTiming(event);
+            val k = event.kineticFeatures
             MealClusterMemberV1(
-                id="${event.tsMs}:${event.carbsG}",startMs=event.tsMs,
-                proteinG=event.proteinG?:k?.proteinG?:0.0,
-                fatG=event.fatG?:k?.fatG?:0.0,fiberG=k?.fiberG?:0.0,
-                mainEndMin=timing.plateauMin,tailEndMin=timing.tailEndMin,
+                id = "${event.tsMs}:${event.carbsG}",
+                startMs = event.tsMs,
+                proteinG = event.proteinG ?: k?.proteinG ?: 0.0,
+                fatG = event.fatG ?: k?.fatG ?: 0.0,
+                fiberG = k?.fiberG ?: 0.0,
+                mainEndMin = timing.plateauMin,
+                tailEndMin = timing.tailEndMin,
             )
         }
 
-    private fun clusteredFoodCdfWithinSegment(event:HybridFoodEvent,normal:List<HybridFoodEvent>,ageMin:Double):Double {
-        val at=event.tsMs+(ageMin.coerceAtLeast(0.0)*MINUTE_MS).toLong()
-        val owner=clusterMember(event)
-        fun desired(food:HybridFoodEvent,t:Long):Double {
-            val member=clusterMember(food)
-            val clock=causalMealClusterClockV1(member,t,normal.map(::clusterMember),ownerStandaloneCdf={rawFoodCdf(food,it)})
-            return rawFoodCdf(food,clock.effectiveAgeMin)
+    private fun clusteredFoodCdfWithinSegment(
+        event: HybridFoodEvent,
+        normal: List<HybridFoodEvent>,
+        ageMin: Double
+    ): Double {
+        val at = event.tsMs + (ageMin.coerceAtLeast(0.0) * MINUTE_MS).toLong()
+        val owner = clusterMember(event)
+        fun desired(food: HybridFoodEvent, t: Long): Double {
+            val member = clusterMember(food)
+            val clock =
+                causalMealClusterClockV1(
+                    member,
+                    t,
+                    normal.map(::clusterMember),
+                    ownerStandaloneCdf = { rawFoodCdf(food, it) }
+                )
+            return rawFoodCdf(food, clock.effectiveAgeMin)
         }
         // THE CLUSTER SHARES ONE PIPE. Each member carries its own calories so
         // the queue can meter what the stomach meters; without this a cluster
         // fell back to the flat 30 g/h and a pizza+beer combo lost the caloric limit
         // that the pizza alone had just gained — the case the measurement said
         // mattered most (+266 min on a joined meal against +82 on the pizza).
-        val massMembers=normal.map{
+        val massMembers = normal.map {
             CarbAppearanceMemberV1(
-                "${it.tsMs}:${it.carbsG}",it.tsMs,it.carbsG,
-                kcal=if(emptyingKcalPerHour==null)null
-                else com.diapilot.core.analysis.MealCaloricExtentV1.kcal(it.carbsG,it.proteinG,it.fatG),
+                "${it.tsMs}:${it.carbsG}",
+                it.tsMs,
+                it.carbsG,
+                kcal =
+                    if (emptyingKcalPerHour == null) null
+                    else
+                        com.diapilot.core.analysis.MealCaloricExtentV1.kcal(
+                            it.carbsG,
+                            it.proteinG,
+                            it.fatG
+                        ),
             )
         }
         // THE KEY MUST NAME EVERY INPUT THE SUPPLY CURVE READS.
@@ -607,48 +666,62 @@ class HybridForecastEngine(
         // 90 min reads 0.287 instant against 0.103 spread over an hour, and the
         // memo returned 0.287 for both. Meal duration is a tracked input; a
         // cache is not allowed to discard one.
-        val key=ClusterMassKey(
-            normal.map{"${it.tsMs}:${it.carbsG}:${it.durationMin}"} +
-                massMembers.map{"${it.id}:${it.startMs}:${it.grams}:${it.kcal}"},
-            at,
-        )
-        val limited=clusterMassCache.getOrPut(key){
-            val supply={m:CarbAppearanceMemberV1,t:Long->
-                val food=normal.first{it.tsMs==m.startMs&&it.carbsG==m.grams};desired(food,t)
-            }
-            val rate=emptyingKcalPerHour
-            if(rate==null)throughputLimitedFractionsV1(massMembers,at,supply)
-            else caloricLimitedFractionsV1(massMembers,at,supply,kcalPerHour=rate,carbSieving=carbSieving)
-        }
-        return limited["${event.tsMs}:${event.carbsG}"]?:0.0
-    }
-
-    private fun mealSegments(foods:List<HybridFoodEvent>):List<List<HybridFoodEvent>> {
-        val key=foods.distinct().sortedBy{it.tsMs}
-        return mealSegmentsCache.getOrPut(key){mealSegmentsUncached(key)}
-    }
-
-    private fun mealSegmentsUncached(foods:List<HybridFoodEvent>):List<List<HybridFoodEvent>> {
-        val segments=mutableListOf<MutableList<HybridFoodEvent>>()
-        for(food in foods.distinct().sortedBy{it.tsMs}){
-            val current=segments.lastOrNull()
-            val split=current==null||food.rescueTreatment||current.any{it.rescueTreatment}||
-                (food.tsMs-current.last().tsMs)/MINUTE_MS>120||current.all{previous->
-                    val age=(food.tsMs-previous.tsMs)/MINUTE_MS.toDouble()
-                    clusteredFoodCdfWithinSegment(previous,current,age)>=.90
+        val key =
+            ClusterMassKey(
+                normal.map { "${it.tsMs}:${it.carbsG}:${it.durationMin}" } +
+                    massMembers.map { "${it.id}:${it.startMs}:${it.grams}:${it.kcal}" },
+                at,
+            )
+        val limited =
+            clusterMassCache.getOrPut(key) {
+                val supply = { m: CarbAppearanceMemberV1, t: Long ->
+                    val food = normal.first { it.tsMs == m.startMs && it.carbsG == m.grams };
+                    desired(food, t)
                 }
-            if(split)segments.add(mutableListOf(food)) else current!!.add(food)
+                val rate = emptyingKcalPerHour
+                if (rate == null) throughputLimitedFractionsV1(massMembers, at, supply)
+                else
+                    caloricLimitedFractionsV1(
+                        massMembers,
+                        at,
+                        supply,
+                        kcalPerHour = rate,
+                        carbSieving = carbSieving
+                    )
+            }
+        return limited["${event.tsMs}:${event.carbsG}"] ?: 0.0
+    }
+
+    private fun mealSegments(foods: List<HybridFoodEvent>): List<List<HybridFoodEvent>> {
+        val key = foods.distinct().sortedBy { it.tsMs }
+        return mealSegmentsCache.getOrPut(key) { mealSegmentsUncached(key) }
+    }
+
+    private fun mealSegmentsUncached(foods: List<HybridFoodEvent>): List<List<HybridFoodEvent>> {
+        val segments = mutableListOf<MutableList<HybridFoodEvent>>()
+        for (food in foods.distinct().sortedBy { it.tsMs }) {
+            val current = segments.lastOrNull()
+            val split =
+                current == null ||
+                    food.rescueTreatment ||
+                    current.any { it.rescueTreatment } ||
+                    (food.tsMs - current.last().tsMs) / MINUTE_MS > 120 ||
+                    current.all { previous ->
+                        val age = (food.tsMs - previous.tsMs) / MINUTE_MS.toDouble()
+                        clusteredFoodCdfWithinSegment(previous, current, age) >= .90
+                    }
+            if (split) segments.add(mutableListOf(food)) else current!!.add(food)
         }
         return segments
     }
 
     /** Causal cluster-adjusted CDF. Later meals can slow only the owner's
      * unrealised remainder; an already >=90% completed segment is a boundary. */
-    fun clusteredFoodCdf(event:HybridFoodEvent,foods:List<HybridFoodEvent>,ageMin:Double):Double {
-        if(event.rescueTreatment)return foodCdf(event,ageMin)
-        val normal=foods.filterNot{it.rescueTreatment}
-        val segment=mealSegments(normal).firstOrNull{event in it}?:listOf(event)
-        return clusteredFoodCdfWithinSegment(event,segment,ageMin)
+    fun clusteredFoodCdf(event: HybridFoodEvent, foods: List<HybridFoodEvent>, ageMin: Double): Double {
+        if (event.rescueTreatment) return foodCdf(event, ageMin)
+        val normal = foods.filterNot { it.rescueTreatment }
+        val segment = mealSegments(normal).firstOrNull { event in it } ?: listOf(event)
+        return clusteredFoodCdfWithinSegment(event, segment, ageMin)
     }
 
     /**
@@ -660,59 +733,121 @@ class HybridForecastEngine(
      * knows how to snapshot a list of times as it runs; this exposes that.
      */
     fun clusteredFoodCdfTimeline(
-        event:HybridFoodEvent,foods:List<HybridFoodEvent>,agesMin:List<Double>,
-    ):List<Double> {
-        if(event.rescueTreatment)
-            return agesMin.map{foodCdf(event,it)}
-        val normal=foods.filterNot{it.rescueTreatment}
-        val segment=mealSegments(normal).firstOrNull{event in it}?:listOf(event)
-        val rate=emptyingKcalPerHour
-        val members=segment.map{
+        event: HybridFoodEvent,
+        foods: List<HybridFoodEvent>,
+        agesMin: List<Double>,
+    ): List<Double> {
+        if (event.rescueTreatment) return agesMin.map { foodCdf(event, it) }
+        val normal = foods.filterNot { it.rescueTreatment }
+        val segment = mealSegments(normal).firstOrNull { event in it } ?: listOf(event)
+        val rate = emptyingKcalPerHour
+        val members = segment.map {
             CarbAppearanceMemberV1(
-                "${it.tsMs}:${it.carbsG}",it.tsMs,it.carbsG,
-                kcal=if(rate==null)null
-                else com.diapilot.core.analysis.MealCaloricExtentV1.kcal(it.carbsG,it.proteinG,it.fatG),
+                "${it.tsMs}:${it.carbsG}",
+                it.tsMs,
+                it.carbsG,
+                kcal =
+                    if (rate == null) null
+                    else
+                        com.diapilot.core.analysis.MealCaloricExtentV1.kcal(
+                            it.carbsG,
+                            it.proteinG,
+                            it.fatG
+                        ),
             )
         }
-        val supply={m:CarbAppearanceMemberV1,t:Long->
-            val food=segment.first{it.tsMs==m.startMs&&it.carbsG==m.grams}
-            val member=clusterMember(food)
-            val clock=causalMealClusterClockV1(member,t,segment.map(::clusterMember),ownerStandaloneCdf={rawFoodCdf(food,it)})
-            rawFoodCdf(food,clock.effectiveAgeMin)
+        val supply = { m: CarbAppearanceMemberV1, t: Long ->
+            val food = segment.first { it.tsMs == m.startMs && it.carbsG == m.grams }
+            val member = clusterMember(food)
+            val clock =
+                causalMealClusterClockV1(
+                    member,
+                    t,
+                    segment.map(::clusterMember),
+                    ownerStandaloneCdf = { rawFoodCdf(food, it) }
+                )
+            rawFoodCdf(food, clock.effectiveAgeMin)
         }
-        val times=agesMin.map{event.tsMs+(it.coerceAtLeast(0.0)*MINUTE_MS).toLong()}
-        val timeline=if(rate==null)throughputLimitedFractionTimelineV1(members,times,supply,gramsPerHour=queueRate(event))
-        else caloricLimitedTimelineV1(members,times,supply,kcalPerHour=rate,carbSieving=carbSieving)
-        val id="${event.tsMs}:${event.carbsG}"
-        return times.map{timeline[it]?.get(id)?:0.0}
+        val times = agesMin.map { event.tsMs + (it.coerceAtLeast(0.0) * MINUTE_MS).toLong() }
+        val timeline =
+            if (rate == null)
+                throughputLimitedFractionTimelineV1(
+                    members,
+                    times,
+                    supply,
+                    gramsPerHour = queueRate(event)
+                )
+            else
+                caloricLimitedTimelineV1(
+                    members,
+                    times,
+                    supply,
+                    kcalPerHour = rate,
+                    carbSieving = carbSieving
+                )
+        val id = "${event.tsMs}:${event.carbsG}"
+        return times.map { timeline[it]?.get(id) ?: 0.0 }
     }
 
-    fun mealClusterAssessment(event:HybridFoodEvent,foods:List<HybridFoodEvent>):MealClusterAssessmentV1 {
-                val sorted=foods.distinct().sortedBy{it.tsMs};val index=sorted.indexOf(event)
-        if(index<0)return MealClusterAssessmentV1(MealTimingScopeV1.INDIVIDUAL,listOf(clusterMember(event).id),event.carbsG,"event outside cluster")
+    fun mealClusterAssessment(
+        event: HybridFoodEvent,
+        foods: List<HybridFoodEvent>
+    ): MealClusterAssessmentV1 {
+        val sorted = foods.distinct().sortedBy { it.tsMs };
+        val index = sorted.indexOf(event)
+        if (index < 0)
+            return MealClusterAssessmentV1(
+                MealTimingScopeV1.INDIVIDUAL,
+                listOf(clusterMember(event).id),
+                event.carbsG,
+                "event outside cluster"
+            )
         // A clock gap is only a candidate boundary. If every normal member of
         // the current segment has already realised >=90% by the new intake,
         // the new meal starts a fresh chain even when the gap is under 120 m.
-        val segments=mealSegments(sorted)
-        val chain=segments.first{event in it}
-        val next=sorted.firstOrNull{it.tsMs>event.tsMs}
-        val realisedAtNext=next?.let{clusteredFoodCdf(event,chain,(it.tsMs-event.tsMs)/MINUTE_MS.toDouble())}
-        if(chain.size==1)return MealClusterAssessmentV1(
-            MealTimingScopeV1.INDIVIDUAL,listOf(clusterMember(event).id),event.carbsG,
-            if(next!=null)"${"%.0f".format((realisedAtNext?:0.0)*100)}% of predicted contribution realised by next intake; next intake starts a new chain" else "isolated intake",
-            next?.tsMs,realisedAtNext,
-        )
-        if(next!=null){
-            val age=(next.tsMs-event.tsMs).toDouble()/MINUTE_MS
-            val clock=causalMealClusterClockV1(clusterMember(event),next.tsMs+1,chain.map(::clusterMember),ownerStandaloneCdf={rawFoodCdf(event,it)})
-            if(clock.lockedBeforeLaterMeals||clusteredFoodCdf(event,chain,age)>=.90)return MealClusterAssessmentV1(
-                MealTimingScopeV1.COMPLETED_BEFORE_CLUSTER,chain.map{clusterMember(it).id},chain.sumOf{it.carbsG},
-                "at least 90% completed before the next intake; contribution locked",next.tsMs,realisedAtNext,
+        val segments = mealSegments(sorted)
+        val chain = segments.first { event in it }
+        val next = sorted.firstOrNull { it.tsMs > event.tsMs }
+        val realisedAtNext = next?.let {
+            clusteredFoodCdf(event, chain, (it.tsMs - event.tsMs) / MINUTE_MS.toDouble())
+        }
+        if (chain.size == 1)
+            return MealClusterAssessmentV1(
+                MealTimingScopeV1.INDIVIDUAL,
+                listOf(clusterMember(event).id),
+                event.carbsG,
+                if (next != null)
+                    "${"%.0f".format((realisedAtNext?:0.0)*100)}% of predicted contribution realised by next intake; next intake starts a new chain"
+                else "isolated intake",
+                next?.tsMs,
+                realisedAtNext,
             )
+        if (next != null) {
+            val age = (next.tsMs - event.tsMs).toDouble() / MINUTE_MS
+            val clock =
+                causalMealClusterClockV1(
+                    clusterMember(event),
+                    next.tsMs + 1,
+                    chain.map(::clusterMember),
+                    ownerStandaloneCdf = { rawFoodCdf(event, it) }
+                )
+            if (clock.lockedBeforeLaterMeals || clusteredFoodCdf(event, chain, age) >= .90)
+                return MealClusterAssessmentV1(
+                    MealTimingScopeV1.COMPLETED_BEFORE_CLUSTER,
+                    chain.map { clusterMember(it).id },
+                    chain.sumOf { it.carbsG },
+                    "at least 90% completed before the next intake; contribution locked",
+                    next.tsMs,
+                    realisedAtNext,
+                )
         }
         return MealClusterAssessmentV1(
-            MealTimingScopeV1.CLUSTER_ONLY,chain.map{clusterMember(it).id},chain.sumOf{it.carbsG},
-            "overlapping residual food and combined macros make individual timing non-identifiable",next?.tsMs,realisedAtNext,
+            MealTimingScopeV1.CLUSTER_ONLY,
+            chain.map { clusterMember(it).id },
+            chain.sumOf { it.carbsG },
+            "overlapping residual food and combined macros make individual timing non-identifiable",
+            next?.tsMs,
+            realisedAtNext,
         )
     }
 
@@ -728,11 +863,23 @@ class HybridForecastEngine(
      * introducing a second food model.
      */
     fun foodTiming(event: HybridFoodEvent): HybridFoodTiming {
-        val key = FoodTimingKey(event.text,event.components,event.carbsG,event.durationMin,event.proteinG,event.fatG,event.kineticFeatures?.identity(),event.rescueTreatment,event.recipeKey)
+        val key =
+            FoodTimingKey(
+                event.text,
+                event.components,
+                event.carbsG,
+                event.durationMin,
+                event.proteinG,
+                event.fatG,
+                event.kineticFeatures?.identity(),
+                event.rescueTreatment,
+                event.recipeKey
+            )
         return foodTimingCache.getOrPut(key) { foodTimingUncached(event) }
     }
 
-    private fun rawFoodTiming(event:HybridFoodEvent):HybridFoodTiming = foodTimingFrom(event,::rawFoodCdf)
+    private fun rawFoodTiming(event: HybridFoodEvent): HybridFoodTiming =
+        foodTimingFrom(event, ::rawFoodCdf)
 
     private fun foodTimingUncached(event: HybridFoodEvent): HybridFoodTiming {
         // foodCdf() applies the 30 g/h queue by replaying it from intake to the
@@ -750,32 +897,43 @@ class HybridForecastEngine(
                     add(minute)
                 }
             }
-            val member = CarbAppearanceMemberV1("${event.tsMs}:${event.carbsG}", event.tsMs, event.carbsG)
+            val member =
+                CarbAppearanceMemberV1("${event.tsMs}:${event.carbsG}", event.tsMs, event.carbsG)
             val ageByTs = ages.associateBy { event.tsMs + (it * MINUTE_MS).toLong() }
-            val timeline = throughputLimitedFractionTimelineV1(
-                listOf(member), ageByTs.keys,
-                desiredCdf = { _, at -> rawFoodCdf(event, (at - event.tsMs) / MINUTE_MS.toDouble()) },
-                gramsPerHour = queueRate(event),
-                stepMin = 0.25,
-            )
+            val timeline =
+                throughputLimitedFractionTimelineV1(
+                    listOf(member),
+                    ageByTs.keys,
+                    desiredCdf = { _, at ->
+                        rawFoodCdf(event, (at - event.tsMs) / MINUTE_MS.toDouble())
+                    },
+                    gramsPerHour = queueRate(event),
+                    stepMin = 0.25,
+                )
             return foodTimingFromSamples(horizon, step) { age ->
                 timeline[event.tsMs + (age * MINUTE_MS).toLong()]?.get(member.id) ?: 0.0
             }
         }
-        return foodTimingFrom(event,::foodCdf)
+        return foodTimingFrom(event, ::foodCdf)
     }
 
-    private fun foodTimingHorizon(event:HybridFoodEvent):Double {
-        val allShapes = physioFeatureShapes(event)?.map{it.second} ?: listOf(physioMacroShape(event))
-        val throughputEnd=if(event.rescueTreatment)30.0 else event.carbsG/queueRate(event)*60.0+120.0
-        return (maxOf(allShapes.maxOf { it.delayMin + it.durationMin },throughputEnd)+
-            event.durationMin.coerceIn(0.0,240.0)+5.0).coerceIn(5.0,1_440.0)
+    private fun foodTimingHorizon(event: HybridFoodEvent): Double {
+        val allShapes = physioFeatureShapes(event)?.map { it.second } ?: listOf(physioMacroShape(event))
+        val throughputEnd =
+            if (event.rescueTreatment) 30.0 else event.carbsG / queueRate(event) * 60.0 + 120.0
+        return (maxOf(allShapes.maxOf { it.delayMin + it.durationMin }, throughputEnd) +
+                event.durationMin.coerceIn(0.0, 240.0) +
+                5.0)
+            .coerceIn(5.0, 1_440.0)
     }
 
-    private fun foodTimingFrom(event:HybridFoodEvent,cdf:(HybridFoodEvent,Double)->Double):HybridFoodTiming {
+    private fun foodTimingFrom(
+        event: HybridFoodEvent,
+        cdf: (HybridFoodEvent, Double) -> Double
+    ): HybridFoodTiming {
         val horizon = foodTimingHorizon(event)
         val step = 0.25
-        return foodTimingFromSamples(horizon,step){cdf(event,it)}
+        return foodTimingFromSamples(horizon, step) { cdf(event, it) }
     }
 
     /**
@@ -795,15 +953,19 @@ class HybridForecastEngine(
      * probe it reads 74 -> 86 -> 98 -> 122. `peakMin` keeps its old meaning and
      * its old numbers — nothing that consumed it has been silently redefined.
      */
-    private fun foodTimingFromSamples(horizon:Double,step:Double,cdf:(Double)->Double):HybridFoodTiming {
+    private fun foodTimingFromSamples(
+        horizon: Double,
+        step: Double,
+        cdf: (Double) -> Double
+    ): HybridFoodTiming {
         val epsilon = 1e-10
         var minute = 0.0
         var previous = cdf(minute).coerceIn(0.0, 1.0)
         var onset: Double? = null
         var peak = 0.0
         var peakGain = Double.NEGATIVE_INFINITY
-        var mainEnd: Double? = if(previous>=.90)0.0 else null
-        var halfMark: Double? = if(previous>=.50)0.0 else null
+        var mainEnd: Double? = if (previous >= .90) 0.0 else null
+        var halfMark: Double? = if (previous >= .50) 0.0 else null
         var tailEnd = 0.0
         while (minute < horizon) {
             val nextMinute = minOf(horizon, minute + step)
@@ -817,8 +979,8 @@ class HybridForecastEngine(
                 }
                 tailEnd = nextMinute
             }
-            if(halfMark==null&&next>=.50)halfMark=nextMinute
-            if(mainEnd==null&&next>=.90)mainEnd=nextMinute
+            if (halfMark == null && next >= .50) halfMark = nextMinute
+            if (mainEnd == null && next >= .90) mainEnd = nextMinute
             minute = nextMinute
             previous = next
         }
@@ -868,30 +1030,44 @@ class HybridForecastEngine(
         )
     }
 
-    private fun physioFeatureShapes(event:HybridFoodEvent):List<Pair<Double,HybridShape>>? {
+    private fun physioFeatureShapes(event: HybridFoodEvent): List<Pair<Double, HybridShape>>? {
         if (featureShapesCache.containsKey(event)) return featureShapesCache[event]
         return computePhysioFeatureShapes(event).also { featureShapesCache[event] = it }
     }
 
-    private fun computePhysioFeatureShapes(event:HybridFoodEvent):List<Pair<Double,HybridShape>>? {
+    private fun computePhysioFeatureShapes(event: HybridFoodEvent): List<Pair<Double, HybridShape>>? {
         // Returning null hands the shape to physioMacroShape, which is now the
         // no-macros path and nothing else: the learned-dish curve that used to
         // pre-empt this mixture was removed.
-        val f=event.kineticFeatures?.normalized()?:return null
-        val protein=(event.proteinG?:f.proteinG?:0.0).coerceIn(0.0,120.0)
-        val fat=(event.fatG?:f.fatG?:0.0).coerceIn(0.0,120.0)
-        val fiber=(f.fiberG?:0.0).coerceIn(0.0,60.0)
+        val f = event.kineticFeatures?.normalized() ?: return null
+        val protein = (event.proteinG ?: f.proteinG ?: 0.0).coerceIn(0.0, 120.0)
+        val fat = (event.fatG ?: f.fatG ?: 0.0).coerceIn(0.0, 120.0)
+        val fiber = (f.fiberG ?: 0.0).coerceIn(0.0, 60.0)
         // MIXED sits BETWEEN soft and solid. It used to be the
         // slowest of all — +6/x1.15 against SOLID's +5/x1.10 — which cannot be
         // right: a mixed plate is not physically slower to leave the stomach
         // than a purely solid one. The enum was conflating AGGREGATE STATE with
         // COMPOSITIONAL COMPLEXITY, and the complexity half is now carried by
         // the caloric queue, which is where it belongs.
-        val formDelay=(when(f.physicalForm){FoodPhysicalFormV2.LIQUID->-5.0;FoodPhysicalFormV2.PUREE->-2.0
-            FoodPhysicalFormV2.SOFT_SOLID->1.0;FoodPhysicalFormV2.MIXED->3.0;FoodPhysicalFormV2.SOLID->5.0;FoodPhysicalFormV2.UNKNOWN->0.0})*formDelayScale
-        val formStretchRaw=when(f.physicalForm){FoodPhysicalFormV2.LIQUID->.82;FoodPhysicalFormV2.PUREE->.92
-            FoodPhysicalFormV2.SOFT_SOLID->1.0;FoodPhysicalFormV2.MIXED->1.05;FoodPhysicalFormV2.SOLID->1.10;FoodPhysicalFormV2.UNKNOWN->1.0}
-        val formStretch=1.0+(formStretchRaw-1.0)*formStretchScale
+        val formDelay =
+            (when (f.physicalForm) {
+                FoodPhysicalFormV2.LIQUID -> -5.0;
+                FoodPhysicalFormV2.PUREE -> -2.0
+                FoodPhysicalFormV2.SOFT_SOLID -> 1.0;
+                FoodPhysicalFormV2.MIXED -> 3.0;
+                FoodPhysicalFormV2.SOLID -> 5.0;
+                FoodPhysicalFormV2.UNKNOWN -> 0.0
+            }) * formDelayScale
+        val formStretchRaw =
+            when (f.physicalForm) {
+                FoodPhysicalFormV2.LIQUID -> .82;
+                FoodPhysicalFormV2.PUREE -> .92
+                FoodPhysicalFormV2.SOFT_SOLID -> 1.0;
+                FoodPhysicalFormV2.MIXED -> 1.05;
+                FoodPhysicalFormV2.SOLID -> 1.10;
+                FoodPhysicalFormV2.UNKNOWN -> 1.0
+            }
+        val formStretch = 1.0 + (formStretchRaw - 1.0) * formStretchScale
         // Conservative bounded priors. Personal evidence may later modify the
         // event offsets, but one LLM estimate cannot create an extreme curve.
         // THE THIRD COUNT OF THE SAME FAT — M-11, measured.
@@ -911,13 +1087,20 @@ class HybridForecastEngine(
         // Measured on six pancake Sundays (stand `fatsweep`): shipped delivers
         // half the carbohydrate at 130 min against an observed peak of 74-96,
         // and every variant that removes fat delay lands closer.
-        val queueMetersMacros=!gastricMacroPrior
+        val queueMetersMacros = !gastricMacroPrior
         // FIBRE IS NOT SCALED. The knobs above test the FAT/PROTEIN prior, and
         // fibre is not in the kcal formula, so the queue cannot be standing in
         // for it — scaling it here would quietly fold a second, unrelated
         // mechanism into the same number.
-        val gastric=((if(queueMetersMacros)0.0 else (fat*FAT_ONSET_MIN_PER_G+protein*.08)*macroGastricScale)+fiber*.45*fiberScale).coerceIn(0.0,40.0)
-        val tail=((if(queueMetersMacros)0.0 else (fat*2.0+protein*1.2)*macroTailScale)+fiber*2.0*fiberScale).coerceIn(0.0,180.0)
+        val gastric =
+            ((if (queueMetersMacros) 0.0
+                else (fat * FAT_ONSET_MIN_PER_G + protein * .08) * macroGastricScale) +
+                    fiber * .45 * fiberScale)
+                .coerceIn(0.0, 40.0)
+        val tail =
+            ((if (queueMetersMacros) 0.0 else (fat * 2.0 + protein * 1.2) * macroTailScale) +
+                    fiber * 2.0 * fiberScale)
+                .coerceIn(0.0, 180.0)
         // FAT -> PEAK, FITTED.
         //
         // The coefficient lived only in physioMacroShape, which since wave 2
@@ -937,27 +1120,47 @@ class HybridForecastEngine(
         // in force, or the two would stack. It stays in the DELAY term, which
         // this fit says nothing about — onset came out +3.4 min per 10 g with
         // an interval of -1.2..+9.0, i.e. undetermined.
-        val fatPeakFitted=macroTiming.promoted&&macroTiming.fatPeakMinPer10g>0.0
-        val gastricForPeak=if(fatPeakFitted)(fiber*.45*fiberScale+protein*.08).coerceIn(0.0,40.0) else gastric
-        val fatPeakShift=if(fatPeakFitted)(fat/10.0)*macroTiming.fatPeakMinPer10g else 0.0
-        fun shape(delayRaw:Double,peakRaw:Double,endRaw:Double,macroShareRaw:Double,basis:Double=1.0):HybridShape {
-            val macroShare=macroShareRaw*macroShareScale
+        val fatPeakFitted = macroTiming.promoted && macroTiming.fatPeakMinPer10g > 0.0
+        val gastricForPeak =
+            if (fatPeakFitted) (fiber * .45 * fiberScale + protein * .08).coerceIn(0.0, 40.0)
+            else gastric
+        val fatPeakShift = if (fatPeakFitted) (fat / 10.0) * macroTiming.fatPeakMinPer10g else 0.0
+        fun shape(
+            delayRaw: Double,
+            peakRaw: Double,
+            endRaw: Double,
+            macroShareRaw: Double,
+            basis: Double = 1.0
+        ): HybridShape {
+            val macroShare = macroShareRaw * macroShareScale
             // The scale multiplies the BASE triangle only. Form, macro and the
             // learned offsets are separate mechanisms measured on their own
             // evidence; folding them in would make one number stand for four.
-            val delay=delayRaw*carbTimeScale*basis
-            val peakAbs=peakRaw*carbTimeScale*basis
-            val endAbs=endRaw*carbTimeScale*basis*foodTailScale
+            val delay = delayRaw * carbTimeScale * basis
+            val peakAbs = peakRaw * carbTimeScale * basis
+            val endAbs = endRaw * carbTimeScale * basis * foodTailScale
             // A FLOOR, BECAUSE NOTHING APPEARS IN THE BLOOD INSTANTLY. The
             // bound used to be zero, and `formDelay` for LIQUID is -5, so a
             // smoothie came out at onset 0 — against a measured median of 8 for
             // that very dish (M-92, n=14). Zero is not a fast food, it is a
             // missing constraint.
-            val d=(delay+formDelay+gastric*macroShare+event.onsetOffsetMin)
-                .coerceIn(MIN_FOOD_ONSET_MIN,180.0)
-            val peak=(peakAbs*formStretch+gastricForPeak*peakGastricShare*macroShare+fatPeakShift+event.peakOffsetMin-d).coerceIn(1.0,360.0)
-            val duration=(endAbs*formStretch+tail*macroShare+event.tailOffsetMin-d).coerceIn(5.0,720.0)
-            return HybridShape(d,peak.coerceAtMost(duration),duration)
+            val d =
+                (delay + formDelay + gastric * macroShare + event.onsetOffsetMin).coerceIn(
+                    MIN_FOOD_ONSET_MIN,
+                    180.0
+                )
+            val peak =
+                (peakAbs * formStretch +
+                        gastricForPeak * peakGastricShare * macroShare +
+                        fatPeakShift +
+                        event.peakOffsetMin - d)
+                    .coerceIn(1.0, 360.0)
+            val duration =
+                (endAbs * formStretch + tail * macroShare + event.tailOffsetMin - d).coerceIn(
+                    5.0,
+                    720.0
+                )
+            return HybridShape(d, peak.coerceAtMost(duration), duration)
         }
         // Collapse toward MEDIUM, not toward the mixture's own centroid: the
         // centroid moves with the weights, so a dish would change shape when
@@ -972,21 +1175,32 @@ class HybridForecastEngine(
         // exactly, so this is a change of ACCESS, not of behaviour.
         val t = carbTriangles
         return listOf(
-            f.fastFraction to shape(
-                sp(t.fastDelayMin, t.mediumDelayMin), sp(t.fastPeakMin, t.mediumPeakMin),
-                sp(t.fastEndMin, t.mediumEndMin), sp(t.fastMacroShare, t.mediumMacroShare),
-                fastTimeScale,
-            ),
-            f.mediumFraction to shape(
-                t.mediumDelayMin, t.mediumPeakMin, t.mediumEndMin, t.mediumMacroShare,
-                mediumTimeScale,
-            ),
-            f.slowFraction to shape(
-                sp(t.slowDelayMin, t.mediumDelayMin), sp(t.slowPeakMin, t.mediumPeakMin),
-                sp(t.slowEndMin, t.mediumEndMin), sp(t.slowMacroShare, t.mediumMacroShare),
-                slowTimeScale,
-            ),
-        ).filter{it.first>1e-6}
+                f.fastFraction to
+                    shape(
+                        sp(t.fastDelayMin, t.mediumDelayMin),
+                        sp(t.fastPeakMin, t.mediumPeakMin),
+                        sp(t.fastEndMin, t.mediumEndMin),
+                        sp(t.fastMacroShare, t.mediumMacroShare),
+                        fastTimeScale,
+                    ),
+                f.mediumFraction to
+                    shape(
+                        t.mediumDelayMin,
+                        t.mediumPeakMin,
+                        t.mediumEndMin,
+                        t.mediumMacroShare,
+                        mediumTimeScale,
+                    ),
+                f.slowFraction to
+                    shape(
+                        sp(t.slowDelayMin, t.mediumDelayMin),
+                        sp(t.slowPeakMin, t.mediumPeakMin),
+                        sp(t.slowEndMin, t.mediumEndMin),
+                        sp(t.slowMacroShare, t.mediumMacroShare),
+                        slowTimeScale,
+                    ),
+            )
+            .filter { it.first > 1e-6 }
     }
 
     private fun foodDelta(
@@ -994,7 +1208,7 @@ class HybridForecastEngine(
         t0: Long,
         t1: Long,
         exposure: Double,
-        clusterFoods:List<HybridFoodEvent> = listOf(event),
+        clusterFoods: List<HybridFoodEvent> = listOf(event),
     ): Double {
         val age0 = (t0 - event.tsMs).toDouble() / MINUTE_MS
         val age1 = (t1 - event.tsMs).toDouble() / MINUTE_MS
@@ -1002,13 +1216,14 @@ class HybridForecastEngine(
         val amplitude = foodAmplitude(event).first
         val horizon = maxOf(0.0, (t1 - t0).toDouble() / MINUTE_MS)
         val futureExposure = exposure * exp(-horizon / model.activity.foodTauMin)
-        val activityMultiplier = maxOf(
-            0.25,
-            1.0 - model.activity.foodGamma *
-                minOf(1.5, (exposure + futureExposure) / 2.0),
-        )
-        val fastFraction = clusteredFoodCdf(event,clusterFoods,age1) -
-            clusteredFoodCdf(event,clusterFoods,maxOf(0.0, age0))
+        val activityMultiplier =
+            maxOf(
+                0.25,
+                1.0 - model.activity.foodGamma * minOf(1.5, (exposure + futureExposure) / 2.0),
+            )
+        val fastFraction =
+            clusteredFoodCdf(event, clusterFoods, age1) -
+                clusteredFoodCdf(event, clusterFoods, maxOf(0.0, age0))
         // The legacy late tail returned a flat zero on this arm and is gone
         // with it; a fatty dish gets its extra tail from the macro shape and
         // the caloric queue, not from a second additive term.
@@ -1018,8 +1233,13 @@ class HybridForecastEngine(
     /** Exact contribution used by [forecast], exposed for a calculation card.
      * Keeping this as a wrapper prevents the UI from rebuilding a parallel
      * pseudo-formula. */
-    fun foodContribution(event:HybridFoodEvent,t0:Long,t1:Long,activityExposure:Double=0.0,clusterFoods:List<HybridFoodEvent> = listOf(event)):Double =
-        foodDelta(event,t0,t1,activityExposure,clusterFoods)
+    fun foodContribution(
+        event: HybridFoodEvent,
+        t0: Long,
+        t1: Long,
+        activityExposure: Double = 0.0,
+        clusterFoods: List<HybridFoodEvent> = listOf(event)
+    ): Double = foodDelta(event, t0, t1, activityExposure, clusterFoods)
 
     private fun insulinDelta(
         event: HybridBolusEvent,
@@ -1030,12 +1250,15 @@ class HybridForecastEngine(
         val age0 = (t0 - event.tsMs).toDouble() / MINUTE_MS
         val age1 = (t1 - event.tsMs).toDouble() / MINUTE_MS
         if (age1 <= 0.0) return 0.0
-        val fraction = insulinCdf(event,age1) - insulinCdf(event,maxOf(0.0, age0))
+        val fraction = insulinCdf(event, age1) - insulinCdf(event, maxOf(0.0, age0))
         val horizon = maxOf(0.0, (t1 - t0).toDouble() / MINUTE_MS)
         val futureExposure = exposure * exp(-horizon / model.activity.tauMin)
-        val multiplier = 1.0 + model.activity.iobGamma *
-            minOf(1.5, (exposure + futureExposure) / 2.0)
-        return -event.units * model.insulin.isf * fraction * multiplier * event.potencyMultiplier.coerceIn(.5,1.5)
+        val multiplier = 1.0 + model.activity.iobGamma * minOf(1.5, (exposure + futureExposure) / 2.0)
+        return -event.units *
+            model.insulin.isf *
+            fraction *
+            multiplier *
+            event.potencyMultiplier.coerceIn(.5, 1.5)
     }
 
 
@@ -1099,10 +1322,15 @@ class HybridForecastEngine(
             val age0 = (t0 - event.tsMs).toDouble() / MINUTE_MS
             val age1 = (t1 - event.tsMs).toDouble() / MINUTE_MS
             if (age1 <= 0.0 || age0 >= p.durationMin) continue
-            action += event.units * event.actionMultiplier.coerceIn(.5,1.5) * (basalCdf(age1) - basalCdf(maxOf(0.0, age0)))
+            action +=
+                event.units *
+                    event.actionMultiplier.coerceIn(.5, 1.5) *
+                    (basalCdf(age1) - basalCdf(maxOf(0.0, age0)))
         }
-        val expected = p.referenceUnits24h * state.basalReferenceScaleMultiplier.coerceIn(.5,1.5) * (t1 - t0).toDouble() /
-            (24.0 * 60.0 * MINUTE_MS)
+        val expected =
+            p.referenceUnits24h *
+                state.basalReferenceScaleMultiplier.coerceIn(.5, 1.5) *
+                (t1 - t0).toDouble() / (24.0 * 60.0 * MINUTE_MS)
         return -p.sensitivityMmolPerActionUnit * (action - expected) * p.scale
     }
 
@@ -1146,19 +1374,23 @@ class HybridForecastEngine(
             val hour = (futureTs.toDouble() / 1000.0 / 3600.0) % 24.0
             val angle = 2.0 * PI * hour / 24.0
             val exposure = state.activityExposure * exp(-minute / model.activity.tauMin)
-            val eventBackgroundRate=state.foodHistory.sumOf{event->
-                val ageMin=(futureTs-event.tsMs).toDouble()/MINUTE_MS
-                if(ageMin<0||ageMin>12*60)0.0 else event.backgroundRateOffsetMmolPerHour*exp(-ageMin/360.0)
-            }
-            val rate30 = c.intercept + (state.backgroundRateOffsetMmolPerHour+eventBackgroundRate)/2.0 +
-                c.sin24 * sin(angle) +
-                c.cos24 * cos(angle) +
-                c.sin12 * sin(2.0 * angle) +
-                c.cos12 * cos(2.0 * angle) -
-                c.stateReversion * (current - model.joint.targetGlucose) +
-                c.sleep * state.asleep +
-                c.sleepDebt * state.sleepDebtHours +
-                c.hoursSinceWake * state.hoursSinceWake
+            val eventBackgroundRate =
+                state.foodHistory.sumOf { event ->
+                    val ageMin = (futureTs - event.tsMs).toDouble() / MINUTE_MS
+                    if (ageMin < 0 || ageMin > 12 * 60) 0.0
+                    else event.backgroundRateOffsetMmolPerHour * exp(-ageMin / 360.0)
+                }
+            val rate30 =
+                c.intercept +
+                    (state.backgroundRateOffsetMmolPerHour + eventBackgroundRate) / 2.0 +
+                    c.sin24 * sin(angle) +
+                    c.cos24 * cos(angle) +
+                    c.sin12 * sin(2.0 * angle) +
+                    c.cos12 * cos(2.0 * angle) -
+                    c.stateReversion * (current - model.joint.targetGlucose) +
+                    c.sleep * state.asleep +
+                    c.sleepDebt * state.sleepDebtHours +
+                    c.hoursSinceWake * state.hoursSinceWake
             val directStep = -c.activityDirect * exposure * 5.0 / 30.0
             activityDirect += directStep
             total += rate30 * 5.0 / 30.0 + directStep
@@ -1166,11 +1398,12 @@ class HybridForecastEngine(
         }
         // Basal follows the same interval, so accumulating the steps gives the
         // same total the single 0..horizon call used to return.
-        val basal = basalDelta(
-            state,
-            state.nowMs + fromMin * MINUTE_MS,
-            state.nowMs + toMin * MINUTE_MS,
-        )
+        val basal =
+            basalDelta(
+                state,
+                state.nowMs + fromMin * MINUTE_MS,
+                state.nowMs + toMin * MINUTE_MS,
+            )
         return total * model.joint.backgroundScale + basal to
             activityDirect * model.joint.backgroundScale
     }
@@ -1198,23 +1431,28 @@ class HybridForecastEngine(
         }
         require(hypotheticalInsulinUnits >= 0.0)
         val history = state.glucoseHistory.sortedBy { it.tsMs }
-        val current = glucoseAtOrBefore(history, state.nowMs)?.plus(state.sensorBiasMmol)
-            ?: error("No causal glucose anchor")
+        val current =
+            glucoseAtOrBefore(history, state.nowMs)?.plus(state.sensorBiasMmol)
+                ?: error("No causal glucose anchor")
         val window = model.trend.windowMin
-        val previous = glucoseAtOrBefore(
-            history,
-            state.nowMs - window * MINUTE_MS,
-        )?.plus(state.sensorBiasMmol)
+        val previous =
+            glucoseAtOrBefore(
+                    history,
+                    state.nowMs - window * MINUTE_MS,
+                )
+                ?.plus(state.sensorBiasMmol)
         val observed = if (previous != null) current - previous else 0.0
         var recentEvents = 0.0
         if (previous != null) {
             val start = state.nowMs - window * MINUTE_MS
-            recentEvents += state.foodHistory.sumOf {
-                foodDelta(it, start, state.nowMs, state.activityExposure,state.foodHistory)
-            }
-            recentEvents += state.bolusHistory.sumOf {
-                insulinDelta(it, start, state.nowMs, state.activityExposure)
-            }
+            recentEvents +=
+                state.foodHistory.sumOf {
+                    foodDelta(it, start, state.nowMs, state.activityExposure, state.foodHistory)
+                }
+            recentEvents +=
+                state.bolusHistory.sumOf {
+                    insulinDelta(it, start, state.nowMs, state.activityExposure)
+                }
         }
         val residualRate = (observed - recentEvents) / maxOf(1, window)
         val scenarioEvent = HybridBolusEvent(state.nowMs, hypotheticalInsulinUnits)
@@ -1263,135 +1501,150 @@ class HybridForecastEngine(
         var scBgFrom = 0
         val previousFoodEvents = DoubleArray(state.foodHistory.size)
         val weightedFoodEvents = DoubleArray(state.foodHistory.size)
-        val points = (0..model.runtime.horizonMin step model.runtime.stepMin).map { horizon ->
-            val future = state.nowMs + horizon * MINUTE_MS
-            val foodContributions = state.foodHistory.map { event ->
-                event to foodDelta(event, state.nowMs, future, state.activityExposure,state.foodHistory)
-            }
-            val food = foodContributions.sumOf { it.second }
-            val incrementWeight = backboneWeight(horizon.toDouble())
-            weightedFood += incrementWeight * (food - previousFood)
-            previousFood = food
-            foodContributions.forEachIndexed { index, (_, value) ->
-                weightedFoodEvents[index] += incrementWeight *
-                    (value - previousFoodEvents[index])
-                previousFoodEvents[index] = value
-            }
-            val unknownFoodUncertainty = foodContributions.withIndex().sumOf { indexed ->
-                val event = indexed.value.first
-                val structurallyUnknown =
-                    event.kineticFeatures == null || event.kineticFeatures.confidence < 0.45
-                if (structurallyUnknown) {
-                    abs(weightedFoodEvents[indexed.index]) *
-                        model.uncertainty.unknownFoodExtraFraction
-                } else {
-                    0.0
+        val points =
+            (0..model.runtime.horizonMin step model.runtime.stepMin).map { horizon ->
+                val future = state.nowMs + horizon * MINUTE_MS
+                val foodContributions =
+                    state.foodHistory.map { event ->
+                        event to
+                            foodDelta(
+                                event,
+                                state.nowMs,
+                                future,
+                                state.activityExposure,
+                                state.foodHistory
+                            )
+                    }
+                val food = foodContributions.sumOf { it.second }
+                val incrementWeight = backboneWeight(horizon.toDouble())
+                weightedFood += incrementWeight * (food - previousFood)
+                previousFood = food
+                foodContributions.forEachIndexed { index, (_, value) ->
+                    weightedFoodEvents[index] += incrementWeight * (value - previousFoodEvents[index])
+                    previousFoodEvents[index] = value
                 }
-            }
-            val insulin = state.bolusHistory.sumOf {
-                insulinDelta(it, state.nowMs, future, state.activityExposure)
-            }
-            weightedInsulin += incrementWeight * (insulin - previousInsulin)
-            previousInsulin = insulin
-            val drift = residualRate * model.trend.tauMin *
-                (1.0 - exp(-horizon / model.trend.tauMin))
-            if (horizon > bgFrom) {
-                val (stepBg, stepAct) = backgroundDelta(
-                    state,
-                    if (steppedBackgroundFeedback) bgLevel else current,
-                    bgFrom,
-                    horizon,
+                val unknownFoodUncertainty =
+                    foodContributions.withIndex().sumOf { indexed ->
+                        val event = indexed.value.first
+                        val structurallyUnknown =
+                            event.kineticFeatures == null || event.kineticFeatures.confidence < 0.45
+                        if (structurallyUnknown) {
+                            abs(weightedFoodEvents[indexed.index]) *
+                                model.uncertainty.unknownFoodExtraFraction
+                        } else {
+                            0.0
+                        }
+                    }
+                val insulin =
+                    state.bolusHistory.sumOf {
+                        insulinDelta(it, state.nowMs, future, state.activityExposure)
+                    }
+                weightedInsulin += incrementWeight * (insulin - previousInsulin)
+                previousInsulin = insulin
+                val drift =
+                    residualRate * model.trend.tauMin * (1.0 - exp(-horizon / model.trend.tauMin))
+                if (horizon > bgFrom) {
+                    val (stepBg, stepAct) =
+                        backgroundDelta(
+                            state,
+                            if (steppedBackgroundFeedback) bgLevel else current,
+                            bgFrom,
+                            horizon,
+                        )
+                    bgTotal += stepBg
+                    bgActivityTotal += stepAct
+                    bgFrom = horizon
+                }
+                val background = bgTotal
+                val activityDirect = bgActivityTotal
+                val raw = food + insulin + drift + background
+                weightedRaw += incrementWeight * (raw - previousRaw)
+                previousRaw = raw
+                val baseline = current + weightedRaw
+                if (hypotheticalInsulinUnits > 0.0 && horizon > scBgFrom) {
+                    scBgTotal +=
+                        backgroundDelta(
+                                state,
+                                if (steppedBackgroundFeedback) scBgLevel else current,
+                                scBgFrom,
+                                horizon,
+                            )
+                            .first
+                    scBgFrom = horizon
+                }
+                // Feed the level forward for the NEXT step. The forecast is what the
+                // reversion must react to, not the background alone — a term that
+                // only saw its own contribution would still miss the meal.
+                bgLevel = baseline
+                val scenarioRaw =
+                    if (hypotheticalInsulinUnits > 0.0) {
+                        insulinDelta(
+                            scenarioEvent,
+                            state.nowMs,
+                            future,
+                            state.activityExposure,
+                        )
+                    } else {
+                        0.0
+                    }
+                weightedScenarioInsulin += incrementWeight * (scenarioRaw - previousScenarioInsulin)
+                previousScenarioInsulin = scenarioRaw
+                val scenario =
+                    if (hypotheticalInsulinUnits > 0.0) {
+                        val scRaw = food + insulin + scenarioRaw + drift + scBgTotal
+                        scWeightedRaw += incrementWeight * (scRaw - scPreviousRaw)
+                        scPreviousRaw = scRaw
+                        val v = current + scWeightedRaw
+                        scBgLevel = v
+                        v
+                    } else {
+                        baseline
+                    }
+                // NAMED insulin, so it stays insulin. Reporting `scenario - baseline`
+                // here would fold the scenario's own background feedback into a
+                // field every consumer reads as «what the dose does», and the
+                // persisted-bolus invariant is stated about exactly that quantity.
+                val scenarioDelta = weightedScenarioInsulin
+                val isfHalfRange =
+                    maxOf(
+                        model.insulin.isf - model.insulin.isfLow,
+                        model.insulin.isfHigh - model.insulin.isf,
+                    )
+                val activeBolusIsfUncertainty =
+                    if (model.uncertainty.includeActiveBolusIsf) {
+                        abs(weightedInsulin) * isfHalfRange / model.insulin.isf
+                    } else {
+                        0.0
+                    }
+                val band =
+                    model.uncertainty.sigmaPerSqrtHour *
+                        sqrt((horizon + state.observationAgeMin.coerceAtLeast(0.0)) / 60.0) +
+                        abs(weightedFood) * model.uncertainty.foodFraction +
+                        unknownFoodUncertainty +
+                        activeBolusIsfUncertainty +
+                        abs(weightedScenarioInsulin) * isfHalfRange / model.insulin.isf
+                // GLUCOSE FLOOR. The integrator has no lower bound of its own — food
+                // is finite, but insulin action is not bounded by however much
+                // glucose is left to remove. See HYBRID_FLOOR_MMOL: forecasts have
+                // stored hundreds of points below zero, some inside hypo-alert runs.
+                //
+                // EVERYTHING is clamped, including the bottom of the uncertainty band:
+                // a band going negative is the same statement, only whispered.
+                HybridForecastPoint(
+                    minutes = horizon,
+                    tsMs = future,
+                    baseline = baseline.coerceAtLeast(HYBRID_FLOOR_MMOL),
+                    scenario = scenario.coerceAtLeast(HYBRID_FLOOR_MMOL),
+                    low = (scenario - band).coerceAtLeast(HYBRID_FLOOR_MMOL),
+                    high = (scenario + band).coerceAtLeast(HYBRID_FLOOR_MMOL),
+                    foodDelta = weightedFood,
+                    insulinActualDelta = weightedInsulin,
+                    insulinScenarioDelta = scenarioDelta,
+                    residualDrift = drift,
+                    backgroundDelta = background,
+                    activityDirectDelta = activityDirect,
                 )
-                bgTotal += stepBg
-                bgActivityTotal += stepAct
-                bgFrom = horizon
             }
-            val background = bgTotal
-            val activityDirect = bgActivityTotal
-            val raw = food + insulin + drift + background
-            weightedRaw += incrementWeight * (raw - previousRaw)
-            previousRaw = raw
-            val baseline = current + weightedRaw
-            if (hypotheticalInsulinUnits > 0.0 && horizon > scBgFrom) {
-                scBgTotal += backgroundDelta(
-                    state,
-                    if (steppedBackgroundFeedback) scBgLevel else current,
-                    scBgFrom,
-                    horizon,
-                ).first
-                scBgFrom = horizon
-            }
-            // Feed the level forward for the NEXT step. The forecast is what the
-            // reversion must react to, not the background alone — a term that
-            // only saw its own contribution would still miss the meal.
-            bgLevel = baseline
-            val scenarioRaw = if (hypotheticalInsulinUnits > 0.0) {
-                insulinDelta(
-                    scenarioEvent,
-                    state.nowMs,
-                    future,
-                    state.activityExposure,
-                )
-            } else {
-                0.0
-            }
-            weightedScenarioInsulin += incrementWeight *
-                (scenarioRaw - previousScenarioInsulin)
-            previousScenarioInsulin = scenarioRaw
-            val scenario = if (hypotheticalInsulinUnits > 0.0) {
-                val scRaw = food + insulin + scenarioRaw + drift + scBgTotal
-                scWeightedRaw += incrementWeight * (scRaw - scPreviousRaw)
-                scPreviousRaw = scRaw
-                val v = current + scWeightedRaw
-                scBgLevel = v
-                v
-            } else {
-                baseline
-            }
-            // NAMED insulin, so it stays insulin. Reporting `scenario - baseline`
-            // here would fold the scenario's own background feedback into a
-            // field every consumer reads as «what the dose does», and the
-            // persisted-bolus invariant is stated about exactly that quantity.
-            val scenarioDelta = weightedScenarioInsulin
-            val isfHalfRange = maxOf(
-                model.insulin.isf - model.insulin.isfLow,
-                model.insulin.isfHigh - model.insulin.isf,
-            )
-            val activeBolusIsfUncertainty = if (
-                model.uncertainty.includeActiveBolusIsf
-            ) {
-                abs(weightedInsulin) * isfHalfRange / model.insulin.isf
-            } else {
-                0.0
-            }
-            val band = model.uncertainty.sigmaPerSqrtHour *
-                sqrt((horizon + state.observationAgeMin.coerceAtLeast(0.0)) / 60.0) +
-                abs(weightedFood) * model.uncertainty.foodFraction +
-                unknownFoodUncertainty +
-                activeBolusIsfUncertainty +
-                abs(weightedScenarioInsulin) * isfHalfRange / model.insulin.isf
-            // GLUCOSE FLOOR. The integrator has no lower bound of its own — food
-            // is finite, but insulin action is not bounded by however much
-            // glucose is left to remove. See HYBRID_FLOOR_MMOL: forecasts have
-            // stored hundreds of points below zero, some inside hypo-alert runs.
-            //
-            // EVERYTHING is clamped, including the bottom of the uncertainty band:
-            // a band going negative is the same statement, only whispered.
-            HybridForecastPoint(
-                minutes = horizon,
-                tsMs = future,
-                baseline = baseline.coerceAtLeast(HYBRID_FLOOR_MMOL),
-                scenario = scenario.coerceAtLeast(HYBRID_FLOOR_MMOL),
-                low = (scenario - band).coerceAtLeast(HYBRID_FLOOR_MMOL),
-                high = (scenario + band).coerceAtLeast(HYBRID_FLOOR_MMOL),
-                foodDelta = weightedFood,
-                insulinActualDelta = weightedInsulin,
-                insulinScenarioDelta = scenarioDelta,
-                residualDrift = drift,
-                backgroundDelta = background,
-                activityDirectDelta = activityDirect,
-            )
-        }
         return HybridForecastResult(
             modelVersion = model.modelVersion,
             personModelId = model.personModelId,
@@ -1417,43 +1670,45 @@ class HybridForecastEngine(
         contexts: List<HybridOpenLoopContext>,
     ): List<HybridOpenLoopPoint> {
         require(initialState.glucoseHistory.isNotEmpty())
-        val anchor = initialState.glucoseHistory
-            .filter { it.tsMs <= initialState.nowMs }
-            .maxByOrNull { it.tsMs }
-            ?: error("No causal glucose anchor")
+        val anchor =
+            initialState.glucoseHistory.filter { it.tsMs <= initialState.nowMs }.maxByOrNull { it.tsMs }
+                ?: error("No causal glucose anchor")
         var simulated = anchor.mmol
         var previousTs = initialState.nowMs
-        return contexts.sortedBy { it.tsMs }.map { context ->
-            require(context.tsMs >= previousTs) { "Open-loop contexts must be monotone" }
-            val step = model.runtime.stepMin
-            val state = initialState.copy(
-                nowMs = context.tsMs,
-                glucoseHistory = listOf(
-                    HybridGlucosePoint(context.tsMs, simulated),
-                ),
-                activityExposure = context.activityExposure,
-                asleep = context.asleep,
-                sleepDebtHours = context.sleepDebtHours,
-                hoursSinceWake = context.hoursSinceWake,
-            )
-            val future = context.tsMs + step * MINUTE_MS
-            val food = state.foodHistory.sumOf {
-                foodDelta(it, context.tsMs, future, context.activityExposure,state.foodHistory)
+        return contexts
+            .sortedBy { it.tsMs }
+            .map { context ->
+                require(context.tsMs >= previousTs) { "Open-loop contexts must be monotone" }
+                val step = model.runtime.stepMin
+                val state =
+                    initialState.copy(
+                        nowMs = context.tsMs,
+                        glucoseHistory = listOf(HybridGlucosePoint(context.tsMs, simulated),),
+                        activityExposure = context.activityExposure,
+                        asleep = context.asleep,
+                        sleepDebtHours = context.sleepDebtHours,
+                        hoursSinceWake = context.hoursSinceWake,
+                    )
+                val future = context.tsMs + step * MINUTE_MS
+                val food =
+                    state.foodHistory.sumOf {
+                        foodDelta(it, context.tsMs, future, context.activityExposure, state.foodHistory)
+                    }
+                val insulin =
+                    state.bolusHistory.sumOf {
+                        insulinDelta(it, context.tsMs, future, context.activityExposure)
+                    }
+                val background = backgroundDelta(state, simulated, 0, step).first
+                simulated += food + insulin + background
+                previousTs = context.tsMs
+                HybridOpenLoopPoint(
+                    tsMs = future,
+                    mmol = simulated,
+                    foodDelta = food,
+                    insulinDelta = insulin,
+                    backgroundDelta = background,
+                )
             }
-            val insulin = state.bolusHistory.sumOf {
-                insulinDelta(it, context.tsMs, future, context.activityExposure)
-            }
-            val background = backgroundDelta(state, simulated, 0, step).first
-            simulated += food + insulin + background
-            previousTs = context.tsMs
-            HybridOpenLoopPoint(
-                tsMs = future,
-                mmol = simulated,
-                foodDelta = food,
-                insulinDelta = insulin,
-                backgroundDelta = background,
-            )
-        }
     }
 
     /** Contiguous blind propagation on the engine's own step grid. The
@@ -1461,17 +1716,19 @@ class HybridForecastEngine(
      * exactly one [HybridRuntimeParams.stepMin] later. A partial trailing step
      * is deliberately not invented. */
     fun openLoopUntil(
-        initialState:HybridForecastState,
-        endExclusiveOrAtMs:Long,
-        contextAt:(Long)->HybridOpenLoopContext,
-    ):List<HybridOpenLoopPoint> {
-        require(endExclusiveOrAtMs>=initialState.nowMs)
-        val stepMs=model.runtime.stepMin*MINUTE_MS
-        val contexts=generateSequence(initialState.nowMs){it+stepMs}
-            .takeWhile{it+stepMs<=endExclusiveOrAtMs}
-            .map(contextAt).toList()
-        val out=openLoop(initialState,contexts)
-        check(out.withIndex().all{(i,p)->p.tsMs==initialState.nowMs+(i+1)*stepMs})
+        initialState: HybridForecastState,
+        endExclusiveOrAtMs: Long,
+        contextAt: (Long) -> HybridOpenLoopContext,
+    ): List<HybridOpenLoopPoint> {
+        require(endExclusiveOrAtMs >= initialState.nowMs)
+        val stepMs = model.runtime.stepMin * MINUTE_MS
+        val contexts =
+            generateSequence(initialState.nowMs) { it + stepMs }
+                .takeWhile { it + stepMs <= endExclusiveOrAtMs }
+                .map(contextAt)
+                .toList()
+        val out = openLoop(initialState, contexts)
+        check(out.withIndex().all { (i, p) -> p.tsMs == initialState.nowMs + (i + 1) * stepMs })
         return out
     }
 

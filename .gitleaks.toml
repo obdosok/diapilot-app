@@ -1,0 +1,19 @@
+title = "DiaPilot gitleaks config"
+
+# Keep every built-in detection rule; only add a narrow allowlist entry below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives, not secrets"
+# Matched against the detected secret itself, and anchored, so only these two
+# exact identifiers are ignored — wherever they appear, in any commit. Pinning
+# them to the commit that introduced them would fail CI the next time either
+# line is touched.
+regexes = [
+    # `generic-api-key` false-positives on carb-sensitivity identifiers: a
+    # SharedPreferences key name and a field access, both containing "key"
+    # and no actual secret.
+    '''^carb_sens_mmol_per_10g$''',
+    '''^key\.carbSensPer10g$''',
+]

@@ -16,6 +16,7 @@ reverse proxy), and host only on machines you control.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import time
@@ -37,7 +38,10 @@ app = FastAPI(title="DiaPilot Companion", docs_url=None, redoc_url=None)
 def _auth(authorization: str | None) -> None:
     if not TOKEN:
         raise HTTPException(500, "server has no COMPANION_TOKEN configured")
-    if authorization != f"Bearer {TOKEN}":
+    # Constant-time comparison: a plain != returns sooner the earlier the first
+    # mismatching character, which leaks the token one character at a time.
+    expected = f"Bearer {TOKEN}".encode()
+    if not hmac.compare_digest((authorization or "").encode(), expected):
         raise HTTPException(401, "bad token")
 
 
@@ -68,8 +72,10 @@ async def backup(file: UploadFile, authorization: str | None = Header(None)):
 
 
 @app.get("/api/latest")
-def latest(token: str = ""):
-    _auth(f"Bearer {token}")
+def latest(authorization: str | None = Header(None)):
+    # The token travels in a header, never in the query string: a URL ends up
+    # in the server's access log, in proxy logs and in browser history.
+    _auth(authorization)
     if not LATEST.exists():
         return JSONResponse({"empty": True})
     return JSONResponse(json.loads(LATEST.read_text(encoding="utf-8")))
@@ -83,7 +89,7 @@ def index():
 
 
 HTML_PAGE = """<!doctype html>
-<html lang="ru"><head>
+<html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
@@ -105,9 +111,9 @@ HTML_PAGE = """<!doctype html>
   .muted { color:#6b7280; font-size:12px; margin-top:10px; }
 </style></head><body><div class="wrap">
 <div id="login" class="card" style="display:none">
-  <p>Токен доступа:</p>
+  <p>Access token:</p>
   <input id="tok" type="password" placeholder="COMPANION_TOKEN">
-  <p class="muted">Сохраняется только в этом браузере.</p>
+  <p class="muted">Stored only in this browser.</p>
 </div>
 <div id="main" style="display:none">
   <div class="big"><span id="bg">—</span> <span id="arrow"></span>
@@ -131,26 +137,40 @@ function askToken() {
     tick();
   });
 }
-function fmtAge(min) { return min < 60 ? min + ' мин' : Math.floor(min/60) + 'ч' + (min%60) + 'м'; }
+function fmtAge(min) { return min < 60 ? min + ' min' : Math.floor(min/60) + 'h ' + (min%60) + 'm'; }
 async function tick() {
   if (!token) { askToken(); return; }
   let r;
-  try { r = await fetch('/api/latest?token=' + encodeURIComponent(token)); }
+  try { r = await fetch('/api/latest', { headers: { 'Authorization': 'Bearer ' + token } }); }
   catch (e) { setTimeout(tick, 15000); return; }
   if (r.status === 401) { localStorage.removeItem('dp_token'); token=''; askToken(); return; }
   const d = await r.json();
   $('main').style.display = 'block';
-  if (d.empty) { $('bg').textContent = 'нет данных'; setTimeout(tick, 15000); return; }
+  if (d.empty) { $('bg').textContent = 'no data'; setTimeout(tick, 15000); return; }
   const mgdl = !!d.mgdl, u = v => mgdl ? Math.round(v*18.0182) : (Math.round(v*10)/10).toFixed(1);
   $('bg').textContent = u(d.bg_mmol);
   $('arrow').textContent = d.arrow || '';
-  $('delta').textContent = (d.delta_mmol!=null ? (d.delta_mmol>0?'+':'') + u(Math.abs(d.delta_mmol))*(d.delta_mmol<0?-1:1) : '') + (mgdl?' мг/дл':' ммоль/л');
+  $('delta').textContent = (d.delta_mmol!=null ? (d.delta_mmol>0?'+':'') + u(Math.abs(d.delta_mmol))*(d.delta_mmol<0?-1:1) : '') + (mgdl?' mg/dL':' mmol/L');
   $('nuance').textContent = d.nuance || '';
   $('status').textContent = d.status_line || '';
   $('insulin').textContent = d.insulin_line || '';
-  $('events').innerHTML = (d.events||[]).map(e => '<div>'+e+'</div>').join('') || '<span class="muted">событий нет</span>';
+  // Event lines are note text typed on the phone: build them as text nodes,
+  // never as HTML, so a note containing markup cannot run script here.
+  const events = $('events');
+  events.replaceChildren();
+  for (const e of (d.events || [])) {
+    const line = document.createElement('div');
+    line.textContent = e;
+    events.append(line);
+  }
+  if (!events.childElementCount) {
+    const none = document.createElement('span');
+    none.className = 'muted';
+    none.textContent = 'no events';
+    events.append(none);
+  }
   const ageMin = Math.floor((Date.now() - d.bg_ts_ms)/60000);
-  $('age').textContent = 'данные: ' + fmtAge(ageMin) + ' назад · обновлено с телефона ' +
+  $('age').textContent = 'data: ' + fmtAge(ageMin) + ' ago · pushed from the phone at ' +
       new Date(d.received_at_ms).toLocaleTimeString();
   $('age').className = ageMin >= 10 ? 'age-warn' : 'muted';
   drawChart(d, mgdl);

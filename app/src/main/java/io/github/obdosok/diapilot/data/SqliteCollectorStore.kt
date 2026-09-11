@@ -30,7 +30,7 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
     SQLiteOpenHelper(context.applicationContext, dbName, null, DB_VERSION), CollectorStore {
 
     internal val appContext: Context = context.applicationContext
-    internal fun <T> withWritableDb(block:(SQLiteDatabase)->T):T=block(writableDatabase)
+    internal fun <T> withWritableDb(block: (SQLiteDatabase) -> T): T = block(writableDatabase)
 
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
@@ -70,17 +70,41 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
      * glucose advances in six-hour finalized buckets; edits to food, insulin,
      * basal, activity or causal evidence invalidate immediately via triggers.
      */
-    internal fun stage10ReceiptCacheKey(version:String,nowMs:Long):String {
-        val db=readableDatabase
+    internal fun stage10ReceiptCacheKey(version: String, nowMs: Long): String {
+        val db = readableDatabase
         ensureModelInputRevisionTracking(db)
-        val material=setOf("annotations","insulin_events","basal_events","steps","sleep_sessions","carb_evidence_v1","physio_context_exposures_v1")
-        val revisions=db.rawQuery(
-            "SELECT source_table,revision FROM physio_model_input_revisions_v1 ORDER BY source_table",null,
-        ).use{c->buildString{while(c.moveToNext())if(c.getString(0) in material)append(c.getString(0)).append(':').append(c.getLong(1)).append(';')}}
-        val latestGlucose=db.rawQuery("SELECT MAX(ts_ms) FROM glucose_readings WHERE ts_ms<=?",arrayOf(nowMs.toString())).use{c->if(c.moveToFirst()&&!c.isNull(0))c.getLong(0)else 0L}
-        val finalizedBucket=latestGlucose/(6L*3_600_000L)
-        val raw="$version|$revisions|g6h=$finalizedBucket"
-        return java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).joinToString(""){"%02x".format(it)}
+        val material =
+            setOf(
+                "annotations",
+                "insulin_events",
+                "basal_events",
+                "steps",
+                "sleep_sessions",
+                "carb_evidence_v1",
+                "physio_context_exposures_v1"
+            )
+        val revisions =
+            db.rawQuery(
+                    "SELECT source_table,revision FROM physio_model_input_revisions_v1 ORDER BY source_table",
+                    null,
+                )
+                .use { c ->
+                    buildString {
+                        while (c.moveToNext()) if (c.getString(0) in material)
+                            append(c.getString(0)).append(':').append(c.getLong(1)).append(';')
+                    }
+                }
+        val latestGlucose =
+            db.rawQuery(
+                    "SELECT MAX(ts_ms) FROM glucose_readings WHERE ts_ms<=?",
+                    arrayOf(nowMs.toString())
+                )
+                .use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else 0L }
+        val finalizedBucket = latestGlucose / (6L * 3_600_000L)
+        val raw = "$version|$revisions|g6h=$finalizedBucket"
+        return java.security.MessageDigest.getInstance("SHA-256")
+            .digest(raw.toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 
     companion object {
@@ -117,13 +141,17 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
 
         internal fun ensureModelInputRevisionTracking(db: SQLiteDatabase) {
             db.execSQL(MODEL_INPUT_REVISIONS_DDL)
-            val existing=db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'",null).use{c->buildSet{while(c.moveToNext())add(c.getString(0))}}
+            val existing =
+                db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { c ->
+                    buildSet { while (c.moveToNext()) add(c.getString(0)) }
+                }
             MODEL_INPUT_TABLES.filter(existing::contains).forEach { table ->
                 db.execSQL(
                     "INSERT OR IGNORE INTO physio_model_input_revisions_v1(source_table,revision,last_change_ms) VALUES(?,0,0)",
                     arrayOf<Any?>(table),
                 )
-                MODEL_INPUT_REVISION_TRIGGERS.filter{it.contains(" ON $table BEGIN")}.forEach(db::execSQL)
+                MODEL_INPUT_REVISION_TRIGGERS.filter { it.contains(" ON $table BEGIN") }
+                    .forEach(db::execSQL)
             }
         }
 
@@ -927,15 +955,25 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
     // --- hard core -------------------------------------------------------
 
     override fun upsertReading(reading: Reading) {
-        val db=writableDatabase
+        val db = writableDatabase
         db.execSQL(
             "INSERT INTO glucose_readings VALUES (?,?,?,?,?) " +
                 "ON CONFLICT(ts_ms) DO UPDATE SET mgdl=excluded.mgdl, mmol=excluded.mmol",
             arrayOf<Any?>(reading.tsMs, reading.mgdl, reading.mmol, reading.trend, reading.source),
         )
-        val observed=System.currentTimeMillis()
-        val live=reading.source!="libre_nfc"&&kotlin.math.abs(observed-reading.tsMs)<=10*60_000L
-        db.execSQL("INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",arrayOf<Any?>(reading.tsMs,PhysioArrivalIdentity.glucose(reading),observed,reading.source,if(live)1 else 0))
+        val observed = System.currentTimeMillis()
+        val live =
+            reading.source != "libre_nfc" && kotlin.math.abs(observed - reading.tsMs) <= 10 * 60_000L
+        db.execSQL(
+            "INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",
+            arrayOf<Any?>(
+                reading.tsMs,
+                PhysioArrivalIdentity.glucose(reading),
+                observed,
+                reading.source,
+                if (live) 1 else 0
+            )
+        )
     }
 
     override fun backfillMainReading(reading: Reading, toleranceMs: Long): Boolean {
@@ -952,12 +990,13 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
         // skipped every point and nothing was ever backfilled.
         db.beginTransaction()
         try {
-            val exists = android.database.DatabaseUtils.longForQuery(
-                db,
-                "SELECT EXISTS(SELECT 1 FROM glucose_readings " +
-                    "WHERE ABS(ts_ms - ${reading.tsMs}) <= $toleranceMs)",
-                null,
-            )
+            val exists =
+                android.database.DatabaseUtils.longForQuery(
+                    db,
+                    "SELECT EXISTS(SELECT 1 FROM glucose_readings " +
+                        "WHERE ABS(ts_ms - ${reading.tsMs}) <= $toleranceMs)",
+                    null,
+                )
             if (exists != 0L) {
                 db.setTransactionSuccessful()
                 return false
@@ -967,7 +1006,16 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
                 arrayOf<Any?>(reading.tsMs, reading.mgdl, reading.mmol, reading.trend, reading.source),
             )
             val inserted = android.database.DatabaseUtils.longForQuery(db, "SELECT changes()", null) > 0
-            if(inserted)db.execSQL("INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,0)",arrayOf<Any?>(reading.tsMs,PhysioArrivalIdentity.glucose(reading),System.currentTimeMillis(),reading.source))
+            if (inserted)
+                db.execSQL(
+                    "INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,0)",
+                    arrayOf<Any?>(
+                        reading.tsMs,
+                        PhysioArrivalIdentity.glucose(reading),
+                        System.currentTimeMillis(),
+                        reading.source
+                    )
+                )
             db.setTransactionSuccessful()
             return inserted
         } finally {
@@ -1087,34 +1135,87 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
         )
         val observedAtMs = System.currentTimeMillis()
         val live = kotlin.math.abs(observedAtMs - event.tsMs) <= 15 * 60_000L
-        val stored=db.rawQuery("SELECT units,insulin_type,source FROM insulin_events WHERE ts_ms=?",arrayOf(event.tsMs.toString())).use{c->if(c.moveToFirst())Triple(c.getDouble(0),c.getString(1),c.getString(2))else null}
-        stored?.let{db.execSQL("INSERT OR IGNORE INTO physio_bolus_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",arrayOf<Any?>(event.tsMs,PhysioArrivalIdentity.bolus(event.tsMs,it.first,it.second,it.third),observedAtMs,it.third,if(live)1 else 0))}
+        val stored =
+            db.rawQuery(
+                    "SELECT units,insulin_type,source FROM insulin_events WHERE ts_ms=?",
+                    arrayOf(event.tsMs.toString())
+                )
+                .use { c ->
+                    if (c.moveToFirst()) Triple(c.getDouble(0), c.getString(1), c.getString(2))
+                    else null
+                }
+        stored?.let {
+            db.execSQL(
+                "INSERT OR IGNORE INTO physio_bolus_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",
+                arrayOf<Any?>(
+                    event.tsMs,
+                    PhysioArrivalIdentity.bolus(event.tsMs, it.first, it.second, it.third),
+                    observedAtMs,
+                    it.third,
+                    if (live) 1 else 0
+                )
+            )
+        }
     }
 
     override fun setBolusUnits(tsMs: Long, units: Double) {
-        val db=writableDatabase
+        val db = writableDatabase
         db.execSQL(
             "UPDATE insulin_events SET units = ?, user_edited = 1 WHERE ts_ms = ?",
             arrayOf<Any?>(units, tsMs),
         )
-        val row=db.rawQuery("SELECT insulin_type,source FROM insulin_events WHERE ts_ms=?",arrayOf(tsMs.toString())).use{c->if(c.moveToFirst())c.getString(0) to c.getString(1)else null}
-        row?.let{val observed=System.currentTimeMillis();db.execSQL("INSERT OR IGNORE INTO physio_bolus_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",arrayOf<Any?>(tsMs,PhysioArrivalIdentity.bolus(tsMs,units,it.first,it.second),observed,it.second,if(kotlin.math.abs(observed-tsMs)<=15*60_000L)1 else 0))}
+        val row =
+            db.rawQuery(
+                    "SELECT insulin_type,source FROM insulin_events WHERE ts_ms=?",
+                    arrayOf(tsMs.toString())
+                )
+                .use { c -> if (c.moveToFirst()) c.getString(0) to c.getString(1) else null }
+        row?.let {
+            val observed = System.currentTimeMillis();
+            db.execSQL(
+                "INSERT OR IGNORE INTO physio_bolus_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",
+                arrayOf<Any?>(
+                    tsMs,
+                    PhysioArrivalIdentity.bolus(tsMs, units, it.first, it.second),
+                    observed,
+                    it.second,
+                    if (kotlin.math.abs(observed - tsMs) <= 15 * 60_000L) 1 else 0
+                )
+            )
+        }
     }
 
     /** A successful Health Connect steps query proves that an empty interval
      * means no recorded steps, rather than missing permission/sync. */
-    internal fun recordActivityCoverage(fromMs:Long,toMs:Long,observedAtMs:Long,source:String="health_connect_steps") {
-        require(toMs>=fromMs)
-        val db=writableDatabase
-        db.beginTransaction();try{
-            val merged=db.rawQuery("SELECT MIN(from_ms),MAX(to_ms) FROM physio_activity_coverage_v1 WHERE from_ms<=? AND to_ms>=?",arrayOf(toMs.toString(),fromMs.toString())).use{c->
-                if(c.moveToFirst()&&!c.isNull(0))minOf(fromMs,c.getLong(0)) to maxOf(toMs,c.getLong(1)) else fromMs to toMs
-            }
+    internal fun recordActivityCoverage(
+        fromMs: Long,
+        toMs: Long,
+        observedAtMs: Long,
+        source: String = "health_connect_steps"
+    ) {
+        require(toMs >= fromMs)
+        val db = writableDatabase
+        db.beginTransaction();
+        try {
+            val merged =
+                db.rawQuery(
+                        "SELECT MIN(from_ms),MAX(to_ms) FROM physio_activity_coverage_v1 WHERE from_ms<=? AND to_ms>=?",
+                        arrayOf(toMs.toString(), fromMs.toString())
+                    )
+                    .use { c ->
+                        if (c.moveToFirst() && !c.isNull(0))
+                            minOf(fromMs, c.getLong(0)) to maxOf(toMs, c.getLong(1))
+                        else fromMs to toMs
+                    }
             // Append the consolidated interval; older rows remain immutable.
-            db.execSQL("INSERT OR IGNORE INTO physio_activity_coverage_v1(from_ms,to_ms,observed_at_ms,source) VALUES(?,?,?,?)",
-                arrayOf<Any?>(merged.first,merged.second,observedAtMs,source))
+            db.execSQL(
+                "INSERT OR IGNORE INTO physio_activity_coverage_v1(from_ms,to_ms,observed_at_ms,source) VALUES(?,?,?,?)",
+                arrayOf<Any?>(merged.first, merged.second, observedAtMs, source)
+            )
             db.setTransactionSuccessful()
-        }finally{db.endTransaction()}
+        } finally {
+            db.endTransaction()
+        }
     }
 
     override fun setBolusPurpose(tsMs: Long, purpose: String?) {
@@ -1541,33 +1642,48 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
     override fun addAnnotation(input: Annotation): Long {
         // A tag-shaped note is stored as its key form (any language ->
         // "walk · 40 min"); the user's own words pass through unchanged.
-        val annotation = input.copy(content = com.diapilot.core.analysis.canonicalNoteContent(input.content))
-        val db=writableDatabase
-        val knownAt=annotation.analysisKnownAtMs?:annotation.carbsKnownAtMs?:System.currentTimeMillis()
-        var id=-1L;var structured=false
+        val annotation =
+            input.copy(content = com.diapilot.core.analysis.canonicalNoteContent(input.content))
+        val db = writableDatabase
+        val knownAt =
+            annotation.analysisKnownAtMs ?: annotation.carbsKnownAtMs ?: System.currentTimeMillis()
+        var id = -1L;
+        var structured = false
         db.beginTransaction()
         try {
-            id=db.insert("annotations", null, ContentValues().apply {
-            put("ts_ms", annotation.tsMs)
-            put("kind", annotation.kind)
-            put("content", annotation.content)
-            put("media_ref", annotation.mediaRef)
-            put("analysis", annotation.analysis)
-            put("analysis_known_at_ms", annotation.analysisKnownAtMs)
-            put("est_carbs", annotation.estCarbs)
-            if (annotation.estCarbs != null) {
-                // Null is historical unknown provenance, never an alias for
-                // event time or import time. Live callers must pass the actual
-                // entry time; strict causal paths exclude null.
-                put("carbs_known_at_ms", annotation.carbsKnownAtMs)
-                put("carbs_source", annotation.carbsSource)
-            }
-            })
-            PhysioContextIngestionRuntime.fromCanonicalAnnotation(annotation.copy(id=id),knownAt,appContext)?.let{row->
-                structured=appendContextExposure(row)
-            }
+            id =
+                db.insert(
+                    "annotations",
+                    null,
+                    ContentValues().apply {
+                        put("ts_ms", annotation.tsMs)
+                        put("kind", annotation.kind)
+                        put("content", annotation.content)
+                        put("media_ref", annotation.mediaRef)
+                        put("analysis", annotation.analysis)
+                        put("analysis_known_at_ms", annotation.analysisKnownAtMs)
+                        put("est_carbs", annotation.estCarbs)
+                        if (annotation.estCarbs != null) {
+                            // Null is historical unknown provenance, never an alias for
+                            // event time or import time. Live callers must pass the actual
+                            // entry time; strict causal paths exclude null.
+                            put("carbs_known_at_ms", annotation.carbsKnownAtMs)
+                            put("carbs_source", annotation.carbsSource)
+                        }
+                    }
+                )
+            PhysioContextIngestionRuntime.fromCanonicalAnnotation(
+                    annotation.copy(id = id),
+                    knownAt,
+                    appContext
+                )
+                ?.let { row ->
+                    structured = appendContextExposure(row)
+                }
             db.setTransactionSuccessful()
-        } finally { db.endTransaction() }
+        } finally {
+            db.endTransaction()
+        }
         return id
     }
 
@@ -1702,37 +1818,41 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
 
     private fun insertCarbEvidence(db: SQLiteDatabase, evidence: CarbEvidenceV1) {
         val v = evidence.input.validated()
-        db.insertOrThrow("carb_evidence_v1", null, ContentValues().apply {
-            put("evidence_id", evidence.evidenceId)
-            put("revision", evidence.revision)
-            put("supersedes_revision", evidence.supersedesRevision)
-            put("annotation_id", evidence.annotationId)
-            put("meal_session_id", evidence.mealSessionId)
-            put("event_time_ms", evidence.eventTimeMs)
-            put("intake_start_ms", evidence.intakeStartMs)
-            put("intake_end_ms", evidence.intakeEndMs)
-            put("known_at_ms", evidence.knownAtMs)
-            put("recorded_at_ms", evidence.recordedAtMs)
-            put("source", v.source.name)
-            put("user_confirmed", if (v.userConfirmed) 1 else 0)
-            put("total_carbs_g", v.totalCarbsG)
-            put("label_carbs_per_100g", v.labelCarbsPer100g)
-            put("weighed_edible_g", v.weighedEdibleG)
-            put("label_carbs_per_serving_g", v.labelCarbsPerServingG)
-            put("servings", v.servings)
-            put("recipe_version", v.recipeVersion)
-            put("recipe_total_carbs_g", v.recipeTotalCarbsG)
-            put("recipe_total_weight_g", v.recipeTotalWeightG)
-            put("recipe_consumed_weight_g", v.recipeConsumedWeightG)
-            put("recipe_consumed_fraction", v.recipeConsumedFraction)
-            put("amount_uncertainty_json", uncertaintyJson(v.amountUncertainty))
-            put("timing_uncertainty_json", uncertaintyJson(v.timingUncertainty))
-            put("evidence_hash", v.evidenceHash)
-            put("alcohol_present", if (v.alcoholPresent) 1 else 0)
-            put("kinetics_v2",v.kineticsV2)
-            put("deleted", if (evidence.deleted) 1 else 0)
-            put("provenance_version", evidence.provenanceVersion)
-            })
+        db.insertOrThrow(
+            "carb_evidence_v1",
+            null,
+            ContentValues().apply {
+                put("evidence_id", evidence.evidenceId)
+                put("revision", evidence.revision)
+                put("supersedes_revision", evidence.supersedesRevision)
+                put("annotation_id", evidence.annotationId)
+                put("meal_session_id", evidence.mealSessionId)
+                put("event_time_ms", evidence.eventTimeMs)
+                put("intake_start_ms", evidence.intakeStartMs)
+                put("intake_end_ms", evidence.intakeEndMs)
+                put("known_at_ms", evidence.knownAtMs)
+                put("recorded_at_ms", evidence.recordedAtMs)
+                put("source", v.source.name)
+                put("user_confirmed", if (v.userConfirmed) 1 else 0)
+                put("total_carbs_g", v.totalCarbsG)
+                put("label_carbs_per_100g", v.labelCarbsPer100g)
+                put("weighed_edible_g", v.weighedEdibleG)
+                put("label_carbs_per_serving_g", v.labelCarbsPerServingG)
+                put("servings", v.servings)
+                put("recipe_version", v.recipeVersion)
+                put("recipe_total_carbs_g", v.recipeTotalCarbsG)
+                put("recipe_total_weight_g", v.recipeTotalWeightG)
+                put("recipe_consumed_weight_g", v.recipeConsumedWeightG)
+                put("recipe_consumed_fraction", v.recipeConsumedFraction)
+                put("amount_uncertainty_json", uncertaintyJson(v.amountUncertainty))
+                put("timing_uncertainty_json", uncertaintyJson(v.timingUncertainty))
+                put("evidence_hash", v.evidenceHash)
+                put("alcohol_present", if (v.alcoholPresent) 1 else 0)
+                put("kinetics_v2", v.kineticsV2)
+                put("deleted", if (evidence.deleted) 1 else 0)
+                put("provenance_version", evidence.provenanceVersion)
+            }
+        )
     }
 
     override fun carbEvidenceHistory(annotationId: Long): List<CarbEvidenceV1> =

@@ -1,5 +1,7 @@
 # DiaPilot
 
+[![CI](https://github.com/obdosok/diapilot/actions/workflows/ci.yml/badge.svg?branch=public)](https://github.com/obdosok/diapilot/actions/workflows/ci.yml)
+
 A personal assistant for living with type 1 diabetes. It collects data without
 the discipline of manual logging, explains what is happening, and makes the
 invisible visible. Android, Kotlin and Jetpack Compose; local-first — the data
@@ -122,6 +124,11 @@ DiaPilot --> widget, lock-screen chip, notifications
 - Databases, exports, device dumps, settings exports and companion-server
   state are gitignored: medical data does not reach git.
 
+## Security
+
+Found a vulnerability? Please report it privately rather than opening a public
+issue — see [SECURITY.md](SECURITY.md) for how, and what is in scope.
+
 ## Building
 
 ```bash
@@ -167,9 +174,10 @@ toolchain resolver can download that JDK. Instrumented tests in
 `diapilot-reference/` holds the stage specifications and the validated Python
 core (stage 0: ISF and the digital twin; stage 1: data collection) that the
 mathematics was ported from. The Kotlin tests mirror its contracts, so the port
-is checked against an independent reference rather than against itself. The
-reference also contains a research-era correction calculator (`advisor.py`),
-kept as history; the Android app does not use it and never proposes a dose.
+is checked against an independent reference rather than against itself. A
+research-era correction advisor existed at that stage; it is deliberately
+excluded from this publication — the Android app never had one and never
+proposes a dose.
 
 ## About this repository
 

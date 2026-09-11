@@ -170,13 +170,14 @@ fun caloricCarbRateGPerHourV1(
  * is why the switch is safe for dextrose, juice and a smoothie.
  */
 data class CarbAppearanceMemberV1(
-    val id:String,
-    val startMs:Long,
-    val grams:Double,
-    val kcal:Double? = null,
+    val id: String,
+    val startMs: Long,
+    val grams: Double,
+    val kcal: Double? = null,
 ) {
     /** Metered calories. Carbohydrate alone unless the meal says otherwise. */
-    val meteredKcal:Double get() = kcal ?: (grams * 4.0)
+    val meteredKcal: Double
+        get() = kcal ?: (grams * 4.0)
 }
 
 /** Fluid-queue cap for apparent carbohydrate appearance. Capacity is not
@@ -184,26 +185,36 @@ data class CarbAppearanceMemberV1(
  * merely because the stomach was idle earlier. The value is an experimental
  * personal prior, not a universal intestinal-absorption constant. */
 fun throughputLimitedFractionsV1(
-    members:List<CarbAppearanceMemberV1>,atMs:Long,
-    desiredCdf:(CarbAppearanceMemberV1,Long)->Double,
-    gramsPerHour:Double=PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
-    stepMin:Double=1.0,
-):Map<String,Double> {
-    val usable=members.filter{it.grams>0&&it.startMs<atMs}.sortedBy{it.startMs}
-    if(usable.isEmpty())return members.associate{it.id to 0.0}
-    val delivered=usable.associate{it.id to 0.0}.toMutableMap()
-    var cursor=usable.first().startMs
-    while(cursor<atMs){
-        val next=minOf(atMs,cursor+(stepMin*MINUTE_MS).toLong().coerceAtLeast(1L))
-        val wanted=usable.associate{m->m.id to (m.grams*desiredCdf(m,next)).coerceIn(0.0,m.grams)}
-        val queue=usable.associate{m->m.id to (wanted.getValue(m.id)-delivered.getValue(m.id)).coerceAtLeast(0.0)}
-        val queued=queue.values.sum()
-        val capacity=gramsPerHour/60.0*((next-cursor)/MINUTE_MS.toDouble())
-        val served=minOf(queued,capacity)
-        if(queued>1e-9&&served>0)usable.forEach{m->delivered[m.id]=delivered.getValue(m.id)+served*queue.getValue(m.id)/queued}
-        cursor=next
+    members: List<CarbAppearanceMemberV1>,
+    atMs: Long,
+    desiredCdf: (CarbAppearanceMemberV1, Long) -> Double,
+    gramsPerHour: Double = PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
+    stepMin: Double = 1.0,
+): Map<String, Double> {
+    val usable = members.filter { it.grams > 0 && it.startMs < atMs }.sortedBy { it.startMs }
+    if (usable.isEmpty()) return members.associate { it.id to 0.0 }
+    val delivered = usable.associate { it.id to 0.0 }.toMutableMap()
+    var cursor = usable.first().startMs
+    while (cursor < atMs) {
+        val next = minOf(atMs, cursor + (stepMin * MINUTE_MS).toLong().coerceAtLeast(1L))
+        val wanted = usable.associate { m ->
+            m.id to (m.grams * desiredCdf(m, next)).coerceIn(0.0, m.grams)
+        }
+        val queue = usable.associate { m ->
+            m.id to (wanted.getValue(m.id) - delivered.getValue(m.id)).coerceAtLeast(0.0)
+        }
+        val queued = queue.values.sum()
+        val capacity = gramsPerHour / 60.0 * ((next - cursor) / MINUTE_MS.toDouble())
+        val served = minOf(queued, capacity)
+        if (queued > 1e-9 && served > 0)
+            usable.forEach { m ->
+                delivered[m.id] = delivered.getValue(m.id) + served * queue.getValue(m.id) / queued
+            }
+        cursor = next
     }
-    return members.associate{m->m.id to ((delivered[m.id]?:0.0)/m.grams.coerceAtLeast(1e-9)).coerceIn(0.0,1.0)}
+    return members.associate { m ->
+        m.id to ((delivered[m.id] ?: 0.0) / m.grams.coerceAtLeast(1e-9)).coerceIn(0.0, 1.0)
+    }
 }
 
 /**
@@ -230,42 +241,53 @@ fun throughputLimitedFractionsV1(
  * sorting here would hide a caller that does not.
  */
 fun throughputLimitedFractionsSeriesV1(
-    members:List<CarbAppearanceMemberV1>,
-    atMsList:List<Long>,
-    desiredCdf:(CarbAppearanceMemberV1,Long)->Double,
-    gramsPerHour:Double=PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
-    stepMin:Double=1.0,
-):List<Map<String,Double>> {
-    if(atMsList.isEmpty())return emptyList()
-    val out=ArrayList<Map<String,Double>>(atMsList.size)
+    members: List<CarbAppearanceMemberV1>,
+    atMsList: List<Long>,
+    desiredCdf: (CarbAppearanceMemberV1, Long) -> Double,
+    gramsPerHour: Double = PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
+    stepMin: Double = 1.0,
+): List<Map<String, Double>> {
+    if (atMsList.isEmpty()) return emptyList()
+    val out = ArrayList<Map<String, Double>>(atMsList.size)
     // Members that have not started by the LAST instant can never contribute to
     // any of them, so the usable set is decided once — but membership is still
     // re-checked per instant, because a member starting midway must read zero
     // before its own start exactly as the single-shot version reports.
-    val ordered=members.filter{it.grams>0}.sortedBy{it.startMs}
-    if(ordered.isEmpty())return atMsList.map{members.associate{m->m.id to 0.0}}
-    val delivered=ordered.associate{it.id to 0.0}.toMutableMap()
-    fun snapshot(atMs:Long):Map<String,Double> =
-        members.associate{m->
-            m.id to if(m.grams<=0||m.startMs>=atMs)0.0
-            else ((delivered[m.id]?:0.0)/m.grams.coerceAtLeast(1e-9)).coerceIn(0.0,1.0)
+    val ordered = members.filter { it.grams > 0 }.sortedBy { it.startMs }
+    if (ordered.isEmpty()) return atMsList.map { members.associate { m -> m.id to 0.0 } }
+    val delivered = ordered.associate { it.id to 0.0 }.toMutableMap()
+    fun snapshot(atMs: Long): Map<String, Double> = members.associate { m ->
+        m.id to
+            if (m.grams <= 0 || m.startMs >= atMs) 0.0
+            else ((delivered[m.id] ?: 0.0) / m.grams.coerceAtLeast(1e-9)).coerceIn(0.0, 1.0)
+    }
+    var cursor = Long.MIN_VALUE
+    atMsList.forEach { atMs ->
+        val usable = ordered.filter { it.startMs < atMs }
+        if (usable.isEmpty()) {
+            out += snapshot(atMs);
+            return@forEach
         }
-    var cursor=Long.MIN_VALUE
-    atMsList.forEach{atMs->
-        val usable=ordered.filter{it.startMs<atMs}
-        if(usable.isEmpty()){ out+=snapshot(atMs); return@forEach }
-        if(cursor==Long.MIN_VALUE)cursor=usable.first().startMs
-        while(cursor<atMs){
-            val next=minOf(atMs,cursor+(stepMin*MINUTE_MS).toLong().coerceAtLeast(1L))
-            val wanted=usable.associate{m->m.id to (m.grams*desiredCdf(m,next)).coerceIn(0.0,m.grams)}
-            val queue=usable.associate{m->m.id to (wanted.getValue(m.id)-delivered.getValue(m.id)).coerceAtLeast(0.0)}
-            val queued=queue.values.sum()
-            val capacity=gramsPerHour/60.0*((next-cursor)/MINUTE_MS.toDouble())
-            val served=minOf(queued,capacity)
-            if(queued>1e-9&&served>0)usable.forEach{m->delivered[m.id]=delivered.getValue(m.id)+served*queue.getValue(m.id)/queued}
-            cursor=next
+        if (cursor == Long.MIN_VALUE) cursor = usable.first().startMs
+        while (cursor < atMs) {
+            val next = minOf(atMs, cursor + (stepMin * MINUTE_MS).toLong().coerceAtLeast(1L))
+            val wanted = usable.associate { m ->
+                m.id to (m.grams * desiredCdf(m, next)).coerceIn(0.0, m.grams)
+            }
+            val queue = usable.associate { m ->
+                m.id to (wanted.getValue(m.id) - delivered.getValue(m.id)).coerceAtLeast(0.0)
+            }
+            val queued = queue.values.sum()
+            val capacity = gramsPerHour / 60.0 * ((next - cursor) / MINUTE_MS.toDouble())
+            val served = minOf(queued, capacity)
+            if (queued > 1e-9 && served > 0)
+                usable.forEach { m ->
+                    delivered[m.id] =
+                        delivered.getValue(m.id) + served * queue.getValue(m.id) / queued
+                }
+            cursor = next
         }
-        out+=snapshot(atMs)
+        out += snapshot(atMs)
     }
     return out
 }
@@ -278,32 +300,47 @@ fun throughputLimitedFractionsSeriesV1(
  * of times. This preserves the state and snapshots it at the requested bins.
  */
 fun throughputLimitedFractionTimelineV1(
-    members:List<CarbAppearanceMemberV1>,atTimes:Collection<Long>,
-    desiredCdf:(CarbAppearanceMemberV1,Long)->Double,
-    gramsPerHour:Double=PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
-    stepMin:Double=1.0,
-):Map<Long,Map<String,Double>> {
-    val targets=atTimes.distinct().sorted()
-    if(targets.isEmpty())return emptyMap()
-    val usable=members.filter{it.grams>0&&it.startMs<targets.last()}.sortedBy{it.startMs}
-    if(usable.isEmpty())return targets.associateWith{members.associate{it.id to 0.0}}
-    val delivered=usable.associate{it.id to 0.0}.toMutableMap()
-    val result=linkedMapOf<Long,Map<String,Double>>()
-    var cursor=usable.first().startMs
-    fun snapshot()=members.associate{m->m.id to ((delivered[m.id]?:0.0)/m.grams.coerceAtLeast(1e-9)).coerceIn(0.0,1.0)}
-    for(target in targets){
-        if(target<=cursor){result[target]=snapshot();continue}
-        while(cursor<target){
-            val next=minOf(target,cursor+(stepMin*MINUTE_MS).toLong().coerceAtLeast(1L))
-            val wanted=usable.associate{m->m.id to (m.grams*desiredCdf(m,next)).coerceIn(0.0,m.grams)}
-            val queue=usable.associate{m->m.id to (wanted.getValue(m.id)-delivered.getValue(m.id)).coerceAtLeast(0.0)}
-            val queued=queue.values.sum()
-            val capacity=gramsPerHour/60.0*((next-cursor)/MINUTE_MS.toDouble())
-            val served=minOf(queued,capacity)
-            if(queued>1e-9&&served>0)usable.forEach{m->delivered[m.id]=delivered.getValue(m.id)+served*queue.getValue(m.id)/queued}
-            cursor=next
+    members: List<CarbAppearanceMemberV1>,
+    atTimes: Collection<Long>,
+    desiredCdf: (CarbAppearanceMemberV1, Long) -> Double,
+    gramsPerHour: Double = PERSONAL_CARB_APPEARANCE_PRIOR_G_PER_HOUR_V1,
+    stepMin: Double = 1.0,
+): Map<Long, Map<String, Double>> {
+    val targets = atTimes.distinct().sorted()
+    if (targets.isEmpty()) return emptyMap()
+    val usable =
+        members.filter { it.grams > 0 && it.startMs < targets.last() }.sortedBy { it.startMs }
+    if (usable.isEmpty()) return targets.associateWith { members.associate { it.id to 0.0 } }
+    val delivered = usable.associate { it.id to 0.0 }.toMutableMap()
+    val result = linkedMapOf<Long, Map<String, Double>>()
+    var cursor = usable.first().startMs
+    fun snapshot() = members.associate { m ->
+        m.id to ((delivered[m.id] ?: 0.0) / m.grams.coerceAtLeast(1e-9)).coerceIn(0.0, 1.0)
+    }
+    for (target in targets) {
+        if (target <= cursor) {
+            result[target] = snapshot();
+            continue
         }
-        result[target]=snapshot()
+        while (cursor < target) {
+            val next = minOf(target, cursor + (stepMin * MINUTE_MS).toLong().coerceAtLeast(1L))
+            val wanted = usable.associate { m ->
+                m.id to (m.grams * desiredCdf(m, next)).coerceIn(0.0, m.grams)
+            }
+            val queue = usable.associate { m ->
+                m.id to (wanted.getValue(m.id) - delivered.getValue(m.id)).coerceAtLeast(0.0)
+            }
+            val queued = queue.values.sum()
+            val capacity = gramsPerHour / 60.0 * ((next - cursor) / MINUTE_MS.toDouble())
+            val served = minOf(queued, capacity)
+            if (queued > 1e-9 && served > 0)
+                usable.forEach { m ->
+                    delivered[m.id] =
+                        delivered.getValue(m.id) + served * queue.getValue(m.id) / queued
+                }
+            cursor = next
+        }
+        result[target] = snapshot()
     }
     return result
 }
@@ -311,31 +348,31 @@ fun throughputLimitedFractionTimelineV1(
 /** Name-independent facts needed to decide whether closely spaced intakes
  * still share a physiologically plausible gastric/absorption context. */
 data class MealClusterMemberV1(
-    val id:String,
-    val startMs:Long,
-    val proteinG:Double=0.0,
-    val fatG:Double=0.0,
-    val fiberG:Double=0.0,
+    val id: String,
+    val startMs: Long,
+    val proteinG: Double = 0.0,
+    val fatG: Double = 0.0,
+    val fiberG: Double = 0.0,
     /** 90% completion and last trace of this member's standalone prior. */
-    val mainEndMin:Double=180.0,
-    val tailEndMin:Double=360.0,
+    val mainEndMin: Double = 180.0,
+    val tailEndMin: Double = 360.0,
 )
 
 data class MealClusterClockV1(
-    val effectiveAgeMin:Double,
-    val lockedBeforeLaterMeals:Boolean,
-    val interactions:Int,
-    val stretch:Double,
+    val effectiveAgeMin: Double,
+    val lockedBeforeLaterMeals: Boolean,
+    val interactions: Int,
+    val stretch: Double,
 )
 
 enum class MealTimingScopeV1 { INDIVIDUAL, COMPLETED_BEFORE_CLUSTER, CLUSTER_ONLY }
 data class MealClusterAssessmentV1(
-    val scope:MealTimingScopeV1,
-    val memberIds:List<String>,
-    val totalCarbsG:Double,
-    val reason:String,
-    val nextMealAtMs:Long?=null,
-    val realisedFractionAtNext:Double?=null,
+    val scope: MealTimingScopeV1,
+    val memberIds: List<String>,
+    val totalCarbsG: Double,
+    val reason: String,
+    val nextMealAtMs: Long? = null,
+    val realisedFractionAtNext: Double? = null,
 )
 
 /**
@@ -351,47 +388,60 @@ data class MealClusterAssessmentV1(
  * CS or total food amplitude.
  */
 fun causalMealClusterClockV1(
-    owner:MealClusterMemberV1,
-    atMs:Long,
-    members:List<MealClusterMemberV1>,
-    ownerStandaloneCdf:(Double)->Double,
-    interactionGapMin:Double=120.0,
-):MealClusterClockV1 {
-    if(atMs<=owner.startMs)return MealClusterClockV1(0.0,false,0,1.0)
-    val sorted=members.sortedBy{it.startMs}
-    fun macroLoad(m:MealClusterMemberV1)=
-        (m.fatG*.012+m.proteinG*.004+m.fiberG*.008).coerceIn(0.0,.65)
-    fun approximateRemaining(m:MealClusterMemberV1,at:Long):Double {
-        val age=(at-m.startMs)/60_000.0
-        if(age<=0)return 1.0
-        if(age>=m.tailEndMin)return 0.0
-        if(age<=m.mainEndMin)return (1.0-.90*age/m.mainEndMin.coerceAtLeast(1.0)).coerceIn(.10,1.0)
-        val tailSpan=(m.tailEndMin-m.mainEndMin).coerceAtLeast(1.0)
-        return (.10*(1-(age-m.mainEndMin)/tailSpan)).coerceIn(0.0,.10)
+    owner: MealClusterMemberV1,
+    atMs: Long,
+    members: List<MealClusterMemberV1>,
+    ownerStandaloneCdf: (Double) -> Double,
+    interactionGapMin: Double = 120.0,
+): MealClusterClockV1 {
+    if (atMs <= owner.startMs) return MealClusterClockV1(0.0, false, 0, 1.0)
+    val sorted = members.sortedBy { it.startMs }
+    fun macroLoad(m: MealClusterMemberV1) =
+        (m.fatG * .012 + m.proteinG * .004 + m.fiberG * .008).coerceIn(0.0, .65)
+    fun approximateRemaining(m: MealClusterMemberV1, at: Long): Double {
+        val age = (at - m.startMs) / 60_000.0
+        if (age <= 0) return 1.0
+        if (age >= m.tailEndMin) return 0.0
+        if (age <= m.mainEndMin)
+            return (1.0 - .90 * age / m.mainEndMin.coerceAtLeast(1.0)).coerceIn(.10, 1.0)
+        val tailSpan = (m.tailEndMin - m.mainEndMin).coerceAtLeast(1.0)
+        return (.10 * (1 - (age - m.mainEndMin) / tailSpan)).coerceIn(0.0, .10)
     }
 
     // Food still present from earlier intakes can affect the new owner's
     // remaining appearance. Its influence is weighted by its residual mass.
-    var stretch=(1.0+sorted.asSequence().filter{it.startMs<owner.startMs}
-        .filter{(owner.startMs-it.startMs)/60_000.0<=interactionGapMin}
-        .sumOf{macroLoad(it)*approximateRemaining(it,owner.startMs)}).coerceIn(1.0,2.2)
-    var effective=0.0
-    var cursor=owner.startMs
-    var interactions=0
-    var locked=false
-    var lastClusterStart=owner.startMs
-    for(next in sorted.filter{it.startMs>owner.startMs&&it.startMs<atMs}) {
-        if((next.startMs-lastClusterStart)/60_000.0>interactionGapMin)break
-        effective+=(next.startMs-cursor)/60_000.0/stretch
-        cursor=next.startMs
-        val remaining=(1-ownerStandaloneCdf(effective)).coerceIn(0.0,1.0)
-        if(remaining<=.10){locked=true;stretch=1.0;break}
-        val added=macroLoad(next)*remaining
-        if(added>1e-6){stretch=(stretch+added).coerceIn(1.0,2.2);interactions++}
-        lastClusterStart=next.startMs
+    var stretch =
+        (1.0 +
+                sorted
+                    .asSequence()
+                    .filter { it.startMs < owner.startMs }
+                    .filter { (owner.startMs - it.startMs) / 60_000.0 <= interactionGapMin }
+                    .sumOf { macroLoad(it) * approximateRemaining(it, owner.startMs) })
+            .coerceIn(1.0, 2.2)
+    var effective = 0.0
+    var cursor = owner.startMs
+    var interactions = 0
+    var locked = false
+    var lastClusterStart = owner.startMs
+    for (next in sorted.filter { it.startMs > owner.startMs && it.startMs < atMs }) {
+        if ((next.startMs - lastClusterStart) / 60_000.0 > interactionGapMin) break
+        effective += (next.startMs - cursor) / 60_000.0 / stretch
+        cursor = next.startMs
+        val remaining = (1 - ownerStandaloneCdf(effective)).coerceIn(0.0, 1.0)
+        if (remaining <= .10) {
+            locked = true;
+            stretch = 1.0;
+            break
+        }
+        val added = macroLoad(next) * remaining
+        if (added > 1e-6) {
+            stretch = (stretch + added).coerceIn(1.0, 2.2);
+            interactions++
+        }
+        lastClusterStart = next.startMs
     }
-    effective+=(atMs-cursor)/60_000.0/stretch
-    return MealClusterClockV1(max(0.0,effective),locked,interactions,stretch)
+    effective += (atMs - cursor) / 60_000.0 / stretch
+    return MealClusterClockV1(max(0.0, effective), locked, interactions, stretch)
 }
 
 
@@ -427,39 +477,52 @@ fun causalMealClusterClockV1(
  * appear at once because the stomach was idle earlier.
  */
 fun caloricLimitedFractionsV1(
-    members:List<CarbAppearanceMemberV1>,atMs:Long,
-    desiredCdf:(CarbAppearanceMemberV1,Long)->Double,
-    kcalPerHour:Double=PERSONAL_EMPTYING_KCAL_PER_HOUR_V1,
-    stepMin:Double=1.0,
-    carbSieving:Double=PERSONAL_CARB_SIEVING_V1,
-):Map<String,Double> = caloricLimitedTimelineV1(
-    members, listOf(atMs), desiredCdf, kcalPerHour, stepMin, carbSieving,
-)[atMs] ?: members.associate { it.id to 0.0 }
+    members: List<CarbAppearanceMemberV1>,
+    atMs: Long,
+    desiredCdf: (CarbAppearanceMemberV1, Long) -> Double,
+    kcalPerHour: Double = PERSONAL_EMPTYING_KCAL_PER_HOUR_V1,
+    stepMin: Double = 1.0,
+    carbSieving: Double = PERSONAL_CARB_SIEVING_V1,
+): Map<String, Double> =
+    caloricLimitedTimelineV1(
+        members,
+        listOf(atMs),
+        desiredCdf,
+        kcalPerHour,
+        stepMin,
+        carbSieving,
+    )[atMs] ?: members.associate { it.id to 0.0 }
 
 /** The same shared pipe, snapshotted at many chronological bins in one pass. */
 fun caloricLimitedTimelineV1(
-    members:List<CarbAppearanceMemberV1>,atTimes:Collection<Long>,
-    desiredCdf:(CarbAppearanceMemberV1,Long)->Double,
-    kcalPerHour:Double=PERSONAL_EMPTYING_KCAL_PER_HOUR_V1,
-    stepMin:Double=1.0,
-    carbSieving:Double=PERSONAL_CARB_SIEVING_V1,
-):Map<Long,Map<String,Double>> {
-    val targets=atTimes.distinct().sorted()
-    if(targets.isEmpty())return emptyMap()
-    val usable=members.filter{it.grams>0&&it.meteredKcal>0&&it.startMs<targets.last()}.sortedBy{it.startMs}
-    if(usable.isEmpty())return targets.associateWith{members.associate{m->m.id to 0.0}}
-    val delivered=usable.associate{it.id to 0.0}.toMutableMap()   // kcal, on the sieved basis
-    val result=linkedMapOf<Long,Map<String,Double>>()
-    var cursor=usable.first().startMs
+    members: List<CarbAppearanceMemberV1>,
+    atTimes: Collection<Long>,
+    desiredCdf: (CarbAppearanceMemberV1, Long) -> Double,
+    kcalPerHour: Double = PERSONAL_EMPTYING_KCAL_PER_HOUR_V1,
+    stepMin: Double = 1.0,
+    carbSieving: Double = PERSONAL_CARB_SIEVING_V1,
+): Map<Long, Map<String, Double>> {
+    val targets = atTimes.distinct().sorted()
+    if (targets.isEmpty()) return emptyMap()
+    val usable =
+        members
+            .filter { it.grams > 0 && it.meteredKcal > 0 && it.startMs < targets.last() }
+            .sortedBy { it.startMs }
+    if (usable.isEmpty()) return targets.associateWith { members.associate { m -> m.id to 0.0 } }
+    val delivered = usable.associate { it.id to 0.0 }.toMutableMap() // kcal, on the sieved basis
+    val result = linkedMapOf<Long, Map<String, Double>>()
+    var cursor = usable.first().startMs
     // Sieving lives HERE and nowhere else: the pipe still meters calories, but
     // the carbohydrate inside a member is read off the delivered calories on a
     // scale that runs ahead of them. sigma=0 divides by the member's whole
     // energy (perfect mixing); sigma=1 divides by its CARBOHYDRATE energy, so
     // the carbohydrate is finished once that many calories have left. Nothing
     // is created: the fat stays in the queue and keeps delaying what is behind.
-    val sigma=carbSieving.coerceIn(0.0,1.0)
-    fun carbBasis(m:CarbAppearanceMemberV1):Double =
-        (sigma*(m.grams*KCAL_PER_CARB_GRAM_V1)+(1-sigma)*m.meteredKcal).coerceAtLeast(1e-9)
+    val sigma = carbSieving.coerceIn(0.0, 1.0)
+    fun carbBasis(m: CarbAppearanceMemberV1): Double =
+        (sigma * (m.grams * KCAL_PER_CARB_GRAM_V1) + (1 - sigma) * m.meteredKcal).coerceAtLeast(
+            1e-9
+        )
     // A QUEUE MAY BOUND ARRIVAL, NEVER MANUFACTURE IT. Without the min() the
     // sieved basis divides a demand expressed in whole calories by the carb
     // calories alone, so on a pizza whose pipe is not yet binding the model
@@ -473,36 +536,46 @@ fun caloricLimitedTimelineV1(
     // confirmed no test catches its removal. It stays as the invariant's
     // statement in code, not as a live guard, and this note is here so nobody
     // reads that surviving mutant as missing coverage.
-    fun snapshot(t:Long)=members.associate{m->
-        m.id to minOf(
-            desiredCdf(m,t),
-            (delivered[m.id]?:0.0)/carbBasis(m),
-        ).coerceIn(0.0,1.0)
+    fun snapshot(t: Long) = members.associate { m ->
+        m.id to
+            minOf(
+                    desiredCdf(m, t),
+                    (delivered[m.id] ?: 0.0) / carbBasis(m),
+                )
+                .coerceIn(0.0, 1.0)
     }
-    for(target in targets){
-        if(target<=cursor){result[target]=snapshot(target);continue}
-        while(cursor<target){
-            val next=minOf(target,cursor+(stepMin*MINUTE_MS).toLong().coerceAtLeast(1L))
+    for (target in targets) {
+        if (target <= cursor) {
+            result[target] = snapshot(target);
+            continue
+        }
+        while (cursor < target) {
+            val next = minOf(target, cursor + (stepMin * MINUTE_MS).toLong().coerceAtLeast(1L))
             // Only meals that have STARTED are in the stomach.
-            val present=usable.filter{it.startMs<next}
+            val present = usable.filter { it.startMs < next }
             // SIEVING GOVERNS THE SPLIT TOO, not only what each meal does with
             // its share. It is a claim about what passes the pylorus, so a
             // fat-heavy dish must not out-bid a beer for the pipe in proportion
             // to calories the sieve is holding back. Sharing by whole calories
             // let pizza pull its carbohydrate through 10% faster than the gram
             // queue at sigma=1, where the two are supposed to be the same model.
-            val queue=present.associate{m->
-                m.id to (carbBasis(m)*desiredCdf(m,next)-delivered.getValue(m.id)).coerceAtLeast(0.0)
+            val queue = present.associate { m ->
+                m.id to
+                    (carbBasis(m) * desiredCdf(m, next) - delivered.getValue(m.id)).coerceAtLeast(
+                        0.0
+                    )
             }
-            val queued=queue.values.sum()
-            val capacity=kcalPerHour/60.0*((next-cursor)/MINUTE_MS.toDouble())
-            val served=minOf(queued,capacity)
-            if(queued>1e-9&&served>0)present.forEach{m->
-                delivered[m.id]=delivered.getValue(m.id)+served*queue.getValue(m.id)/queued
-            }
-            cursor=next
+            val queued = queue.values.sum()
+            val capacity = kcalPerHour / 60.0 * ((next - cursor) / MINUTE_MS.toDouble())
+            val served = minOf(queued, capacity)
+            if (queued > 1e-9 && served > 0)
+                present.forEach { m ->
+                    delivered[m.id] =
+                        delivered.getValue(m.id) + served * queue.getValue(m.id) / queued
+                }
+            cursor = next
         }
-        result[target]=snapshot(target)
+        result[target] = snapshot(target)
     }
     return result
 }

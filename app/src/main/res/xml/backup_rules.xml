@@ -1,13 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Auto Backup rules for Android 6-11 (API 23-30), referenced by
+    android:fullBackupContent. On API 31+ data_extraction_rules.xml is read
+    instead.
+
+    With android:allowBackup="false" this file is never consulted: below API 31
+    that attribute disables Auto Backup, key/value backup and device-to-device
+    transfer alike. It still excludes everything, so that flipping allowBackup
+    alone would not start uploading the preferences (API key, companion token)
+    and the medical database to the user's cloud account.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
 </full-backup-content>

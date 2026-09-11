@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [public]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Gradle 9.4.1 (see gradle/wrapper/gradle-wrapper.properties) and AGP
+      # (gradle/libs.versions.toml) both need JDK 17+; 21 matches what the
+      # project is built and tested with locally.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # No local.properties on the runner: the Android SDK is already on
+      # this image and settings.gradle.kts / build.gradle.kts never read
+      # sdk.dir, so nothing needs to be generated here.
+      - name: Build and test
+        run: ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug --console=plain
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # .gitleaks.toml at the repo root (if present) is picked up
+      # automatically; it only allowlists two specific, verified
+      # false-positive identifiers, scoped to their exact commit.
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"

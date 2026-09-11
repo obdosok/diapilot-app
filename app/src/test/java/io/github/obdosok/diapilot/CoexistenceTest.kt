@@ -27,6 +27,20 @@ class CoexistenceTest {
 
     private val legacyId = "com.example.diapilot"
 
+    // The companion token is kept in SecretStore, whose real cipher needs
+    // AndroidKeyStore; Robolectric has none, so a fake stands in.
+    private val originalCipherFactory = io.github.obdosok.diapilot.data.Secrets.cipherFactory
+
+    @org.junit.Before fun fakeCipher() {
+        io.github.obdosok.diapilot.data.Secrets.cipherFactory = { io.github.obdosok.diapilot.data.FakeSecretCipher() }
+        io.github.obdosok.diapilot.data.Secrets.reset()
+    }
+
+    @org.junit.After fun realCipher() {
+        io.github.obdosok.diapilot.data.Secrets.cipherFactory = originalCipherFactory
+        io.github.obdosok.diapilot.data.Secrets.reset()
+    }
+
     @Test fun `the public build has its own applicationId`() {
         assertEquals("io.github.obdosok.diapilot", BuildConfig.APPLICATION_ID)
         assertEquals(BuildConfig.APPLICATION_ID, AppIdentity.APPLICATION_ID)

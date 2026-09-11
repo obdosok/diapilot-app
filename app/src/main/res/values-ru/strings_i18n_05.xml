@@ -3,6 +3,7 @@
     <string name="ask_screen_setup_title">Спросить свои данные</string>
     <string name="ask_screen_intro">Задавайте вопросы своим данным обычным языком: «почему ночью был высокий сахар?», «как на меня действует пиво?». Ответы строит Claude по сводке ваших данных.\n\nНужен ваш API-ключ Anthropic (console.anthropic.com → API Keys). Ключ хранится только на этом устройстве. Сводка данных отправляется в API только в момент вопроса.</string>
     <string name="ask_screen_save">Сохранить</string>
+    <string name="ask_screen_key_not_saved">Не удалось надёжно сохранить ключ на этом устройстве, поэтому он не сохранён.</string>
     <string name="ask_screen_chat_title">Спросить</string>
     <string name="ask_screen_digest_button">📋 Дайджест</string>
     <string name="ask_screen_clear">Очистить</string>

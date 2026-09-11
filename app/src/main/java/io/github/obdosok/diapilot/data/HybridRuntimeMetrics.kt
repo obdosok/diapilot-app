@@ -166,58 +166,61 @@ object HybridRuntimeMetrics {
      * deconvolution. The insulin kernel has already been removed (added back to
      * the observed glucose trace). Whole-meal rows only: component rows are not
      * independent observations of the full meal shown in History. */
-    fun installLiveFoodObservations(
-        corpus:List<com.diapilot.core.analysis.MealObservation>,
-    ) {
-        liveObservationsByTs=corpus.asSequence().filter{it.component==null}
-            .groupBy{it.onsetMs}.mapValues{(_,rows)->
-                val row=rows.maxByOrNull{it.confidence}!!
-                HybridFoodObservation(
-                    status=when {
-                        !row.neighbourResolved->"overlap_unresolved"
-                        row.peakObserved&&row.tailObserved->"deconvolved_peak_and_tail"
-                        row.peakObserved->"deconvolved_peak"
-                        else->"deconvolved_censored"
-                    },
-                    amplitudeMmol=row.peakRise+(if(row.tailObserved)row.tailRise else 0.0),
-                    onsetMin=row.onsetLagMin?.roundToInt(),
-                    levelMaxMin=row.ttpMin.roundToInt(),
-                    // MealObservation carries whether the late phase was seen,
-                    // but not a defensible exact plateau minute.
-                    plateauMin=null,
-                    observedWindowMin=null,
-                    levelMaxCensored=!row.peakObserved,
-                    plateauCensored=true,
-                    sensorUnstable=false,
-                    insulinSubtracted=true,
-                    method="live note-anchored deconvolution; insulin kernel removed",
-                    confidence=row.confidence,
-                    latePhaseObserved=row.tailObserved,
-                    curveTaus=row.curveTaus,
-                    curveMmol=row.curveMmol,
-                    neighbourMmol=row.neighbourMmol,
-                    neighbourResolved=row.neighbourResolved,
-                    neighbourQuality=row.neighbourQuality,
-                )
-            }
+    fun installLiveFoodObservations(corpus: List<com.diapilot.core.analysis.MealObservation>,) {
+        liveObservationsByTs =
+            corpus
+                .asSequence()
+                .filter { it.component == null }
+                .groupBy { it.onsetMs }
+                .mapValues { (_, rows) ->
+                    val row = rows.maxByOrNull { it.confidence }!!
+                    HybridFoodObservation(
+                        status =
+                            when {
+                                !row.neighbourResolved -> "overlap_unresolved"
+                                row.peakObserved && row.tailObserved -> "deconvolved_peak_and_tail"
+                                row.peakObserved -> "deconvolved_peak"
+                                else -> "deconvolved_censored"
+                            },
+                        amplitudeMmol = row.peakRise + (if (row.tailObserved) row.tailRise else 0.0),
+                        onsetMin = row.onsetLagMin?.roundToInt(),
+                        levelMaxMin = row.ttpMin.roundToInt(),
+                        // MealObservation carries whether the late phase was seen,
+                        // but not a defensible exact plateau minute.
+                        plateauMin = null,
+                        observedWindowMin = null,
+                        levelMaxCensored = !row.peakObserved,
+                        plateauCensored = true,
+                        sensorUnstable = false,
+                        insulinSubtracted = true,
+                        method = "live note-anchored deconvolution; insulin kernel removed",
+                        confidence = row.confidence,
+                        latePhaseObserved = row.tailObserved,
+                        curveTaus = row.curveTaus,
+                        curveMmol = row.curveMmol,
+                        neighbourMmol = row.neighbourMmol,
+                        neighbourResolved = row.neighbourResolved,
+                        neighbourQuality = row.neighbourQuality,
+                    )
+                }
     }
 
     // Preserve the bundled audit's richer plateau/window measurement, but merge
     // current overlap diagnostics into it. Choosing either map wholesale hid the
     // neighbour defect on every older meal present in the bundled artifact.
-    private fun observationAt(tsMs:Long):HybridFoodObservation? {
-        val bundled=bundledObservationsByTs[tsMs]
-        val live=liveObservationsByTs[tsMs]
-        if(bundled==null)return live
-        if(live==null)return bundled
+    private fun observationAt(tsMs: Long): HybridFoodObservation? {
+        val bundled = bundledObservationsByTs[tsMs]
+        val live = liveObservationsByTs[tsMs]
+        if (bundled == null) return live
+        if (live == null) return bundled
         return bundled.copy(
-            status=if(live.status=="overlap_unresolved")live.status else bundled.status,
-            confidence=live.confidence?:bundled.confidence,
-            latePhaseObserved=bundled.latePhaseObserved||live.latePhaseObserved,
-            neighbourMmol=live.neighbourMmol,
-            neighbourResolved=live.neighbourResolved,
-            neighbourQuality=live.neighbourQuality,
-            method="${bundled.method}; live overlap audit",
+            status = if (live.status == "overlap_unresolved") live.status else bundled.status,
+            confidence = live.confidence ?: bundled.confidence,
+            latePhaseObserved = bundled.latePhaseObserved || live.latePhaseObserved,
+            neighbourMmol = live.neighbourMmol,
+            neighbourResolved = live.neighbourResolved,
+            neighbourQuality = live.neighbourQuality,
+            method = "${bundled.method}; live overlap audit",
         )
     }
 
@@ -248,16 +251,25 @@ object HybridRuntimeMetrics {
      * curve is still the exact shared one.
      */
     fun physioIobUnits(store: CollectorStore, tsMs: Long): Double? {
-        val person=PhysioRuntime.artifact(store,tsMs)?.personModelAt(12.0,emptySet())?:return null
-        return iobWithPerson(store,tsMs,person)
+        val person = PhysioRuntime.artifact(store, tsMs)?.personModelAt(12.0, emptySet()) ?: return null
+        return iobWithPerson(store, tsMs, person)
     }
 
-    private fun iobWithPerson(store:CollectorStore,tsMs:Long,person:com.diapilot.core.hybrid.HybridPersonModel):Double {
-        val engine=HybridForecastEngine(person)
-        val lookbackMs=(person.insulin.tailDurationMin*60_000.0).toLong()
-        return store.boluses(tsMs-lookbackMs,tsMs).asSequence()
-            .filter { it.units>0.0&&!com.diapilot.core.analysis.isPrimePurpose(it.purpose) }
-            .sumOf { bolus->bolus.units*engine.insulinRemainingFraction((tsMs-bolus.tsMs)/60_000.0,bolus.units) }
+    private fun iobWithPerson(
+        store: CollectorStore,
+        tsMs: Long,
+        person: com.diapilot.core.hybrid.HybridPersonModel
+    ): Double {
+        val engine = HybridForecastEngine(person)
+        val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
+        return store
+            .boluses(tsMs - lookbackMs, tsMs)
+            .asSequence()
+            .filter { it.units > 0.0 && !com.diapilot.core.analysis.isPrimePurpose(it.purpose) }
+            .sumOf { bolus ->
+                bolus.units *
+                    engine.insulinRemainingFraction((tsMs - bolus.tsMs) / 60_000.0, bolus.units)
+            }
     }
 
     /**
@@ -294,20 +306,35 @@ object HybridRuntimeMetrics {
     /** Chart-grid counterpart of [physioIobUnits]. One artifact/engine and one
      * bolus query are reused for the complete grid. */
     fun physioIobSeries(
-        store:CollectorStore,fromMs:Long,toMs:Long,stepMs:Long=5L*60_000L,
-    ):List<Pair<Long,Double>> {
+        store: CollectorStore,
+        fromMs: Long,
+        toMs: Long,
+        stepMs: Long = 5L * 60_000L,
+    ): List<Pair<Long, Double>> {
         val tArt = android.os.SystemClock.elapsedRealtime()
-        val person=PhysioRuntime.artifact(store,toMs)?.personModelAt(12.0,emptySet())?:return emptyList()
+        val person =
+            PhysioRuntime.artifact(store, toMs)?.personModelAt(12.0, emptySet()) ?: return emptyList()
         val tArt1 = android.os.SystemClock.elapsedRealtime()
-        if (tArt1 - tArt >= 200) android.util.Log.i(
-            "ForecastPerf", "iob: artifact ${tArt1 - tArt} ms",
-        )
-        val engine=HybridForecastEngine(person)
-        val lookbackMs=(person.insulin.tailDurationMin*60_000.0).toLong()
-        val boluses=store.boluses(fromMs-lookbackMs,toMs).filter{it.units>0.0&&!com.diapilot.core.analysis.isPrimePurpose(it.purpose)}
-        return (fromMs..toMs step stepMs).map{ts->ts to boluses.asSequence()
-            .filter{it.tsMs in (ts-lookbackMs)..ts}
-            .sumOf{it.units*engine.insulinRemainingFraction((ts-it.tsMs)/60_000.0,it.units)}}
+        if (tArt1 - tArt >= 200)
+            android.util.Log.i(
+                "ForecastPerf",
+                "iob: artifact ${tArt1 - tArt} ms",
+            )
+        val engine = HybridForecastEngine(person)
+        val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
+        val boluses =
+            store.boluses(fromMs - lookbackMs, toMs).filter {
+                it.units > 0.0 && !com.diapilot.core.analysis.isPrimePurpose(it.purpose)
+            }
+        return (fromMs..toMs step stepMs).map { ts ->
+            ts to
+                boluses
+                    .asSequence()
+                    .filter { it.tsMs in (ts - lookbackMs)..ts }
+                    .sumOf {
+                        it.units * engine.insulinRemainingFraction((ts - it.tsMs) / 60_000.0, it.units)
+                    }
+        }
     }
 
     /**
@@ -505,8 +532,13 @@ object HybridRuntimeMetrics {
         return iobSeries(store, fromMs, toMs, stepMs)
     }
 
-    fun physioInsulinLandmarks(store:CollectorStore,asOfMs:Long):com.diapilot.core.hybrid.HybridInsulinLandmarks? =
-        PhysioRuntime.artifact(store,asOfMs)?.personModelAt(12.0,emptySet())?.let{HybridForecastEngine(it).insulinLandmarks()}
+    fun physioInsulinLandmarks(
+        store: CollectorStore,
+        asOfMs: Long
+    ): com.diapilot.core.hybrid.HybridInsulinLandmarks? =
+        PhysioRuntime.artifact(store, asOfMs)?.personModelAt(12.0, emptySet())?.let {
+            HybridForecastEngine(it).insulinLandmarks()
+        }
 
     fun carbSensitivityMmolPerGram(): Double? =
         model()?.food?.let { it.globalFactor * it.calibration }
@@ -643,22 +675,25 @@ object HybridRuntimeMetrics {
         carbsG: Double?,
         analysis: String?,
         tsMs: Long? = null,
-        macroTiming: com.diapilot.core.hybrid.MacroTimingParamsV1 = com.diapilot.core.hybrid.MacroTimingParamsV1(),
+        macroTiming: com.diapilot.core.hybrid.MacroTimingParamsV1 =
+            com.diapilot.core.hybrid.MacroTimingParamsV1(),
         physioArtifact: com.diapilot.core.physio.PhysioArtifactV1? = null,
     ): HybridFoodReadout? {
         // One constructor — see [physioForecastEngine]. This is the single-row
         // receipt behind "How it was calculated"; built by hand it showed a fatty dish
         // by different rules than the card above it.
-        val engine=com.diapilot.core.hybrid.physioForecastEngine(person,macroTiming)
-        val baseEvent=foodEvent(0L,text,carbsG,analysis)?:return null
-        val event=if(physioArtifact!=null){
-            physioArtifact.decorateFood(classifyPhysioFood(baseEvent),emptySet())
-        }else baseEvent
-        return foodReadout(engine,event,tsMs).copy(
-            modelLabel="Physio v1",
-            amplitudeBasis=FoodBasis.GLOBAL_CS,
-            timingBasis=FoodBasis.MACROS_DURATION,
-        )
+        val engine = com.diapilot.core.hybrid.physioForecastEngine(person, macroTiming)
+        val baseEvent = foodEvent(0L, text, carbsG, analysis) ?: return null
+        val event =
+            if (physioArtifact != null) {
+                physioArtifact.decorateFood(classifyPhysioFood(baseEvent), emptySet())
+            } else baseEvent
+        return foodReadout(engine, event, tsMs)
+            .copy(
+                modelLabel = "Physio v1",
+                amplitudeBasis = FoodBasis.GLOBAL_CS,
+                timingBasis = FoodBasis.MACROS_DURATION,
+            )
     }
 
     /**
@@ -757,8 +792,8 @@ object HybridRuntimeMetrics {
     /** Apply the same Stage-8 recipe/form hierarchy used by the live forecast.
      * History receipts previously passed only personModelAt(), losing this
      * event-owned metadata and silently falling back to legacy 25/95/160. */
-    private fun classifyPhysioFood(event:HybridFoodEvent):HybridFoodEvent {
-        return event.copy(physicalForm=null,carbClass=null)
+    private fun classifyPhysioFood(event: HybridFoodEvent): HybridFoodEvent {
+        return event.copy(physicalForm = null, carbClass = null)
     }
 
     private fun foodReadout(
@@ -769,7 +804,7 @@ object HybridRuntimeMetrics {
         tsMs: Long?,
     ): HybridFoodReadout? {
         val event = foodEvent(0L, text, carbsG, analysis) ?: return null
-        return foodReadout(engine,event,tsMs)
+        return foodReadout(engine, event, tsMs)
     }
 
     private fun foodReadout(
@@ -786,36 +821,42 @@ object HybridRuntimeMetrics {
             peakMin = timing.peakMin.roundToInt(),
             halfArrivalMin = timing.medianArrivalMin.roundToInt(),
             durationMin = timing.plateauMin.roundToInt(),
-            group = if(event.kineticFeatures!=null)"feature-mixture-v2" else "neutral-fallback-v2",
+            group = if (event.kineticFeatures != null) "feature-mixture-v2" else "neutral-fallback-v2",
             componentBased = isComposite,
             observed = tsMs?.let(::observationAt),
             carbsG = event.carbsG,
             proteinG = event.proteinG ?: event.kineticFeatures?.proteinG,
             fatG = event.fatG ?: event.kineticFeatures?.fatG,
-            modelCurveMmol = com.diapilot.core.analysis.DECONV_CHECKPOINTS.map { tau ->
-                amplitude * engine.foodCdf(event, tau)
-            },
+            modelCurveMmol =
+                com.diapilot.core.analysis.DECONV_CHECKPOINTS.map { tau ->
+                    amplitude * engine.foodCdf(event, tau)
+                },
             // There is no second route to draw any more: every dish takes the
             // macro mixture (or the prior when its macros are unknown), so the
             // «this is what the mixture would have said» comparison line has
             // nothing to compare against.
             mixtureCurveMmol = emptyList(),
-            timingTemplateId=if(event.kineticFeatures!=null)"continuous-mixture" else "base-default",
-            timingSource=if(event.kineticFeatures!=null)"structured-feature-mixture-v2"
+            timingTemplateId =
+                if (event.kineticFeatures != null) "continuous-mixture" else "base-default",
+            timingSource =
+                if (event.kineticFeatures != null) "structured-feature-mixture-v2"
                 else "physiological_prior",
-
-            kinetics=event.kineticFeatures?.normalized()?.let{
-                // Kept compact: the user reads the three percentages as an
-                // input control, but not the provenance tag — that moved off
-                // the card. Form stays: liquid-vs-solid is a decision input too.
-                FoodKineticsLine(
-                    fastPct=Math.round(it.fastFraction*100).toInt(),
-                    mediumPct=Math.round(it.mediumFraction*100).toInt(),
-                    slowPct=Math.round(it.slowFraction*100).toInt(),
-                    form=it.physicalForm.name,
-                    tailEndMin=if(timing.tailEndMin>timing.plateauMin+30)Math.round(timing.tailEndMin).toInt() else null,
-                )
-            },
+            kinetics =
+                event.kineticFeatures?.normalized()?.let {
+                    // Kept compact: the user reads the three percentages as an
+                    // input control, but not the provenance tag — that moved off
+                    // the card. Form stays: liquid-vs-solid is a decision input too.
+                    FoodKineticsLine(
+                        fastPct = Math.round(it.fastFraction * 100).toInt(),
+                        mediumPct = Math.round(it.mediumFraction * 100).toInt(),
+                        slowPct = Math.round(it.slowFraction * 100).toInt(),
+                        form = it.physicalForm.name,
+                        tailEndMin =
+                            if (timing.tailEndMin > timing.plateauMin + 30)
+                                Math.round(timing.tailEndMin).toInt()
+                            else null,
+                    )
+                },
         )
     }
 }

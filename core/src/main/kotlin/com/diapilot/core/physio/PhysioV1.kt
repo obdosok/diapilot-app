@@ -49,25 +49,54 @@ data class FactorEvidenceV1(
     val typedEffect: EffectPayloadV1? = null,
 ) {
     init {
-        require(rawExposures >= 0 && usableEpisodes >= 0 && prospectiveEpisodes >= 0 && retrospectiveEpisodes >= 0 && coverageFraction in 0.0..1.0)
-        if (forecastUse == ForecastUse.MEDIAN) require(status == EvidenceStatus.SUPPORTED || promotionStage in setOf(PromotionStageV1.PROMOTED_MEDIAN,PromotionStageV1.MONITORED))
+        require(
+            rawExposures >= 0 &&
+                usableEpisodes >= 0 &&
+                prospectiveEpisodes >= 0 &&
+                retrospectiveEpisodes >= 0 &&
+                coverageFraction in 0.0..1.0
+        )
+        if (forecastUse == ForecastUse.MEDIAN)
+            require(
+                status == EvidenceStatus.SUPPORTED ||
+                    promotionStage in
+                        setOf(PromotionStageV1.PROMOTED_MEDIAN, PromotionStageV1.MONITORED)
+            )
         typedEffect?.let {
-            val expected=when(dataSource){
-                else->PhysioHypothesisRegistryV1.definitions.firstOrNull { d -> d.id==dataSource }?.executableSpec?.parameterTarget
-            }
+            val expected =
+                when (dataSource) {
+                    else ->
+                        PhysioHypothesisRegistryV1.definitions
+                            .firstOrNull { d -> d.id == dataSource }
+                            ?.executableSpec
+                            ?.parameterTarget
+                }
             require(it.target == expected)
         }
         if (status == EvidenceStatus.SOURCE_MISSING) require(rawExposures == 0 && usableEpisodes == 0)
         if (status == EvidenceStatus.NO_EXPOSURES) require(rawExposures == 0)
-        if (status == EvidenceStatus.NULL_COMPATIBLE) require(
-            effectPercent.independentDays >= 5 && effectPercent.p10 >= -minimumPracticalEffectPercent &&
-                effectPercent.p90 <= minimumPracticalEffectPercent,
-        ) { "null-compatible requires adequate support and a narrow practically-null interval" }
-        if (status == EvidenceStatus.SUPPORTED) require(
-            effectPercent.independentDays >= 5 && effectPercent.p10 * effectPercent.p90 > 0.0 &&
-                stableAcrossFolds && heldOutDirectionalStable && permutationP != null && permutationP <= 0.05 &&
-                prospectiveEpisodes > 0 && evidenceProvenance in setOf(EvidenceProvenanceV1.PROSPECTIVE_CHECKPOINT, EvidenceProvenanceV1.MIXED),
-        ) { "supported factor must pass preregistered gates" }
+        if (status == EvidenceStatus.NULL_COMPATIBLE)
+            require(
+                effectPercent.independentDays >= 5 &&
+                    effectPercent.p10 >= -minimumPracticalEffectPercent &&
+                    effectPercent.p90 <= minimumPracticalEffectPercent,
+            ) {
+                "null-compatible requires adequate support and a narrow practically-null interval"
+            }
+        if (status == EvidenceStatus.SUPPORTED)
+            require(
+                effectPercent.independentDays >= 5 &&
+                    effectPercent.p10 * effectPercent.p90 > 0.0 &&
+                    stableAcrossFolds &&
+                    heldOutDirectionalStable &&
+                    permutationP != null &&
+                    permutationP <= 0.05 &&
+                    prospectiveEpisodes > 0 &&
+                    evidenceProvenance in
+                        setOf(EvidenceProvenanceV1.PROSPECTIVE_CHECKPOINT, EvidenceProvenanceV1.MIXED),
+            ) {
+                "supported factor must pass preregistered gates"
+            }
     }
 }
 
@@ -160,17 +189,56 @@ data class IntervalVarianceContributionsV1(
     )
 }
 
-fun conditionalVarianceV1(base:VarianceLedgerV1,modifiers:List<AppliedModifierV1>,activeContextIds:Set<String>):VarianceLedgerV1 {
-    fun width(e:EffectPayloadV1)=abs(e.high-e.low)/2.0
-    fun normalized(e:EffectPayloadV1)=when(e.target.unit){"fraction"->width(e);"minute"->width(e)/180.0;"mmol/L/hour"->width(e);"mmol/L"->width(e);else->0.0}
-    fun extra(vararg targets:ParameterTargetV1)=sqrt(modifiers.filter{it.hypothesisId in activeContextIds&&it.effect.target in targets}.sumOf{normalized(it.effect)*normalized(it.effect)})
-    fun combine(a:Double,b:Double)=sqrt(a*a+b*b).coerceAtMost(.8)
+fun conditionalVarianceV1(
+    base: VarianceLedgerV1,
+    modifiers: List<AppliedModifierV1>,
+    activeContextIds: Set<String>
+): VarianceLedgerV1 {
+    fun width(e: EffectPayloadV1) = abs(e.high - e.low) / 2.0
+    fun normalized(e: EffectPayloadV1) =
+        when (e.target.unit) {
+            "fraction" -> width(e);
+            "minute" -> width(e) / 180.0;
+            "mmol/L/hour" -> width(e);
+            "mmol/L" -> width(e);
+            else -> 0.0
+        }
+    fun extra(vararg targets: ParameterTargetV1) =
+        sqrt(
+            modifiers
+                .filter { it.hypothesisId in activeContextIds && it.effect.target in targets }
+                .sumOf { normalized(it.effect) * normalized(it.effect) }
+        )
+    fun combine(a: Double, b: Double) = sqrt(a * a + b * b).coerceAtMost(.8)
     return base.copy(
-        foodTiming=combine(base.foodTiming,extra(ParameterTargetV1.FOOD_ONSET,ParameterTargetV1.FOOD_PEAK,ParameterTargetV1.FOOD_TAIL)),
-        insulinTiming=combine(base.insulinTiming,extra(ParameterTargetV1.ISF_MULTIPLIER,ParameterTargetV1.INSULIN_ONSET,ParameterTargetV1.INSULIN_PEAK,ParameterTargetV1.INSULIN_TAIL,ParameterTargetV1.INSULIN_POTENCY)),
-        backgroundHepatic=combine(base.backgroundHepatic,extra(ParameterTargetV1.BACKGROUND_RATE)),
-        basalMismatch=combine(base.basalMismatch,extra(ParameterTargetV1.BASAL_MISMATCH)),
-        sensorProcess=combine(base.sensorProcess,extra(ParameterTargetV1.SENSOR_BIAS,ParameterTargetV1.SENSOR_PROCESS_VARIANCE)),
+        foodTiming =
+            combine(
+                base.foodTiming,
+                extra(
+                    ParameterTargetV1.FOOD_ONSET,
+                    ParameterTargetV1.FOOD_PEAK,
+                    ParameterTargetV1.FOOD_TAIL
+                )
+            ),
+        insulinTiming =
+            combine(
+                base.insulinTiming,
+                extra(
+                    ParameterTargetV1.ISF_MULTIPLIER,
+                    ParameterTargetV1.INSULIN_ONSET,
+                    ParameterTargetV1.INSULIN_PEAK,
+                    ParameterTargetV1.INSULIN_TAIL,
+                    ParameterTargetV1.INSULIN_POTENCY
+                )
+            ),
+        backgroundHepatic =
+            combine(base.backgroundHepatic, extra(ParameterTargetV1.BACKGROUND_RATE)),
+        basalMismatch = combine(base.basalMismatch, extra(ParameterTargetV1.BASAL_MISMATCH)),
+        sensorProcess =
+            combine(
+                base.sensorProcess,
+                extra(ParameterTargetV1.SENSOR_BIAS, ParameterTargetV1.SENSOR_PROCESS_VARIANCE)
+            ),
     )
 }
 
@@ -305,105 +373,188 @@ data class PhysioArtifactV1(
     }
 
     /** Context posterior width applies only while its registered exposure is active. */
-    fun varianceAt(activeContextIds:Set<String>):VarianceLedgerV1 = conditionalVarianceV1(variance,promotedModifiers,activeContextIds)
+    fun varianceAt(activeContextIds: Set<String>): VarianceLedgerV1 =
+        conditionalVarianceV1(variance, promotedModifiers, activeContextIds)
 
     /** Reuses production timing mechanics; amplitude policy is selected explicitly by the engine. */
-    fun personModelAt(hour: Double, activeContextIds:Set<String> = emptySet()): HybridPersonModel {
-        val active=promotedModifiers.filter{it.hypothesisId in activeContextIds}
-        fun fractions(target:ParameterTargetV1)=active.filter{it.effect.target==target}.sumOf{it.effect.median}
-        val isf = (effectiveIsf(hour)*(1.0+fractions(ParameterTargetV1.ISF_MULTIPLIER))).coerceIn(bounds.isfMmolPerLUmin,bounds.isfMmolPerLUmax)
+    fun personModelAt(hour: Double, activeContextIds: Set<String> = emptySet()): HybridPersonModel {
+        val active = promotedModifiers.filter { it.hypothesisId in activeContextIds }
+        fun fractions(target: ParameterTargetV1) =
+            active.filter { it.effect.target == target }.sumOf { it.effect.median }
+        val isf =
+            (effectiveIsf(hour) * (1.0 + fractions(ParameterTargetV1.ISF_MULTIPLIER))).coerceIn(
+                bounds.isfMmolPerLUmin,
+                bounds.isfMmolPerLUmax
+            )
         val f = baseMechanics.food
         return baseMechanics.copy(
             modelVersion = "PHYSIO_V1:${artifactId}",
             personModelId = "physio:${artifactId}",
-            insulin = baseMechanics.insulin.copy(isf = isf, isfLow = minOf(globalIsf.p10,isf), isfHigh = maxOf(globalIsf.p90,isf)),
-            food = f.copy(
-                globalFactor = globalCs.median,
-            ),
+            insulin =
+                baseMechanics.insulin.copy(
+                    isf = isf,
+                    isfLow = minOf(globalIsf.p10, isf),
+                    isfHigh = maxOf(globalIsf.p90, isf)
+                ),
+            food = f.copy(globalFactor = globalCs.median,),
             // Legacy activity/sleep coefficients were fitted as part of a
             // different factorization. They cannot silently enter PHYSIO's
             // median before their versioned promotion gates pass.
             activity = baseMechanics.activity.copy(iobGamma = 0.0, foodGamma = 0.0),
-            joint = baseMechanics.joint.copy(coefficients = baseMechanics.joint.coefficients.copy(
-                // activityDirect and sleepDebt stay zeroed — not measured here.
-                activityDirect = 0.0, sleepDebt = 0.0,
-                sleep = backgroundCoefficients?.sleepMmolPerHour ?: 0.0,
-                hoursSinceWake = backgroundCoefficients?.hoursSinceWakeMmolPerHourPerHour ?: 0.0,
-            )),
+            joint =
+                baseMechanics.joint.copy(
+                    coefficients =
+                        baseMechanics.joint.coefficients.copy(
+                            // activityDirect and sleepDebt stay zeroed — not measured here.
+                            activityDirect = 0.0,
+                            sleepDebt = 0.0,
+                            sleep = backgroundCoefficients?.sleepMmolPerHour ?: 0.0,
+                            hoursSinceWake =
+                                backgroundCoefficients?.hoursSinceWakeMmolPerHourPerHour ?: 0.0,
+                        )
+                ),
             // PHYSIO intervals are generated from the typed variance ledger
             // below. Retaining legacy corridor terms would double-count food,
             // process and ISF uncertainty.
-            uncertainty = baseMechanics.uncertainty.copy(
-                sigmaPerSqrtHour = 0.0,
-                foodFraction = 0.0,
-                unknownFoodExtraFraction = 0.0,
-                includeActiveBolusIsf = false,
-            ),
+            uncertainty =
+                baseMechanics.uncertainty.copy(
+                    sigmaPerSqrtHour = 0.0,
+                    foodFraction = 0.0,
+                    unknownFoodExtraFraction = 0.0,
+                    includeActiveBolusIsf = false,
+                ),
         )
     }
 
-    private fun active(ids:Set<String>)=promotedModifiers.filter{it.hypothesisId in ids}
-    fun decorateBolus(event:HybridBolusEvent,ids:Set<String>):HybridBolusEvent {
-        val a=active(ids)
-        fun minutes(t:ParameterTargetV1)=a.filter{it.effect.target==t}.sumOf{it.effect.median}
-        fun fraction(t:ParameterTargetV1)=a.filter{it.effect.target==t}.sumOf{it.effect.median}
-        return event.copy(contextIds=ids,onsetOffsetMin=minutes(ParameterTargetV1.INSULIN_ONSET).coerceIn(-30.0,30.0),
-            peakOffsetMin=minutes(ParameterTargetV1.INSULIN_PEAK).coerceIn(-60.0,60.0),tailOffsetMin=minutes(ParameterTargetV1.INSULIN_TAIL).coerceIn(-120.0,120.0),
-            potencyMultiplier=(1+fraction(ParameterTargetV1.INSULIN_POTENCY)).coerceIn(.5,1.5),processVarianceFraction=event.processVarianceFraction)
+    private fun active(ids: Set<String>) = promotedModifiers.filter { it.hypothesisId in ids }
+    fun decorateBolus(event: HybridBolusEvent, ids: Set<String>): HybridBolusEvent {
+        val a = active(ids)
+        fun minutes(t: ParameterTargetV1) =
+            a.filter { it.effect.target == t }.sumOf { it.effect.median }
+        fun fraction(t: ParameterTargetV1) =
+            a.filter { it.effect.target == t }.sumOf { it.effect.median }
+        return event.copy(
+            contextIds = ids,
+            onsetOffsetMin = minutes(ParameterTargetV1.INSULIN_ONSET).coerceIn(-30.0, 30.0),
+            peakOffsetMin = minutes(ParameterTargetV1.INSULIN_PEAK).coerceIn(-60.0, 60.0),
+            tailOffsetMin = minutes(ParameterTargetV1.INSULIN_TAIL).coerceIn(-120.0, 120.0),
+            potencyMultiplier = (1 + fraction(ParameterTargetV1.INSULIN_POTENCY)).coerceIn(.5, 1.5),
+            processVarianceFraction = event.processVarianceFraction
+        )
     }
-    fun decorateFood(event:HybridFoodEvent,ids:Set<String>):HybridFoodEvent {
-        val a=active(ids)
-        fun minutes(t:ParameterTargetV1)=a.filter{it.effect.target==t}.sumOf{it.effect.median}
-        val background=a.filter{it.effect.target==ParameterTargetV1.BACKGROUND_RATE}.sumOf{it.effect.median}.coerceIn(-1.0,1.0)
-        return event.copy(contextIds=ids,onsetOffsetMin=minutes(ParameterTargetV1.FOOD_ONSET).coerceIn(-60.0,60.0),
-            peakOffsetMin=minutes(ParameterTargetV1.FOOD_PEAK).coerceIn(-120.0,120.0),tailOffsetMin=minutes(ParameterTargetV1.FOOD_TAIL).coerceIn(-240.0,240.0),backgroundRateOffsetMmolPerHour=background)
+    fun decorateFood(event: HybridFoodEvent, ids: Set<String>): HybridFoodEvent {
+        val a = active(ids)
+        fun minutes(t: ParameterTargetV1) =
+            a.filter { it.effect.target == t }.sumOf { it.effect.median }
+        val background =
+            a.filter { it.effect.target == ParameterTargetV1.BACKGROUND_RATE }
+                .sumOf { it.effect.median }
+                .coerceIn(-1.0, 1.0)
+        return event.copy(
+            contextIds = ids,
+            onsetOffsetMin = minutes(ParameterTargetV1.FOOD_ONSET).coerceIn(-60.0, 60.0),
+            peakOffsetMin = minutes(ParameterTargetV1.FOOD_PEAK).coerceIn(-120.0, 120.0),
+            tailOffsetMin = minutes(ParameterTargetV1.FOOD_TAIL).coerceIn(-240.0, 240.0),
+            backgroundRateOffsetMmolPerHour = background
+        )
     }
-    fun decorateBasal(event:HybridBasalEvent,ids:Set<String>):HybridBasalEvent {
-        val fraction=active(ids).filter{it.effect.target==ParameterTargetV1.BASAL_MISMATCH}.sumOf{it.effect.median}
-        return event.copy(contextIds=ids,actionMultiplier=(1+fraction).coerceIn(.5,1.5))
+    fun decorateBasal(event: HybridBasalEvent, ids: Set<String>): HybridBasalEvent {
+        val fraction =
+            active(ids)
+                .filter { it.effect.target == ParameterTargetV1.BASAL_MISMATCH }
+                .sumOf { it.effect.median }
+        return event.copy(contextIds = ids, actionMultiplier = (1 + fraction).coerceIn(.5, 1.5))
     }
-    fun decorateState(state:HybridForecastState,anchorIds:Set<String>):HybridForecastState {
-        val a=active(anchorIds)
-        val rate=a.filter{it.effect.target==ParameterTargetV1.BACKGROUND_RATE}.sumOf{it.effect.median}.coerceIn(-1.0,1.0)
-        val sensorBias=a.filter{it.effect.target==ParameterTargetV1.SENSOR_BIAS}.sumOf{it.effect.median}.coerceIn(-2.0,2.0)
-        val sensorSigma=a.filter{it.effect.target==ParameterTargetV1.SENSOR_PROCESS_VARIANCE}.sumOf{abs(it.effect.median)}.coerceIn(0.0,1.0)
-        return state.copy(contextFlags=anchorIds,backgroundRateOffsetMmolPerHour=rate,sensorBiasMmol=sensorBias,sensorProcessSigmaMmol=sensorSigma)
+    fun decorateState(state: HybridForecastState, anchorIds: Set<String>): HybridForecastState {
+        val a = active(anchorIds)
+        val rate =
+            a.filter { it.effect.target == ParameterTargetV1.BACKGROUND_RATE }
+                .sumOf { it.effect.median }
+                .coerceIn(-1.0, 1.0)
+        val sensorBias =
+            a.filter { it.effect.target == ParameterTargetV1.SENSOR_BIAS }
+                .sumOf { it.effect.median }
+                .coerceIn(-2.0, 2.0)
+        val sensorSigma =
+            a.filter { it.effect.target == ParameterTargetV1.SENSOR_PROCESS_VARIANCE }
+                .sumOf { abs(it.effect.median) }
+                .coerceIn(0.0, 1.0)
+        return state.copy(
+            contextFlags = anchorIds,
+            backgroundRateOffsetMmolPerHour = rate,
+            sensorBiasMmol = sensorBias,
+            sensorProcessSigmaMmol = sensorSigma
+        )
     }
 }
 
-data class AppliedModifierV1(val hypothesisId:String,val effect:EffectPayloadV1,val promotionRevision:Int,val promotedKnownAtMs:Long,val evaluationHash:String){
+data class AppliedModifierV1(
+    val hypothesisId: String,
+    val effect: EffectPayloadV1,
+    val promotionRevision: Int,
+    val promotedKnownAtMs: Long,
+    val evaluationHash: String
+) {
     init {
-        val definition=PhysioHypothesisRegistryV1.definitions.firstOrNull{it.id==hypothesisId}
-            ?: error("unknown runtime hypothesis $hypothesisId")
-        require(definition.executableSpec.parameterTarget==effect.target){"typed effect ${effect.target} cannot be applied to ${definition.executableSpec.parameterTarget}"}
-        require(promotionRevision>0&&promotedKnownAtMs>=0&&evaluationHash.isNotBlank())
+        val definition =
+            PhysioHypothesisRegistryV1.definitions.firstOrNull { it.id == hypothesisId }
+                ?: error("unknown runtime hypothesis $hypothesisId")
+        require(definition.executableSpec.parameterTarget == effect.target) {
+            "typed effect ${effect.target} cannot be applied to ${definition.executableSpec.parameterTarget}"
+        }
+        require(promotionRevision > 0 && promotedKnownAtMs >= 0 && evaluationHash.isNotBlank())
     }
 }
 
 class PhysioForecastEngine(private val artifact: PhysioArtifactV1) {
-    fun intervalContributions(point: HybridForecastPoint, macroExtra: Double = 0.0, activeContextIds:Set<String> = emptySet()): IntervalVarianceContributionsV1 {
+    fun intervalContributions(
+        point: HybridForecastPoint,
+        macroExtra: Double = 0.0,
+        activeContextIds: Set<String> = emptySet()
+    ): IntervalVarianceContributionsV1 {
         return intervalContributionsV1(point, artifact.varianceAt(activeContextIds), macroExtra)
     }
 
-    fun forecast(state: HybridForecastState, hypotheticalInsulinUnits: Double = 0.0): HybridForecastResult {
-        val decorated=artifact.decorateState(state.copy(
-            foodHistory=state.foodHistory.map{artifact.decorateFood(it,it.contextIds)},
-            bolusHistory=state.bolusHistory.map{artifact.decorateBolus(it,it.contextIds)},
-            basalHistory=state.basalHistory.map{artifact.decorateBasal(it,it.contextIds)},
-        ),state.contextFlags)
-        val hour = java.time.Instant.ofEpochMilli(state.nowMs).atZone(java.time.ZoneOffset.UTC).hour.toDouble()
-        val median = HybridForecastEngine(
-            artifact.personModelAt(hour,state.contextFlags),
-            artifact.macroTiming,
-        ).forecast(decorated, hypotheticalInsulinUnits)
-        val macroExtra = macroTimingUncertaintyExtraV1(decorated.foodHistory, artifact.macroTiming.promoted)
-        val activeOwnerIds = state.contextFlags + decorated.foodHistory.flatMap { it.contextIds } +
-            decorated.bolusHistory.flatMap { it.contextIds } + decorated.basalHistory.flatMap { it.contextIds }
-        return median.copy(points = median.points.map { point ->
-            val baseWidth = intervalContributions(point, macroExtra,activeOwnerIds).halfWidth()
-            val width=sqrt(baseWidth*baseWidth+decorated.sensorProcessSigmaMmol*decorated.sensorProcessSigmaMmol)
-            point.copy(low = point.scenario - width, high = point.scenario + width)
-        })
+    fun forecast(
+        state: HybridForecastState,
+        hypotheticalInsulinUnits: Double = 0.0
+    ): HybridForecastResult {
+        val decorated =
+            artifact.decorateState(
+                state.copy(
+                    foodHistory = state.foodHistory.map { artifact.decorateFood(it, it.contextIds) },
+                    bolusHistory = state.bolusHistory.map { artifact.decorateBolus(it, it.contextIds) },
+                    basalHistory = state.basalHistory.map { artifact.decorateBasal(it, it.contextIds) },
+                ),
+                state.contextFlags
+            )
+        val hour =
+            java.time.Instant.ofEpochMilli(state.nowMs).atZone(java.time.ZoneOffset.UTC).hour.toDouble()
+        val median =
+            HybridForecastEngine(
+                    artifact.personModelAt(hour, state.contextFlags),
+                    artifact.macroTiming,
+                )
+                .forecast(decorated, hypotheticalInsulinUnits)
+        val macroExtra =
+            macroTimingUncertaintyExtraV1(decorated.foodHistory, artifact.macroTiming.promoted)
+        val activeOwnerIds =
+            state.contextFlags +
+                decorated.foodHistory.flatMap { it.contextIds } +
+                decorated.bolusHistory.flatMap { it.contextIds } +
+                decorated.basalHistory.flatMap { it.contextIds }
+        return median.copy(
+            points =
+                median.points.map { point ->
+                    val baseWidth = intervalContributions(point, macroExtra, activeOwnerIds).halfWidth()
+                    val width =
+                        sqrt(
+                            baseWidth * baseWidth +
+                                decorated.sensorProcessSigmaMmol * decorated.sensorProcessSigmaMmol
+                        )
+                    point.copy(low = point.scenario - width, high = point.scenario + width)
+                }
+        )
     }
 }
 

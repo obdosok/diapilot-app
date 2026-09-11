@@ -4,6 +4,7 @@
     <string name="ask_screen_intro">Ask your data questions in plain language: “why was glucose high at night?”, “how does beer affect me?”. Claude builds the answers from a summary of your data.\n\nYou need your own Anthropic API key (console.anthropic.com → API Keys). The key is stored only on this device. The data summary is sent to the API only when you ask a question.</string>
     <string name="ask_screen_key_placeholder" translatable="false">sk-ant-…</string>
     <string name="ask_screen_save">Save</string>
+    <string name="ask_screen_key_not_saved">The key could not be stored securely on this device, so it was not saved.</string>
     <string name="ask_screen_chat_title">Ask</string>
     <string name="ask_screen_digest_button">📋 Digest</string>
     <string name="ask_screen_clear">Clear</string>

@@ -30,7 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.AskClaude
@@ -54,6 +57,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
 
     if (apiKey == null) {
         var keyField by remember { mutableStateOf("") }
+        var saveFailed by remember { mutableStateOf(false) }
         Column(
             modifier = modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -68,14 +72,25 @@ fun AskScreen(modifier: Modifier = Modifier) {
                 onValueChange = { keyField = it },
                 label = { Text(stringResource(R.string.ask_screen_key_placeholder)) },
                 singleLine = true,
+                // Masked, and a password keyboard: no suggestions, and the IME
+                // does not learn the key into its dictionary.
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
             TextButton(onClick = {
                 if (keyField.trim().startsWith("sk-ant-")) {
-                    AskClaude.saveApiKey(context, keyField)
-                    apiKey = keyField.trim()
+                    saveFailed = !AskClaude.saveApiKey(context, keyField)
+                    if (!saveFailed) apiKey = AskClaude.apiKey(context)
                 }
             }) { Text(stringResource(R.string.ask_screen_save)) }
+            if (saveFailed) {
+                Text(
+                    stringResource(R.string.ask_screen_key_not_saved),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
         return
     }

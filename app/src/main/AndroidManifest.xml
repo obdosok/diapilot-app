@@ -43,9 +43,14 @@
         <package android:name="com.eveningoutpost.dexdrip" />
     </queries>
 
+    <!-- No system backup or device transfer: the preferences hold credentials
+         and the database is medical data; the app has its own explicit backup.
+         allowBackup="false" covers cloud backup on all API levels and device
+         transfer below API 31; data_extraction_rules.xml covers device transfer
+         on API 31+, where allowBackup no longer does. BackupPolicyTest pins it. -->
     <application
         android:name=".DiaPilotApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"

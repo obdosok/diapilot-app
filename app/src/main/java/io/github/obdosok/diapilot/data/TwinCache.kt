@@ -28,27 +28,49 @@ object TwinCache {
 
     private val stage10Generation=java.util.concurrent.atomic.AtomicLong(0)
 
-    private val stage9Executor=java.util.concurrent.ThreadPoolExecutor(
-        1,1,0L,java.util.concurrent.TimeUnit.MILLISECONDS,
-        java.util.concurrent.ArrayBlockingQueue<Runnable>(1),
-        java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy(),
-    )
-    internal fun scheduleStage9FailOpen(task:(Long)->Unit):Long {
-        val generation=stage10Generation.incrementAndGet()
+    private val stage9Executor =
+        java.util.concurrent.ThreadPoolExecutor(
+            1,
+            1,
+            0L,
+            java.util.concurrent.TimeUnit.MILLISECONDS,
+            java.util.concurrent.ArrayBlockingQueue<Runnable>(1),
+            java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy(),
+        )
+    internal fun scheduleStage9FailOpen(task: (Long) -> Unit): Long {
+        val generation = stage10Generation.incrementAndGet()
         FoodCalculationRegistry.expectEpisodeGeneration(generation)
-        try { stage9Executor.execute { try { task(generation) } catch(t:Throwable) { Log.w(TAG,"Stage10 sidecar failed open",t) } } }
-        catch(t:Throwable) { Log.w(TAG,"Stage9 sidecar not scheduled",t) }
+        try {
+            stage9Executor.execute {
+                try {
+                    task(generation)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Stage10 sidecar failed open", t)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Stage9 sidecar not scheduled", t)
+        }
         return generation
     }
-    internal fun invalidateStage10Eligibility(context:android.content.Context,ids:Set<Long>):Long {
+    internal fun invalidateStage10Eligibility(context: android.content.Context, ids: Set<Long>): Long {
         // Propose rather than pre-increment: the registry can prove that an
         // identical blocked set is already enforced, in which case neither
         // the global generation nor disk snapshot should churn.
-        val reserved=FoodCalculationRegistry.invalidateClosedEpisodeEligibility(ids,stage10Generation.get()+1,context)
-        stage10Generation.accumulateAndGet(reserved){a,b->maxOf(a,b)}
+        val reserved =
+            FoodCalculationRegistry.invalidateClosedEpisodeEligibility(
+                ids,
+                stage10Generation.get() + 1,
+                context
+            )
+        stage10Generation.accumulateAndGet(reserved) { a, b -> maxOf(a, b) }
         return reserved
     }
-    internal fun <T> publishThenScheduleStage9(model:T,publish:(T)->Unit,task:(Long)->Unit):T {
+    internal fun <T> publishThenScheduleStage9(
+        model: T,
+        publish: (T) -> Unit,
+        task: (Long) -> Unit
+    ): T {
         publish(model)
         scheduleStage9FailOpen(task)
         return model
@@ -294,15 +316,19 @@ object TwinCache {
         // │ generation change once marks exist.                                        │
         // └────────────────────────────────────────────────────────────────────────────┘
         val marksTeach = Settings.marksTeachModel(context)
-        val marks = if (marksTeach) com.diapilot.core.analysis.MealMarks(store.mealMarks())
-        else com.diapilot.core.analysis.MealMarks.EMPTY
-        val key = TwinCacheKey(
-            fastInsulin, Settings.carbSensPer10gMmol(context),
-            Settings.carbSensOverrideMmolPerG(context),
-            marks.stamp(),Stage9EpisodeRuntime.CACHE_VERSION,
-            HybridShadowRegistry.modelSha256().orEmpty(),
-            FoodEraSettings.current().startMs,
-        )
+        val marks =
+            if (marksTeach) com.diapilot.core.analysis.MealMarks(store.mealMarks())
+            else com.diapilot.core.analysis.MealMarks.EMPTY
+        val key =
+            TwinCacheKey(
+                fastInsulin,
+                Settings.carbSensPer10gMmol(context),
+                Settings.carbSensOverrideMmolPerG(context),
+                marks.stamp(),
+                Stage9EpisodeRuntime.CACHE_VERSION,
+                HybridShadowRegistry.modelSha256().orEmpty(),
+                FoodEraSettings.current().startMs,
+            )
         cached?.let { if (now - builtAtMs < TTL_MS && builtKey == key) return it }
 
         // A COLD PROCESS IS NOT A STALE MODEL. `getForForecast` has always
@@ -343,18 +369,19 @@ object TwinCache {
         // rare by construction (6 h TTL + explicit invalidations), so this is a handful
         // of lines a day, not a stream; `adb logcat -s TwinCache` is the whole tool.
         val startedAtMs = android.os.SystemClock.elapsedRealtime()
-        val reason = when {
-            cached == null -> "no in-memory model (cold process or invalidate)"
-            builtKey != key -> "settings/marks changed"
-            else -> "TTL expired"
-        }
+        val reason =
+            when {
+                cached == null -> "no in-memory model (cold process or invalidate)"
+                builtKey != key -> "settings/marks changed"
+                else -> "TTL expired"
+            }
         Log.i(TAG, "build START — $reason, on '${Thread.currentThread().name}'")
         fun sinceStart() = android.os.SystemClock.elapsedRealtime() - startedAtMs
 
         // Sensor-only: meter fingersticks are a different scale — they
         // calibrate (as a lens) and show as points, but must not sit inside
         // the trace the kernel/ISF are learned from.
-        val foodEraStart=FoodEraSettings.current().startMs
+        val foodEraStart = FoodEraSettings.current().startMs
         val readings = store.sensorReadings(foodEraStart, now)
         if (readings.size < 500) return null
         val tLoad = sinceStart()
@@ -385,20 +412,25 @@ object TwinCache {
         // older sensors' readings would extrapolate — data before the epoch
         // stays raw (identity), which is honest: no meter truth exists there.
         val calEpochStartMs = run {
-            val ws = Settings.libreSensorStartMs(context).takeIf { it > 0 }
-                ?.let { (now - it).coerceIn(3_600_000L, 14L * 24 * 3_600_000) }
-                ?: (14L * 24 * 3_600_000)
+            val ws =
+                Settings.libreSensorStartMs(context)
+                    .takeIf { it > 0 }
+                    ?.let { (now - it).coerceIn(3_600_000L, 14L * 24 * 3_600_000) }
+                    ?: (14L * 24 * 3_600_000)
             now - ws
         }
         fun calScale(
             pts: List<com.diapilot.core.collector.GlucosePoint>,
         ): List<com.diapilot.core.collector.GlucosePoint> =
             if (trainingCalTimeline.isEmpty()) pts
-            else pts.map { point ->
-                trainingCalTimeline.lastOrNull {
-                    point.tsMs in it.validFromMs..it.validUntilMs
-                }?.apply(point) ?: point
-            }
+            else
+                pts.map { point ->
+                    trainingCalTimeline
+                        .lastOrNull {
+                            point.tsMs in it.validFromMs..it.validUntilMs
+                        }
+                        ?.apply(point) ?: point
+                }
         // One scale for everything downstream of the lens — the principle this
         // file already states for the forecast, now also honoured by ISF.
         val calReadings = calScale(readings)
@@ -412,12 +444,15 @@ object TwinCache {
         // Logged food = ground truth (always disqualifies an ISF episode);
         // detector-inferred meals = a heuristic rise a "correction"-tagged
         // correction is allowed to override (see detectIsfEpisodes).
-        val loggedFoodOnsets = annotationsAll
-            .filter { it.estCarbs != null || it.kind == "food" }.map { it.tsMs }.distinct()
+        val loggedFoodOnsets =
+            annotationsAll
+                .filter { it.estCarbs != null || it.kind == "food" }
+                .map { it.tsMs }
+                .distinct()
         val detectedFoodOnsets = store.meals(foodEraStart, now).map { it.onsetMs }.distinct()
         // Fixed experiment boundary. Deriving this from the oldest food note
         // lets an import/edit silently change the training population.
-        val reliableFoodEraStartMs:Long? = foodEraStart
+        val reliableFoodEraStartMs: Long? = foodEraStart
         // Activity windows BEFORE episode detection: a correction inside a
         // bout (muscle drain) or its sensitization tail (a nocturnal shot
         // after an evening 2.5h walk) measures insulin+exercise and inflates
@@ -438,12 +473,13 @@ object TwinCache {
         // NOT invariant-safe by assumption (see Activity.detectActivityWindows):
         // calibrated ⊆ legacy holds on THIS corpus but is not a property of the
         // code, so the switch is measured on fresh data, never assumed.
-        val actWindows = com.diapilot.core.analysis.detectActivityWindows(
-            hr = store.heartRate(foodEraStart, now),
-            steps = store.steps(foodEraStart, now),
-            notes = annotationsAll,
-            calibrated = true,
-        )
+        val actWindows =
+            com.diapilot.core.analysis.detectActivityWindows(
+                hr = store.heartRate(foodEraStart, now),
+                steps = store.steps(foodEraStart, now),
+                notes = annotationsAll,
+                calibrated = true,
+            )
         // The epoch is a STEP, not a seam: the CGM stream runs straight through a
         // sensor change (measured: 141 points in ±6 h around it, max gap 5 min,
         // none across it), so an episode window spanning the epoch sees a
@@ -455,14 +491,15 @@ object TwinCache {
         val bolusesForIsf = boluses.filterNot {
             it.tsMs in (calEpochStartMs - STRADDLE_GUARD_MS)..calEpochStartMs
         }
-        val det = detectIsfEpisodes(
-            readings = calReadings,
-            boluses = bolusesForIsf,
-            foodOnsetsMs = loggedFoodOnsets,
-            detectedFoodOnsetsMs = detectedFoodOnsets,
-            cfg = if (fastInsulin) KERNEL_CFG_FAST else KERNEL_CFG,
-            activityWindows = actWindows,
-        )
+        val det =
+            detectIsfEpisodes(
+                readings = calReadings,
+                boluses = bolusesForIsf,
+                foodOnsetsMs = loggedFoodOnsets,
+                detectedFoodOnsetsMs = detectedFoodOnsets,
+                cfg = if (fastInsulin) KERNEL_CFG_FAST else KERNEL_CFG,
+                activityWindows = actWindows,
+            )
         val episodes = det.episodes.filter { !it.anomaly }
         // MIN_EPISODES is a LEARNING gate, not an availability gate.  After
         // the fixed food-era cutoff an existing user can legitimately have a
@@ -478,18 +515,28 @@ object TwinCache {
         // Recency + era weights: the body changes unmarked, fresh episodes
         // outvote the blind era; a dosing-regime break discounts what's
         // before it (user's own doses dropped & split at some point).
-        val doseChange = if(personalizedKernelReady) com.diapilot.core.analysis.detectDoseRegimeChange(boluses, episodes = episodes) else null
-        val sensitivityChange = if(personalizedKernelReady) com.diapilot.core.analysis.detectSensitivityRegimeChange(episodes) else null
-        val physiologicalChangeMs = listOfNotNull(
-            doseChange?.takeIf { it.responseConfirmed }?.changeMs,
-            sensitivityChange?.changeMs,
-        ).maxOrNull()
-        val epWeights = com.diapilot.core.analysis.episodeWeights(
-            episodes, now,
-            // A confirmed dose/response shift OR a direct persistent ISF
-            // shift discounts the old physiology.
-            changepointMs = physiologicalChangeMs,
-        )
+        val doseChange =
+            if (personalizedKernelReady)
+                com.diapilot.core.analysis.detectDoseRegimeChange(boluses, episodes = episodes)
+            else null
+        val sensitivityChange =
+            if (personalizedKernelReady)
+                com.diapilot.core.analysis.detectSensitivityRegimeChange(episodes)
+            else null
+        val physiologicalChangeMs =
+            listOfNotNull(
+                    doseChange?.takeIf { it.responseConfirmed }?.changeMs,
+                    sensitivityChange?.changeMs,
+                )
+                .maxOrNull()
+        val epWeights =
+            com.diapilot.core.analysis.episodeWeights(
+                episodes,
+                now,
+                // A confirmed dose/response shift OR a direct persistent ISF
+                // shift discounts the old physiology.
+                changepointMs = physiologicalChangeMs,
+            )
         // Same scale as the episodes it learns from. Shape is affine-invariant
         // (a constant offset cancels in every difference) and the amplitude is
         // re-pinned below, so this is consistency, not a change of physics —
@@ -498,72 +545,95 @@ object TwinCache {
         // kernel plateau and amplitudeEstimate all scale by it, and the LIVE ISF
         // amplitude moves on that day. Probably more correct, but it will not
         // look like a code change — so expect it.
-        val priorPerson = PhysioRuntime.artifact(store,now)?.personModelAt(
-            java.util.Calendar.getInstance().apply{timeInMillis=now}.get(java.util.Calendar.HOUR_OF_DAY).toDouble(),
-        ) ?: HybridRuntimeMetrics.model()
-        val learned = if(personalizedKernelReady) {
-            insulinKernel(calReadings, episodes, weights = epWeights)
-        } else {
-            priorPerson?.let { com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(1.0) }
-                ?: emptyList()
-        }
+        val priorPerson =
+            PhysioRuntime.artifact(store, now)
+                ?.personModelAt(
+                    java.util.Calendar.getInstance()
+                        .apply { timeInMillis = now }
+                        .get(java.util.Calendar.HOUR_OF_DAY)
+                        .toDouble(),
+                ) ?: HybridRuntimeMetrics.model()
+        val learned =
+            if (personalizedKernelReady) {
+                insulinKernel(calReadings, episodes, weights = epWeights)
+            } else {
+                priorPerson?.let {
+                    com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(1.0)
+                } ?: emptyList()
+            }
         if (learned.isEmpty()) return null
         // The amplitude comes from TRUSTED corrections against a population
         // prior built from this body's own total daily dose — never from the
         // corpus, 97.5% of which predates food logging.
-        val tdd = com.diapilot.core.analysis.totalDailyDose(
-            boluses = boluses, basals = store.basalEvents(foodEraStart, now), nowMs = now,
-        )
-        val prior = tdd?.let { com.diapilot.core.analysis.isfPriorFromTdd(it) }
-        val amplitudeEstimate = if (!personalizedKernelReady) {
-            null
-        } else if (prior == null || reliableFoodEraStartMs == null) {
-            Log.w(TAG, "No ISF prior (tdd=$tdd, era=$reliableFoodEraStartMs) — kernel keeps its own scale")
-            null
-        } else {
-            com.diapilot.core.analysis.estimateCurrentIsfAmplitude(
-                episodes, reliableFoodEraStartMs, prior,
+        val tdd =
+            com.diapilot.core.analysis.totalDailyDose(
+                boluses = boluses,
+                basals = store.basalEvents(foodEraStart, now),
+                nowMs = now,
             )
-        }
+        val prior = tdd?.let { com.diapilot.core.analysis.isfPriorFromTdd(it) }
+        val amplitudeEstimate =
+            if (!personalizedKernelReady) {
+                null
+            } else if (prior == null || reliableFoodEraStartMs == null) {
+                Log.w(
+                    TAG,
+                    "No ISF prior (tdd=$tdd, era=$reliableFoodEraStartMs) — kernel keeps its own scale"
+                )
+                null
+            } else {
+                com.diapilot.core.analysis.estimateCurrentIsfAmplitude(
+                    episodes,
+                    reliableFoodEraStartMs,
+                    prior,
+                )
+            }
         // ISF prior: the learned SHAPE is kept, the amplitude is rescaled to
         // the user's known per-unit drop — historical episodes predate food
         // logging, so their measured drop is diluted by invisible meals.
-        val kernel = if(!personalizedKernelReady) learned else run {
-            // BEFORE the rescale. Scaling and a running minimum COMMUTE, so this
-            // ordering is not cosmetic: monotone-first re-shapes the curve
-            // against a FIXED plateau — mass moves out of the first hour into
-            // the tail and the total per-unit drop is unchanged — while
-            // monotone-last would make the deepest bin the new plateau and raise
-            // the amplitude ~18%. Measured, the amplitude half of that bundle is
-            // harmful on its own (worse at every horizon on insulin-opened
-            // segments) and the reshape carries the entire gain. It is also the
-            // half that cannot be justified: the "deepest measured drop" is the
-            // minimum of 27 noisy plateau bins, and a perfectly flat curve with
-            // this bin-to-bin noise would hand back ~14% of it as selection.
-            // No estimate means no amplitude EVIDENCE — keep the learned shape
-            // at its own scale rather than pinning it to the unconfirmed corpus.
-            // The hand ISF used to be able to pin this target too
-            // (`Settings.isfOverrideMmol`). That was a THIRD door with no setter
-            // anywhere in the app; verified null on a real device before
-            // removing it, so this is a deletion of dead weight, not a change of
-            // behaviour. The hand ISF now has exactly one home: P1.
-            val target = amplitudeEstimate?.mmolPerUnit
-                ?: -com.diapilot.core.analysis.monotoneKernel(learned).last().median
-            com.diapilot.core.analysis.shippedKernel(learned, target)
-        }
+        val kernel =
+            if (!personalizedKernelReady) learned
+            else
+                run {
+                    // BEFORE the rescale. Scaling and a running minimum COMMUTE, so this
+                    // ordering is not cosmetic: monotone-first re-shapes the curve
+                    // against a FIXED plateau — mass moves out of the first hour into
+                    // the tail and the total per-unit drop is unchanged — while
+                    // monotone-last would make the deepest bin the new plateau and raise
+                    // the amplitude ~18%. Measured, the amplitude half of that bundle is
+                    // harmful on its own (worse at every horizon on insulin-opened
+                    // segments) and the reshape carries the entire gain. It is also the
+                    // half that cannot be justified: the "deepest measured drop" is the
+                    // minimum of 27 noisy plateau bins, and a perfectly flat curve with
+                    // this bin-to-bin noise would hand back ~14% of it as selection.
+                    // No estimate means no amplitude EVIDENCE — keep the learned shape
+                    // at its own scale rather than pinning it to the unconfirmed corpus.
+                    // The hand ISF used to be able to pin this target too
+                    // (`Settings.isfOverrideMmol`). That was a THIRD door with no setter
+                    // anywhere in the app; verified null on a real device before
+                    // removing it, so this is a deletion of dead weight, not a change of
+                    // behaviour. The hand ISF now has exactly one home: P1.
+                    val target =
+                        amplitudeEstimate?.mmolPerUnit
+                            ?: -com.diapilot.core.analysis.monotoneKernel(learned).last().median
+                    com.diapilot.core.analysis.shippedKernel(learned, target)
+                }
         // The physio engine owns insulin timing. The legacy Twin kernel above
         // remains the learned correction evidence/forecast input, but food
         // deconvolution must subtract the profile whose onset/peak/tail the UI
         // and the engine actually declare.
-        val deconvPhysio=PhysioRuntime.artifact(store,now)
-        val deconvLegacy=HybridRuntimeMetrics.model()
-        val deconvKernelCache=HashMap<Pair<Long,Double>,List<KernelPoint>>()
-        val deconvKernelForBolus:(com.diapilot.core.collector.BolusPoint)->List<KernelPoint> = {b->
-            deconvKernelCache.getOrPut(b.tsMs to b.units){
-                val cal=java.util.Calendar.getInstance().apply{timeInMillis=b.tsMs}
-                val hour=cal.get(java.util.Calendar.HOUR_OF_DAY)+cal.get(java.util.Calendar.MINUTE)/60.0
-                val person=deconvPhysio?.personModelAt(hour) ?:deconvLegacy
-                person?.let{com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(b.units)}?:kernel
+        val deconvPhysio = PhysioRuntime.artifact(store, now)
+        val deconvLegacy = HybridRuntimeMetrics.model()
+        val deconvKernelCache = HashMap<Pair<Long, Double>, List<KernelPoint>>()
+        val deconvKernelForBolus: (com.diapilot.core.collector.BolusPoint) -> List<KernelPoint> = { b ->
+            deconvKernelCache.getOrPut(b.tsMs to b.units) {
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = b.tsMs }
+                val hour =
+                    cal.get(java.util.Calendar.HOUR_OF_DAY) + cal.get(java.util.Calendar.MINUTE) / 60.0
+                val person = deconvPhysio?.personModelAt(hour) ?: deconvLegacy
+                person?.let {
+                    com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(b.units)
+                } ?: kernel
             }
         }
         val tKernel = sinceStart()
@@ -575,11 +645,12 @@ object TwinCache {
         // A corridor needs statistics: a short era gave implausibly wide p80
         // bands ("quiet" wider than "after meal") — switch to the clean
         // era only once it can carry the estimate.
-        val calFrom = if (eraStart != null && now - eraStart > 10L * 86_400_000) {
-            maxOf(eraStart, now - 30L * 24 * 3_600_000)
-        } else {
-            now - 30L * 24 * 3_600_000
-        }
+        val calFrom =
+            if (eraStart != null && now - eraStart > 10L * 86_400_000) {
+                maxOf(eraStart, now - 30L * 24 * 3_600_000)
+            } else {
+                now - 30L * 24 * 3_600_000
+            }
         // Persistent meter calibration: everything the LIVE forecast consumes
         // (corridor widths, carb sensitivity, dish curves, profile rises) is
         // computed on the CALIBRATED scale — the scale the forecast anchor and
@@ -592,26 +663,41 @@ object TwinCache {
         // One residual pass, widths bucketed by REGIME: quiet stretches get
         // an honestly narrow band, absorbing meals an honestly wide one.
         val calCal = java.util.Calendar.getInstance()
-        val corridors = com.diapilot.core.twin.calibrateRegimeCorridors(
-            recent, boluses, kernel,
-            foods = io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
-                store, null, riseScale = foodRiseScale, riseScaleFromMs = calEpochStartMs,
-            ),
-            mealOnsetsMs = store.meals(calFrom, now).map { it.onsetMs },
-            activityWindows = actWindows30,
-            hourOf = { ts ->
-                calCal.timeInMillis = ts
-                calCal.get(java.util.Calendar.HOUR_OF_DAY)
-            },
-        )
-        val corridor = corridors?.global ?: calibrateCorridor(
-            recent, boluses, kernel,
-            foods = io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
-                store, null, riseScale = foodRiseScale, riseScaleFromMs = calEpochStartMs,
-            ),
-        )
+        val corridors =
+            com.diapilot.core.twin.calibrateRegimeCorridors(
+                recent,
+                boluses,
+                kernel,
+                foods =
+                    io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
+                        store,
+                        null,
+                        riseScale = foodRiseScale,
+                        riseScaleFromMs = calEpochStartMs,
+                    ),
+                mealOnsetsMs = store.meals(calFrom, now).map { it.onsetMs },
+                activityWindows = actWindows30,
+                hourOf = { ts ->
+                    calCal.timeInMillis = ts
+                    calCal.get(java.util.Calendar.HOUR_OF_DAY)
+                },
+            )
+        val corridor =
+            corridors?.global
+                ?: calibrateCorridor(
+                    recent,
+                    boluses,
+                    kernel,
+                    foods =
+                        io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
+                            store,
+                            null,
+                            riseScale = foodRiseScale,
+                            riseScaleFromMs = calEpochStartMs,
+                        ),
+                )
         val tCorridor = sinceStart()
-        val byTod = if(personalizedKernelReady) aggregateByTod(episodes) else emptyMap()
+        val byTod = if (personalizedKernelReady) aggregateByTod(episodes) else emptyMap()
         // `annotationsAll` is the SAME query — re-issued here since forever. Left as
         // it is for now (it is measured below, not assumed to be free), but if the
         // ledger ever shows this segment dominated by loading rather than computing,
@@ -624,50 +710,71 @@ object TwinCache {
         val tContexts = sinceStart()
         // Carbs sensitivity: meals carrying a grams estimate calibrate the
         // grams→mmol scale the prediction uses for first-time dishes.
-        val labelByOnset = store.labeledMeals(limit = 500)
-            .filter { it.event.onsetMs >= foodEraStart }
-            .associate { it.event.onsetMs to it.labelName }
+        val labelByOnset =
+            store
+                .labeledMeals(limit = 500)
+                .filter { it.event.onsetMs >= foodEraStart }
+                .associate { it.event.onsetMs to it.labelName }
         val tLabels = sinceStart()
-        val learnedSens = com.diapilot.core.analysis.carbSensitivity(
-            com.diapilot.core.analysis.carbEpisodes(
-                store.meals(foodEraStart, now), labelByOnset, annotations,
-                // Exercise skews both scales — episodes with elevated HR are
-                // excluded from calibration.
-            hr = store.heartRate(FoodEraSettings.current().clampFrom(now - 60L * 24 * 3_600_000), now),
-                // Detector rises are raw-scale; the kernel term subtracted in
-                // glucoseEffect is meter-scale — put the rise there too, or
-                // the grams→mmol ratio inherits the calibration slope error.
-            ).map { if (it.onsetMs >= calEpochStartMs) it.copy(rise = it.rise * foodRiseScale) else it }
-                // ANSWERED meals leave the amplitude learner. This is the LIVE coefficient
-                // — `carbSensitivity` over detector episodes — so a "there were more grams"
-                // answer that did not land here would be a screen, not a correction. Episodes are
-                // resolved through their OWNING meal: a mark sits on the note-anchored
-                // session start and these are keyed by the DETECTOR's onset. Resolution by
-                // proximity was measured to reach a neighbour's evidence in a third of
-                // cases — see `mealMarkOwners`.
-                .excludingMarked(marks, markOwners),
-            kernel,
-            kernelForEpisode={e->
-                deconvKernelForBolus(com.diapilot.core.collector.BolusPoint(e.onsetMs,e.bolusUnits?:1.0))
-            },
-        )
+        val learnedSens =
+            com.diapilot.core.analysis.carbSensitivity(
+                com.diapilot.core.analysis
+                    .carbEpisodes(
+                        store.meals(foodEraStart, now),
+                        labelByOnset,
+                        annotations,
+                        // Exercise skews both scales — episodes with elevated HR are
+                        // excluded from calibration.
+                        hr =
+                            store.heartRate(
+                                FoodEraSettings.current().clampFrom(now - 60L * 24 * 3_600_000),
+                                now
+                            ),
+                        // Detector rises are raw-scale; the kernel term subtracted in
+                        // glucoseEffect is meter-scale — put the rise there too, or
+                        // the grams→mmol ratio inherits the calibration slope error.
+                    )
+                    .map {
+                        if (it.onsetMs >= calEpochStartMs) it.copy(rise = it.rise * foodRiseScale)
+                        else it
+                    }
+                    // ANSWERED meals leave the amplitude learner. This is the LIVE coefficient
+                    // — `carbSensitivity` over detector episodes — so a "there were more grams"
+                    // answer that did not land here would be a screen, not a correction. Episodes are
+                    // resolved through their OWNING meal: a mark sits on the note-anchored
+                    // session start and these are keyed by the DETECTOR's onset. Resolution by
+                    // proximity was measured to reach a neighbour's evidence in a third of
+                    // cases — see `mealMarkOwners`.
+                    .excludingMarked(marks, markOwners),
+                kernel,
+                kernelForEpisode = { e ->
+                    deconvKernelForBolus(
+                        com.diapilot.core.collector.BolusPoint(e.onsetMs, e.bolusUnits ?: 1.0)
+                    )
+                },
+            )
         // Carb-side prior, symmetric to the ISF one: the user's known
         // rise-per-10g wins while priced-meal calibration is thin (<10 meals).
         val sensPrior = Settings.carbSensPer10gMmol(context)?.div(10.0)
-        val carbSens = when {
-            sensPrior != null && (learnedSens == null || learnedSens.n < 10) ->
-                com.diapilot.core.analysis.CarbSensitivity(
-                    mmolPerGram = sensPrior,
-                    q1 = sensPrior * 0.7, q3 = sensPrior * 1.3, n = 0,
-                )
-            else -> learnedSens
-        }
+        val carbSens =
+            when {
+                sensPrior != null && (learnedSens == null || learnedSens.n < 10) ->
+                    com.diapilot.core.analysis.CarbSensitivity(
+                        mmolPerGram = sensPrior,
+                        q1 = sensPrior * 0.7,
+                        q3 = sensPrior * 1.3,
+                        n = 0,
+                    )
+                else -> learnedSens
+            }
         // The OVERRIDE is applied last and wins over both. The learned value is
         // carried alongside, not overwritten — an assumption must stay visibly an
         // assumption, which is precisely what the tablet constant did not do.
-        val carbSensEffective = com.diapilot.core.analysis.effectiveCarbSens(
-            carbSens, Settings.carbSensOverrideMmolPerG(context),
-        )
+        val carbSensEffective =
+            com.diapilot.core.analysis.effectiveCarbSens(
+                carbSens,
+                Settings.carbSensOverrideMmolPerG(context),
+            )
         val tCarbSens = sinceStart()
         Log.i(
             TAG,
@@ -677,28 +784,36 @@ object TwinCache {
         )
         // Exercise: the drop coefficient learned from clean (food-free)
         // bouts, conservative default otherwise (windows computed above).
-        val learnedDrop = com.diapilot.core.twin.learnActivityDropPerMin(
-            readings = readings.filter { it.tsMs > now - 30L * 24 * 3_600_000 },
-            boluses = boluses,
-            kernel = kernel,
-            windows = actWindows30,
-            foodOnsetsMs = store.meals(FoodEraSettings.current().clampFrom(now - 30L * 24 * 3_600_000), now).map { it.onsetMs },
-        )
+        val learnedDrop =
+            com.diapilot.core.twin.learnActivityDropPerMin(
+                readings = readings.filter { it.tsMs > now - 30L * 24 * 3_600_000 },
+                boluses = boluses,
+                kernel = kernel,
+                windows = actWindows30,
+                foodOnsetsMs =
+                    store
+                        .meals(FoodEraSettings.current().clampFrom(now - 30L * 24 * 3_600_000), now)
+                        .map { it.onsetMs },
+            )
         // Prolonged post-exercise sensitization (evening walk → night low).
-        val postActivityDrop = com.diapilot.core.twin.learnPostActivityDropPerMin(
-            readings = readings.filter { it.tsMs > now - 30L * 24 * 3_600_000 },
-            boluses = boluses,
-            kernel = kernel,
-            windows = actWindows30,
-            foodOnsetsMs = store.meals(FoodEraSettings.current().clampFrom(now - 30L * 24 * 3_600_000), now).map { it.onsetMs },
-        ) ?: 0.0
+        val postActivityDrop =
+            com.diapilot.core.twin.learnPostActivityDropPerMin(
+                readings = readings.filter { it.tsMs > now - 30L * 24 * 3_600_000 },
+                boluses = boluses,
+                kernel = kernel,
+                windows = actWindows30,
+                foodOnsetsMs =
+                    store
+                        .meals(FoodEraSettings.current().clampFrom(now - 30L * 24 * 3_600_000), now)
+                        .map { it.onsetMs },
+            ) ?: 0.0
         val tActivity = sinceStart()
 
         // Curves on the METER-CALIBRATED scale (persistent layer only — the
         // transient models a recent check's residual, meaningless on months of
         // history). The kernel amplitude is ISF-pinned (meter scale), so
         // subtracting it from calibrated readings is consistent.
-        val curveReadings = calReadings   // identical to the ISF series — one full-history map, not two
+        val curveReadings = calReadings // identical to the ISF series — one full-history map, not two
         // Non-food confounders (activity / illness) that corrupt ANY
         // insulin-adjusted meal profile. Shared by dish curves and the note-
         // anchored corpus; food↔food overlap is handled separately per builder.
@@ -714,19 +829,44 @@ object TwinCache {
                     com.diapilot.core.analysis.NoteTag.ILL,
                     com.diapilot.core.analysis.NoteTag.STRESS,
                     com.diapilot.core.analysis.NoteTag.ALCOHOL ->
-                        add(com.diapilot.core.analysis.FoodContaminationWindow(n.tsMs - 3L * 3_600_000, n.tsMs + 24L * 3_600_000))
+                        add(
+                            com.diapilot.core.analysis.FoodContaminationWindow(
+                                n.tsMs - 3L * 3_600_000,
+                                n.tsMs + 24L * 3_600_000
+                            )
+                        )
                     com.diapilot.core.analysis.NoteTag.NEW_SENSOR ->
-                        add(com.diapilot.core.analysis.FoodContaminationWindow(n.tsMs - 60L * 60_000, n.tsMs + 6L * 3_600_000))
+                        add(
+                            com.diapilot.core.analysis.FoodContaminationWindow(
+                                n.tsMs - 60L * 60_000,
+                                n.tsMs + 6L * 3_600_000
+                            )
+                        )
                     else -> Unit
                 }
             }
         }
         val softConfounderWindows = buildList {
-            actWindows30.forEach { add(com.diapilot.core.analysis.FoodContaminationWindow(it.startMs, it.endMs + 90L * 60_000)) }
+            actWindows30.forEach {
+                add(
+                    com.diapilot.core.analysis.FoodContaminationWindow(
+                        it.startMs,
+                        it.endMs + 90L * 60_000
+                    )
+                )
+            }
             annotationsAll.forEach { n ->
                 val tag = com.diapilot.core.analysis.NoteTag.of(n.content)
-                if (tag == com.diapilot.core.analysis.NoteTag.WORKOUT || tag == com.diapilot.core.analysis.NoteTag.WALK) {
-                    add(com.diapilot.core.analysis.FoodContaminationWindow(n.tsMs - 60L * 60_000, n.tsMs + 6L * 3_600_000))
+                if (
+                    tag == com.diapilot.core.analysis.NoteTag.WORKOUT ||
+                        tag == com.diapilot.core.analysis.NoteTag.WALK
+                ) {
+                    add(
+                        com.diapilot.core.analysis.FoodContaminationWindow(
+                            n.tsMs - 60L * 60_000,
+                            n.tsMs + 6L * 3_600_000
+                        )
+                    )
                 }
             }
         }
@@ -738,7 +878,10 @@ object TwinCache {
         // windows go to dish curves only, NOT to the deconvolution.
         val rescueWindows = annotationsAll.mapNotNull { n ->
             if (com.diapilot.core.analysis.isRescueNote(n.content)) {
-                com.diapilot.core.analysis.FoodContaminationWindow(n.tsMs - 30L * 60_000, n.tsMs + 120L * 60_000)
+                com.diapilot.core.analysis.FoodContaminationWindow(
+                    n.tsMs - 30L * 60_000,
+                    n.tsMs + 120L * 60_000
+                )
             } else null
         }
         // Dish curves keep the old all-or-nothing exclusion (hard + soft), only
@@ -789,85 +932,96 @@ object TwinCache {
         // different sets on a meaningful fraction of them, so the deconvolution
         // corpus and every ISF/landmark measurement were reading different
         // glucose on a couple of days out of every five.
-        val corpusReadings = calScale(
-            com.diapilot.core.analysis.MeasurementStreamCore.chooseFrom(
-                store.sensorReadingsWithSource(foodEraStart, now),
-            ).readings,
-        )
+        val corpusReadings =
+            calScale(
+                com.diapilot.core.analysis.MeasurementStreamCore.chooseFrom(
+                        store.sensorReadingsWithSource(foodEraStart, now),
+                    )
+                    .readings,
+            )
         // One kernel per hour, from the SAME provider deconvKernelForBolus uses.
         // Cheap (24 entries) and exact while the person model carries a measured
         // action CDF, where the shape does not depend on the dose.
-        val deconvKernelsByHour = (0..23).mapNotNull { hour ->
-            (deconvPhysio?.personModelAt(hour.toDouble()) ?: deconvLegacy)?.let { person ->
-                hour to com.diapilot.core.hybrid.HybridForecastEngine(person).insulinKernelPoints(1.0)
-            }
-        }.toMap()
-        val fingerprintCorpus = com.diapilot.core.analysis.deconvolvedMealObservations(
-            // Never let an open meal teach its partial rise as a completed
-            // amplitude/peak and immediately feed that answer back into its
-            // own live forecast. Six hours covers the longest food window.
-            notes = annotationsAll.filter{it.tsMs<=now-6L*3_600_000L},
-            readings = corpusReadings,
-            boluses = boluses,
-            kernel = kernel,
-            nowMs = now,
-            contaminationWindows = confounderWindows,
-            softContaminationWindows = softConfounderWindows,
-            // NEIGHBOUR SUBTRACTION. Off, a meal is subtracted from its follower
-            // only when EVERY ingredient of it is already pooled — a gate that by
-            // construction never opens for a dessert, so that whole class was
-            // learning its amplitude off curves still carrying the previous meal.
-            // The effective carb sensitivity is what a not-yet-measured neighbour
-            // is modelled at, so it must be the EFFECTIVE value, not the learned
-            // one: the arm would otherwise subtract neighbours at an amplitude the
-            // forecast does not use.
-            carbSensPerGram = carbSensEffective?.mmolPerGram,
-            kernelForBolus=deconvKernelForBolus,
-            // SUBTRACT A NEIGHBOUR WITH THE CURVE THE FORECAST DRAWS, at the
-            // neighbour's OWN measured amplitude where a previous pass found one.
-            // Enabled BY THE USER'S DECISION after reviewing their own
-            // cards: a dish without a concept profile was subtracted as
-            // zero, so the dish behind it was credited with a large spurious rise for its grams.
-            // Measured: that episode's error falls sharply, episodes above twice the
-            // global scale drop by more than half, and meals with no neighbour do not move
-            // at all. It converges over passes (the largest per-pass change shrinks by
-            // more than an order of magnitude).
-            // Known and NOT yet closed: a residual under-read on meals that
-            // had a neighbour, part of which is window censoring.
-            neighbourAppearance = (deconvPhysio?.personModelAt(12.0) ?: deconvLegacy)?.let { person ->
-                com.diapilot.core.analysis.NeighbourContributionV1.factory(
-                    com.diapilot.core.hybrid.physioForecastEngine(person),
-                    carbSensEffective?.mmolPerGram ?: .165,
-                    // AT THE GLOBAL SCALE, not at the neighbour's own recovered
-                    // amplitude. Re-measured on the stand that finally
-                    // reproduces most of this corpus: the same episode's error drops
-                    // substantially more at the global scale than at its
-                    // neighbour's own, and corpus-wide the episodes above twice
-                    // the scale drop further with the global scale than without it.
-                    // The "own amplitude" refinement was justified on a stand that
-                    // computed something else — the earlier dish's own recovered
-                    // value is depressed BECAUSE the later dish took its rise, so
-                    // subtracting it at that value cannot give the rise back.
-                    useOwnAmplitude = false,
+        val deconvKernelsByHour =
+            (0..23)
+                .mapNotNull { hour ->
+                    (deconvPhysio?.personModelAt(hour.toDouble()) ?: deconvLegacy)?.let { person ->
+                        hour to
+                            com.diapilot.core.hybrid
+                                .HybridForecastEngine(person)
+                                .insulinKernelPoints(1.0)
+                    }
+                }
+                .toMap()
+        val fingerprintCorpus =
+            com.diapilot.core.analysis
+                .deconvolvedMealObservations(
+                    // Never let an open meal teach its partial rise as a completed
+                    // amplitude/peak and immediately feed that answer back into its
+                    // own live forecast. Six hours covers the longest food window.
+                    notes = annotationsAll.filter { it.tsMs <= now - 6L * 3_600_000L },
+                    readings = corpusReadings,
+                    boluses = boluses,
+                    kernel = kernel,
+                    nowMs = now,
+                    contaminationWindows = confounderWindows,
+                    softContaminationWindows = softConfounderWindows,
+                    // NEIGHBOUR SUBTRACTION. Off, a meal is subtracted from its follower
+                    // only when EVERY ingredient of it is already pooled — a gate that by
+                    // construction never opens for a dessert, so that whole class was
+                    // learning its amplitude off curves still carrying the previous meal.
+                    // The effective carb sensitivity is what a not-yet-measured neighbour
+                    // is modelled at, so it must be the EFFECTIVE value, not the learned
+                    // one: the arm would otherwise subtract neighbours at an amplitude the
+                    // forecast does not use.
+                    carbSensPerGram = carbSensEffective?.mmolPerGram,
+                    kernelForBolus = deconvKernelForBolus,
+                    // SUBTRACT A NEIGHBOUR WITH THE CURVE THE FORECAST DRAWS, at the
+                    // neighbour's OWN measured amplitude where a previous pass found one.
+                    // Enabled BY THE USER'S DECISION after reviewing their own
+                    // cards: a dish without a concept profile was subtracted as
+                    // zero, so the dish behind it was credited with a large spurious rise for its grams.
+                    // Measured: that episode's error falls sharply, episodes above twice the
+                    // global scale drop by more than half, and meals with no neighbour do not move
+                    // at all. It converges over passes (the largest per-pass change shrinks by
+                    // more than an order of magnitude).
+                    // Known and NOT yet closed: a residual under-read on meals that
+                    // had a neighbour, part of which is window censoring.
+                    neighbourAppearance =
+                        (deconvPhysio?.personModelAt(12.0) ?: deconvLegacy)?.let { person ->
+                            com.diapilot.core.analysis.NeighbourContributionV1.factory(
+                                com.diapilot.core.hybrid.physioForecastEngine(person),
+                                carbSensEffective?.mmolPerGram ?: .165,
+                                // AT THE GLOBAL SCALE, not at the neighbour's own recovered
+                                // amplitude. Re-measured on the stand that finally
+                                // reproduces most of this corpus: the same episode's error drops
+                                // substantially more at the global scale than at its
+                                // neighbour's own, and corpus-wide the episodes above twice
+                                // the scale drop further with the global scale than without it.
+                                // The "own amplitude" refinement was justified on a stand that
+                                // computed something else — the earlier dish's own recovered
+                                // value is depressed BECAUSE the later dish took its rise, so
+                                // subtracting it at that value cannot give the rise back.
+                                useOwnAmplitude = false,
+                            )
+                        },
+                    // DIVIDE THE INSULIN THE WAY THE CARBOHYDRATE IS DIVIDED.
+                    // Measured on the stand that reproduces most of this corpus: the
+                    // window returned ALL the insulin but shared out only the food, so
+                    // one flat-glucose episode with substantial insulin in the window was
+                    // charged a large spurious rise for its grams. Dividing the meal's
+                    // food signal by expected carb delivery corrects it sharply, and
+                    // corpus-wide the episodes above twice the scale drop by more than half with
+                    // the tail percentile falling similarly. A lone meal has a share of 1 and is untouched.
+                    divideInsulinLikeCarbs = true,
                 )
-            },
-            // DIVIDE THE INSULIN THE WAY THE CARBOHYDRATE IS DIVIDED.
-            // Measured on the stand that reproduces most of this corpus: the
-            // window returned ALL the insulin but shared out only the food, so
-            // one flat-glucose episode with substantial insulin in the window was
-            // charged a large spurious rise for its grams. Dividing the meal's
-            // food signal by expected carb delivery corrects it sharply, and
-            // corpus-wide the episodes above twice the scale drop by more than half with
-            // the tail percentile falling similarly. A lone meal has a share of 1 and is untouched.
-            divideInsulinLikeCarbs = true,
-        )
-            // The answers reach the donor pool LAST, after the deconvolution has run. That
-            // order is deliberate: a marked meal still truncates its neighbours' clean
-            // windows and still gets subtracted from them — it happened, and pretending it
-            // did not would corrupt the meals around it. What changes is only what may be
-            // LEARNED from it, and rows are neutralised in place rather than dropped so the
-            // triage screen can still show them and the user can still change their mind.
-            .applyMarks(marks)
+                // The answers reach the donor pool LAST, after the deconvolution has run. That
+                // order is deliberate: a marked meal still truncates its neighbours' clean
+                // windows and still gets subtracted from them — it happened, and pretending it
+                // did not would corrupt the meals around it. What changes is only what may be
+                // LEARNED from it, and rows are neutralised in place rather than dropped so the
+                // triage screen can still show them and the user can still change their mind.
+                .applyMarks(marks)
         val tCorpus = sinceStart()
         // DOSSIERS ARE NO LONGER BUILT, by the user's decision:
         // "a component breakdown, if it shows nonsense, is not worth having."
@@ -893,136 +1047,214 @@ object TwinCache {
                 "heap ${(rt.totalMemory() - rt.freeMemory()) shr 20}/${rt.maxMemory() shr 20} MB",
         )
         return Model(
-            kernel, corridor, corridors = corridors, byTod = byTod,
-            contexts = contexts, carbSens = carbSensEffective,
-            carbSensLearned = carbSens,
-            learnedCarbSens = learnedSens,
-            learnedIsfMmolPerU = if(personalizedKernelReady) -learned.last().median else 0.0,
-            kernelEpisodes = episodes.size,
-            effectiveEpisodes = if(personalizedKernelReady) com.diapilot.core.analysis.effectiveSampleSize(epWeights) else 0.0,
-            reliableFoodEraStartMs = reliableFoodEraStartMs,
-            estimatedIsfMmolPerU = amplitudeEstimate?.mmolPerUnit ?: 0.0,
-            freshIsfEpisodes = amplitudeEstimate?.freshEpisodes ?: 0,
-            freshIsfBlend = amplitudeEstimate?.blend ?: 0.0,
-            activityWindows = actWindows30,
-            activityDropPerMin = learnedDrop
-                ?: com.diapilot.core.twin.DEFAULT_ACTIVITY_DROP_PER_MIN,
-            learnedActivityDrop = learnedDrop,
-            postActivityDropPerMin = postActivityDrop,
-            doseChange = doseChange,
-            sensitivityChange = sensitivityChange,
-            fingerprintCorpus = fingerprintCorpus,
-            deconvKernelsByHour = deconvKernelsByHour,
-            mealMarks = marks.active,
-            foodRiseScale = foodRiseScale,
-            meterInterceptMmol = meterInterceptMmol,
-            calEpochStartMs = calEpochStartMs,
-        ).also {
-            cached = it
-            builtAtMs = now
-            builtKey = key
-            // Persist for background consumers across process restarts.
-            TwinSnapshot.save(context, it, now, key)
-            diskRestored = TwinSnapshot.Restored(it, now, key)
-            diskChecked = true
-            // Model is safely published BEFORE the diagnostic is scheduled.
-            // Exceptions, OOM and queue rejection fail open; the sidecar has a
-            // time budget and can never block this forecast/alert caller.
-            val stage10SourceKey=(store as? SqliteCollectorStore)?.let{FoodCalculationRegistry.sourceKey(it,context,now)}
-            if(stage10SourceKey==null||!FoodCalculationRegistry.isCurrent(stage10SourceKey)) {
-                publishThenScheduleStage9(Unit, {}, task = { generation ->
-                    // Closed-episode eligibility controls learning weight, not
-                    // whether the user may see a diagnostic receipt. Filtering
-                    // here made History blank for every estimated meal.
-                    val diagnosticAnnotations=annotationsAll
-                    // Receipts are display text: after a language switch the whole
-                    // history is rebuilt, not only the hot tail.
-                    val fullRefresh=FoodCalculationRegistry.needsFullRefresh(now)||
-                        FoodCalculationRegistry.needsLanguageRefresh(context)
-                    val receiptLanguage=context.uiLanguage()
-                    // The visible hot tail is 72 h; eight preceding hours are
-                    // included so a meal/bolus just before the boundary can
-                    // still contribute its physiological tail to the first day.
-                    val lookbackMs=if(fullRefresh)30L*24*3_600_000L else 80L*3_600_000L
-                    val replaceIds=annotationsAll.asSequence()
-                        .filter{it.tsMs>=now-lookbackMs&&it.tsMs<=now&&com.diapilot.core.analysis.isFoodNote(it)}
-                        .map{it.id}.toSet()
-                    // ---- THE QUEUE NOW DRAINS ITSELF ----------------------
-                    //
-                    // A slice used to run once per full Twin build and stop when
-                    // its two-second budget expired, leaving "Continue calculation"
-                    // for the user to tap — repeatedly, and each tap invalidated the
-                    // whole Twin and rebuilt it just to earn one more slice.
-                    //
-                    // Worse after the history refresh was put on a change stamp
-                    // (A-35): full builds became rare on the History tab, which
-                    // is exactly the tab where the receipts are read, so the
-                    // backlog would have stopped draining altogether.
-                    //
-                    // So the slicing loops HERE instead. Each slice keeps its
-                    // two-second budget, so nothing hogs a core; between slices
-                    // the thread yields; and each one publishes, so the count on
-                    // screen climbs while the user watches. The wall-clock cap exists
-                    // because this is a diagnostic sidecar, not the forecast: if
-                    // a very long backlog does not finish inside it, the stored
-                    // offset carries to the next pass exactly as before.
-                    var result=Stage9EpisodeRuntime.buildDetailed(
-                        diagnosticAnnotations, corpusReadings, boluses, episodes,
-                        reliableFoodEraStartMs, now,
-                        budgetMs=FoodCalculationRegistry.takeContinuationBudget(),
-                        carbEvidenceAsOf={id,asOf->store.carbEvidenceKnownAt(id,asOf)},
-                        lookbackMs=lookbackMs,
-                        personModelForBolus={b->
-                            val cal=java.util.Calendar.getInstance().apply{timeInMillis=b.tsMs}
-                            val hour=cal.get(java.util.Calendar.HOUR_OF_DAY)+cal.get(java.util.Calendar.MINUTE)/60.0
-                            deconvPhysio?.personModelAt(hour) ?:deconvLegacy
-                        },
-                        clusterOffset=FoodCalculationRegistry.continuationOffset(),
-                        context=context,
-                    )
-                    var accepted=FoodCalculationRegistry.updateEpisodeAttributionWindow(
-                        result.receipts,replaceIds,generation,result.complete,result.processedClusters,result.totalClusters,
-                        result.budgetLimited,fullRefresh,now,result.nextOffset,
-                        language=receiptLanguage,
-                    )
-                    if(accepted&&stage10SourceKey!=null)FoodCalculationRegistry.persist(context,stage10SourceKey)
-                    val drainUntil=android.os.SystemClock.elapsedRealtime()+STAGE10_DRAIN_MS
-                    var guard=0
-                    while(accepted&&!result.complete&&result.nextOffset>0&&
-                        android.os.SystemClock.elapsedRealtime()<drainUntil&&guard++<STAGE10_MAX_SLICES
-                    ) {
-                        // Yield between slices: this runs while the user is using the
-                        // app, and a sidecar that makes the journal stutter is
-                        // its own bug report.
-                        try { Thread.sleep(120L) } catch (_: InterruptedException) { break }
-                        result=Stage9EpisodeRuntime.buildDetailed(
-                            diagnosticAnnotations, corpusReadings, boluses, episodes,
-                            reliableFoodEraStartMs, now,
-                            budgetMs=2_000L,
-                            carbEvidenceAsOf={id,asOf->store.carbEvidenceKnownAt(id,asOf)},
-                            lookbackMs=lookbackMs,
-                            personModelForBolus={b->
-                                val cal=java.util.Calendar.getInstance().apply{timeInMillis=b.tsMs}
-                                val hour=cal.get(java.util.Calendar.HOUR_OF_DAY)+cal.get(java.util.Calendar.MINUTE)/60.0
-                                deconvPhysio?.personModelAt(hour) ?:deconvLegacy
-                            },
-                            clusterOffset=result.nextOffset,
-                            context=context,
-                        )
-                        accepted=FoodCalculationRegistry.updateEpisodeAttributionWindow(
-                            result.receipts,replaceIds,generation,result.complete,result.processedClusters,
-                            result.totalClusters,result.budgetLimited,fullRefresh,now,result.nextOffset,
-                            language=receiptLanguage,
-                        )
-                        if(accepted&&stage10SourceKey!=null)FoodCalculationRegistry.persist(context,stage10SourceKey)
+                kernel,
+                corridor,
+                corridors = corridors,
+                byTod = byTod,
+                contexts = contexts,
+                carbSens = carbSensEffective,
+                carbSensLearned = carbSens,
+                learnedCarbSens = learnedSens,
+                learnedIsfMmolPerU = if (personalizedKernelReady) -learned.last().median else 0.0,
+                kernelEpisodes = episodes.size,
+                effectiveEpisodes =
+                    if (personalizedKernelReady)
+                        com.diapilot.core.analysis.effectiveSampleSize(epWeights)
+                    else 0.0,
+                reliableFoodEraStartMs = reliableFoodEraStartMs,
+                estimatedIsfMmolPerU = amplitudeEstimate?.mmolPerUnit ?: 0.0,
+                freshIsfEpisodes = amplitudeEstimate?.freshEpisodes ?: 0,
+                freshIsfBlend = amplitudeEstimate?.blend ?: 0.0,
+                activityWindows = actWindows30,
+                activityDropPerMin =
+                    learnedDrop ?: com.diapilot.core.twin.DEFAULT_ACTIVITY_DROP_PER_MIN,
+                learnedActivityDrop = learnedDrop,
+                postActivityDropPerMin = postActivityDrop,
+                doseChange = doseChange,
+                sensitivityChange = sensitivityChange,
+                fingerprintCorpus = fingerprintCorpus,
+                deconvKernelsByHour = deconvKernelsByHour,
+                mealMarks = marks.active,
+                foodRiseScale = foodRiseScale,
+                meterInterceptMmol = meterInterceptMmol,
+                calEpochStartMs = calEpochStartMs,
+            )
+            .also {
+                cached = it
+                builtAtMs = now
+                builtKey = key
+                // Persist for background consumers across process restarts.
+                TwinSnapshot.save(context, it, now, key)
+                diskRestored = TwinSnapshot.Restored(it, now, key)
+                diskChecked = true
+                // Model is safely published BEFORE the diagnostic is scheduled.
+                // Exceptions, OOM and queue rejection fail open; the sidecar has a
+                // time budget and can never block this forecast/alert caller.
+                val stage10SourceKey =
+                    (store as? SqliteCollectorStore)?.let {
+                        FoodCalculationRegistry.sourceKey(it, context, now)
                     }
-                })
-            } else {
-                Log.i(TAG,"Stage10 receipts restored/current — deconvolution skipped")
+                if (stage10SourceKey == null || !FoodCalculationRegistry.isCurrent(stage10SourceKey)) {
+                    publishThenScheduleStage9(
+                        Unit,
+                        {},
+                        task = { generation ->
+                            // Closed-episode eligibility controls learning weight, not
+                            // whether the user may see a diagnostic receipt. Filtering
+                            // here made History blank for every estimated meal.
+                            val diagnosticAnnotations = annotationsAll
+                            // Receipts are display text: after a language switch the whole
+                            // history is rebuilt, not only the hot tail.
+                            val fullRefresh =
+                                FoodCalculationRegistry.needsFullRefresh(now) ||
+                                    FoodCalculationRegistry.needsLanguageRefresh(context)
+                            val receiptLanguage = context.uiLanguage()
+                            // The visible hot tail is 72 h; eight preceding hours are
+                            // included so a meal/bolus just before the boundary can
+                            // still contribute its physiological tail to the first day.
+                            val lookbackMs =
+                                if (fullRefresh) 30L * 24 * 3_600_000L else 80L * 3_600_000L
+                            val replaceIds =
+                                annotationsAll
+                                    .asSequence()
+                                    .filter {
+                                        it.tsMs >= now - lookbackMs &&
+                                            it.tsMs <= now &&
+                                            com.diapilot.core.analysis.isFoodNote(it)
+                                    }
+                                    .map { it.id }
+                                    .toSet()
+                            // ---- THE QUEUE NOW DRAINS ITSELF ----------------------
+                            //
+                            // A slice used to run once per full Twin build and stop when
+                            // its two-second budget expired, leaving "Continue calculation"
+                            // for the user to tap — repeatedly, and each tap invalidated the
+                            // whole Twin and rebuilt it just to earn one more slice.
+                            //
+                            // Worse after the history refresh was put on a change stamp
+                            // (A-35): full builds became rare on the History tab, which
+                            // is exactly the tab where the receipts are read, so the
+                            // backlog would have stopped draining altogether.
+                            //
+                            // So the slicing loops HERE instead. Each slice keeps its
+                            // two-second budget, so nothing hogs a core; between slices
+                            // the thread yields; and each one publishes, so the count on
+                            // screen climbs while the user watches. The wall-clock cap exists
+                            // because this is a diagnostic sidecar, not the forecast: if
+                            // a very long backlog does not finish inside it, the stored
+                            // offset carries to the next pass exactly as before.
+                            var result =
+                                Stage9EpisodeRuntime.buildDetailed(
+                                    diagnosticAnnotations,
+                                    corpusReadings,
+                                    boluses,
+                                    episodes,
+                                    reliableFoodEraStartMs,
+                                    now,
+                                    budgetMs = FoodCalculationRegistry.takeContinuationBudget(),
+                                    carbEvidenceAsOf = { id, asOf ->
+                                        store.carbEvidenceKnownAt(id, asOf)
+                                    },
+                                    lookbackMs = lookbackMs,
+                                    personModelForBolus = { b ->
+                                        val cal =
+                                            java.util.Calendar.getInstance().apply {
+                                                timeInMillis = b.tsMs
+                                            }
+                                        val hour =
+                                            cal.get(java.util.Calendar.HOUR_OF_DAY) +
+                                                cal.get(java.util.Calendar.MINUTE) / 60.0
+                                        deconvPhysio?.personModelAt(hour) ?: deconvLegacy
+                                    },
+                                    clusterOffset = FoodCalculationRegistry.continuationOffset(),
+                                    context = context,
+                                )
+                            var accepted =
+                                FoodCalculationRegistry.updateEpisodeAttributionWindow(
+                                    result.receipts,
+                                    replaceIds,
+                                    generation,
+                                    result.complete,
+                                    result.processedClusters,
+                                    result.totalClusters,
+                                    result.budgetLimited,
+                                    fullRefresh,
+                                    now,
+                                    result.nextOffset,
+                                    language = receiptLanguage,
+                                )
+                            if (accepted && stage10SourceKey != null)
+                                FoodCalculationRegistry.persist(context, stage10SourceKey)
+                            val drainUntil = android.os.SystemClock.elapsedRealtime() + STAGE10_DRAIN_MS
+                            var guard = 0
+                            while (
+                                accepted &&
+                                    !result.complete &&
+                                    result.nextOffset > 0 &&
+                                    android.os.SystemClock.elapsedRealtime() < drainUntil &&
+                                    guard++ < STAGE10_MAX_SLICES
+                            ) {
+                                // Yield between slices: this runs while the user is using the
+                                // app, and a sidecar that makes the journal stutter is
+                                // its own bug report.
+                                try {
+                                    Thread.sleep(120L)
+                                } catch (_: InterruptedException) {
+                                    break
+                                }
+                                result =
+                                    Stage9EpisodeRuntime.buildDetailed(
+                                        diagnosticAnnotations,
+                                        corpusReadings,
+                                        boluses,
+                                        episodes,
+                                        reliableFoodEraStartMs,
+                                        now,
+                                        budgetMs = 2_000L,
+                                        carbEvidenceAsOf = { id, asOf ->
+                                            store.carbEvidenceKnownAt(id, asOf)
+                                        },
+                                        lookbackMs = lookbackMs,
+                                        personModelForBolus = { b ->
+                                            val cal =
+                                                java.util.Calendar.getInstance().apply {
+                                                    timeInMillis = b.tsMs
+                                                }
+                                            val hour =
+                                                cal.get(java.util.Calendar.HOUR_OF_DAY) +
+                                                    cal.get(java.util.Calendar.MINUTE) / 60.0
+                                            deconvPhysio?.personModelAt(hour) ?: deconvLegacy
+                                        },
+                                        clusterOffset = result.nextOffset,
+                                        context = context,
+                                    )
+                                accepted =
+                                    FoodCalculationRegistry.updateEpisodeAttributionWindow(
+                                        result.receipts,
+                                        replaceIds,
+                                        generation,
+                                        result.complete,
+                                        result.processedClusters,
+                                        result.totalClusters,
+                                        result.budgetLimited,
+                                        fullRefresh,
+                                        now,
+                                        result.nextOffset,
+                                        language = receiptLanguage,
+                                    )
+                                if (accepted && stage10SourceKey != null)
+                                    FoodCalculationRegistry.persist(context, stage10SourceKey)
+                            }
+                        }
+                    )
+                } else {
+                    Log.i(TAG, "Stage10 receipts restored/current — deconvolution skipped")
+                }
+                // Diagnostics dump — the Kotlin-computed food-model view, so it can
+                // be exported/inspected without re-deriving it by hand.
+                try {
+                    DiagnosticsExport.write(context, store, it, now)
+                } catch (_: Exception) {}
             }
-            // Diagnostics dump — the Kotlin-computed food-model view, so it can
-            // be exported/inspected without re-deriving it by hand.
-            try { DiagnosticsExport.write(context, store, it, now) } catch (_: Exception) {}
-        }
     }
 }
