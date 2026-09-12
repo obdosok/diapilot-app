@@ -133,6 +133,15 @@ class SecretStore(internal val prefs: SharedPreferences, private val cipher: Sec
     enum class Secret(val prefKey: String, val legacyPrefKey: String) {
         ANTHROPIC_API_KEY("anthropic_api_key_enc", "anthropic_api_key"),
         COMPANION_TOKEN("companion_token_enc", "companion_token"),
+
+        /** The loopback server's per-installation token ([WatchApiToken]). Born
+         *  encrypted: the legacy name never existed on disk and is declared
+         *  only because every secret is looked up under both names. */
+        WATCH_API_TOKEN("watch_api_token_enc", "watch_api_token"),
+
+        /** Optional `api-secret` for xDrip's local web service, entered by the
+         *  user if their xDrip has one configured. */
+        XDRIP_API_SECRET("xdrip_api_secret_enc", "xdrip_api_secret"),
     }
 
     private class Cached(val value: String?)

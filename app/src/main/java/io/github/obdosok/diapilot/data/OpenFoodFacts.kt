@@ -65,24 +65,38 @@ object OpenFoodFacts {
     fun portion(per100: Double?, weightG: Double): Double? =
         per100?.let { it * weightG / 100.0 }
 
-    /** Blocking HTTP lookup — invoke on Dispatchers.IO. Null = not found or
-     *  network failure; the manual path stays available either way. */
-    fun lookup(barcode: String): Product? = try {
-        val conn = URL(
-            "https://world.openfoodfacts.org/api/v2/product/$barcode.json" +
-                "?fields=product_name,brands,nutriments,serving_quantity,serving_quantity_unit",
-        ).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "GET"
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 15_000
-            conn.setRequestProperty("User-Agent", "DiaPilot/1.3 (personal T1D companion)")
-            if (conn.responseCode != 200) null
-            else parse(barcode, JSONObject(conn.inputStream.bufferedReader().readText()))
-        } finally {
-            conn.disconnect()
+    /**
+     * What may be interpolated into the request path: EAN-8 through GTIN-14.
+     *
+     * The code scanner is configured for EAN/UPC formats, so in practice
+     * nothing else arrives — but "in practice" is a property of today's
+     * callers, not of this function, and the value goes into a URL unencoded.
+     * Checking the shape is cheaper than proving every caller.
+     */
+    internal val BARCODE = Regex("""^\d{8,14}$""")
+
+    /** Blocking HTTP lookup — invoke on Dispatchers.IO. Null = not found,
+     *  network failure, or a string that is not a barcode; the manual path
+     *  stays available either way. */
+    fun lookup(barcode: String): Product? {
+        if (!BARCODE.matches(barcode)) return null
+        return try {
+            val conn = URL(
+                "https://world.openfoodfacts.org/api/v2/product/$barcode.json" +
+                    "?fields=product_name,brands,nutriments,serving_quantity,serving_quantity_unit",
+            ).openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 15_000
+                conn.setRequestProperty("User-Agent", "DiaPilot/1.3 (personal T1D companion)")
+                if (conn.responseCode != 200) null
+                else parse(barcode, JSONObject(conn.inputStream.bufferedReader().readText()))
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: Exception) {
+            null
         }
-    } catch (_: Exception) {
-        null
     }
 }

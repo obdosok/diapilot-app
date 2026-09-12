@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import io.github.obdosok.diapilot.widget.BgWidget
 
 /**
  * The in-app language choice (Settings -> Language).
@@ -58,7 +59,7 @@ enum class AppLanguage(val tag: String?) {
             // repaint the widget here; on 33+ DiaPilotApplication does it once
             // the system has applied the new locale.
             if (Build.VERSION.SDK_INT < 33) {
-                io.github.obdosok.diapilot.widget.BgWidget.updateAll(context.applicationContext)
+                BgWidget.updateAll(context.applicationContext)
             }
         }
 

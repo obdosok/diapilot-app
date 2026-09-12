@@ -16,6 +16,17 @@ import android.util.Log
 import android.widget.RemoteViews
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.displayHistory
+import io.github.obdosok.diapilot.data.forecastAnchor
+import io.github.obdosok.diapilot.data.tir24h
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -66,20 +77,20 @@ object BgWidget {
         // context still carries the system language.
         val text = context.localized()
         val views = RemoteViews(context.packageName, R.layout.widget_bg)
-        val store = io.github.obdosok.diapilot.data.Stores.get(context)
+        val store = Stores.get(context)
         val now = System.currentTimeMillis()
-        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
-        val rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
-        val rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
+        val mgdl = Units.isMgdl(context)
+        val rangeLo = Settings.rangeLoMmol(context)
+        val rangeHi = Settings.rangeHiMmol(context)
 
         // Same lenses as everywhere: minute promotion + meter correction
         // (cached — refitting from 14 days of rows every minute was waste).
-        val minuteCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
-        val meterCal = io.github.obdosok.diapilot.data.MeterCalCache.get(store, context)
+        val minuteCal = MinuteCalCache.get(store, context)
+        val meterCal = MeterCalCache.get(store, context)
         fun lens(ts: Long, mmol: Double): Double =
             meterCal?.correctedAt(ts, mmol) ?: mmol
 
-        val sharedAnchor = io.github.obdosok.diapilot.data.forecastAnchor(store, context, now)
+        val sharedAnchor = forecastAnchor(store, context, now)
         val lastTs = sharedAnchor?.reading?.tsMs ?: 0L
         val lastMmol = sharedAnchor?.reading?.mmol ?: Double.NaN
 
@@ -139,7 +150,7 @@ object BgWidget {
 
         // Insulin line: IOB (hidden once spent) + the last dose with age —
         // the pair that tells how active the insulin on board still is.
-        val iob = io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+        val iob = HybridRuntimeMetrics
             .surfaceIobUnits(store, context, now) ?: 0.0
         val lastBolus = store.boluses(
             now - com.diapilot.core.PersonalParams.DEFAULT.lastDoseShowMin * 60_000, now,
@@ -161,7 +172,7 @@ object BgWidget {
         }
         views.setTextViewText(R.id.widget_insulin, insulinLine)
 
-        val tir = io.github.obdosok.diapilot.data.tir24h(store, context, now, rangeLo, rangeHi)
+        val tir = tir24h(store, context, now, rangeLo, rangeHi)
         views.setTextViewText(
             R.id.widget_tir,
             tir?.let { "TIR ${it.inRange}%  ·  ↓${it.low}%  ↑${it.high}%" } ?: "TIR —",
@@ -210,17 +221,17 @@ object BgWidget {
         // the watch draws, not the jittery per-minute OOP2 stream. The grid is
         // also the frozen record the trend/delta are computed from, so the
         // widget's chart, arrow and number all agree.
-        val pts = io.github.obdosok.diapilot.data.displayHistory(store, context, from, now)
+        val pts = displayHistory(store, context, from, now)
             .map { it.tsMs to it.mmol }
             .sortedBy { it.first }
 
         // Forecast branch from the cached twin.
         val prediction = try {
-            val model = io.github.obdosok.diapilot.data.TwinCache.getForForecast(store, context)
-            val anchor = io.github.obdosok.diapilot.data.forecastAnchor(store, context, now)
+            val model = TwinCache.getForForecast(store, context)
+            val anchor = forecastAnchor(store, context, now)
             if (model != null && anchor != null) {
                 // The shared engine — the widget shows the SAME forecast.
-                io.github.obdosok.diapilot.data.Forecaster.forecast(
+                Forecaster.forecast(
                     store, model, now,
                     anchorTsMs = anchor.reading.tsMs,
                     anchorMmol = anchor.reading.mmol,

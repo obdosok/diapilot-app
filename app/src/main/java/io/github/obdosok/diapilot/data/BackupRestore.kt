@@ -2,7 +2,9 @@ package io.github.obdosok.diapilot.data
 
 import android.content.Context
 import android.net.Uri
+import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.collect.CompanionSync
 import io.github.obdosok.diapilot.i18n.localized
 import java.io.File
 
@@ -129,7 +131,7 @@ object BackupRestore {
                     android.provider.MediaStore.Downloads.DISPLAY_NAME,
                 ),
                 "${android.provider.MediaStore.Downloads.DISPLAY_NAME} LIKE ?",
-                arrayOf(io.github.obdosok.diapilot.AppIdentity.autoBackupPrefix() + "%"),
+                arrayOf(AppIdentity.autoBackupPrefix() + "%"),
                 "${android.provider.MediaStore.Downloads.DATE_MODIFIED} DESC",
             )?.use { c ->
                 buildList { while (c.moveToNext()) add(c.getLong(0) to c.getString(1)) }
@@ -184,7 +186,7 @@ object BackupRestore {
             // below, the SAF lookup in the cloud folder and the prune all
             // match by name, and a name shared with another installed copy of
             // the app would reuse — through SAF, overwrite — that copy's file.
-            val name = io.github.obdosok.diapilot.AppIdentity.autoBackupName(day)
+            val name = AppIdentity.autoBackupName(day)
             val resolver = context.contentResolver
             if (targets.downloads) {
                 val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
@@ -221,7 +223,7 @@ object BackupRestore {
                 }
             }
             // Third copy: off-device, to the companion server when configured.
-            io.github.obdosok.diapilot.collect.CompanionSync.uploadBackup(context)
+            CompanionSync.uploadBackup(context)
             if (targets.downloads) pruneAutoBackups(context)
             prefs.edit().putLong(KEY_LAST, now).apply()
             android.util.Log.i("BackupRestore", "auto-backup written: $name")

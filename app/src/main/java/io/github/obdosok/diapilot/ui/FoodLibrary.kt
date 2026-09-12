@@ -48,11 +48,16 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import com.diapilot.core.analysis.FoodMemory
 import com.diapilot.core.analysis.normalizeFoodName
+import io.github.obdosok.diapilot.AppIdentity
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.AskClaude
+import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.SqliteCollectorStore.FoodLibEntry
 import io.github.obdosok.diapilot.data.SqliteCollectorStore.RecipeItem
-import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.i18n.FoodText
 import io.github.obdosok.diapilot.i18n.localized
 import java.io.File
 import java.text.SimpleDateFormat
@@ -93,7 +98,8 @@ internal fun FoodLibraryDialog(
     onChanged: () -> Unit,
 ) {
     val context = LocalContext.current
-    val store = remember { Stores.get(context) as? SqliteCollectorStore }
+    val graph = LocalAppGraph.current
+    val store = remember { graph.store as? SqliteCollectorStore }
     var libRows by remember { mutableStateOf<List<FoodLibEntry>>(emptyList()) }
     var reloadTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(reloadTick) {
@@ -115,7 +121,7 @@ internal fun FoodLibraryDialog(
                         )
                     }
                 }
-            val notes = store?.annotations(io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
+            val notes = store?.annotations(FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
             com.diapilot.core.analysis.componentSubstrate(notes, recipes)
         }
     }
@@ -126,7 +132,7 @@ internal fun FoodLibraryDialog(
     var pools by remember { mutableStateOf<List<com.diapilot.core.analysis.ConceptPool>>(emptyList()) }
     LaunchedEffect(reloadTick) {
         pools = withContext(Dispatchers.IO) {
-            val notes = store?.annotations(io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
+            val notes = store?.annotations(FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
             com.diapilot.core.analysis.conceptPoolsFromAnnotations(notes)
         }
     }
@@ -138,14 +144,14 @@ internal fun FoodLibraryDialog(
     var deconvStats by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(reloadTick) {
         val m = withContext(Dispatchers.IO) {
-            io.github.obdosok.diapilot.data.TwinCache.getForForecast(store!!, context)
+            TwinCache.getForForecast(store!!, context)
         } ?: return@LaunchedEffect
         // Validation stats: how much of the history the deconvolution recovered,
         // and how clean it is (censored share, mmol/g and ttp spread).
         deconvStats = withContext(Dispatchers.IO) {
             val corpus = m.fingerprintCorpus
             if (corpus.isEmpty()) return@withContext null
-            val totalNotes = store?.annotations(io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
+            val totalNotes = store?.annotations(FoodEraSettings.current().startMs, System.currentTimeMillis()).orEmpty()
                 .count { it.kind == "food" && (it.estCarbs ?: 0.0) > 0 }
             val censored = corpus.count { !it.peakObserved }
             fun median(xs: List<Double>) = xs.sorted().let { if (it.isEmpty()) 0.0 else it[it.size / 2] }
@@ -548,7 +554,7 @@ internal fun FoodLibraryDialog(
                     store?.let { com.diapilot.core.analysis.setUserConceptAliases(it.conceptAliases()) }
                     // Donor corpus (in the twin model) maps names→concepts too —
                     // rebuild it so the reassignment reaches the shadow forecast.
-                    io.github.obdosok.diapilot.data.TwinCache.invalidate()
+                    TwinCache.invalidate()
                     android.os.Handler(android.os.Looper.getMainLooper()).post { reload() }
                 }.start()
             },
@@ -557,7 +563,7 @@ internal fun FoodLibraryDialog(
                 Thread {
                     store?.deleteConceptAlias(rawName)
                     store?.let { com.diapilot.core.analysis.setUserConceptAliases(it.conceptAliases()) }
-                    io.github.obdosok.diapilot.data.TwinCache.invalidate()
+                    TwinCache.invalidate()
                     android.os.Handler(android.os.Looper.getMainLooper()).post { reload() }
                 }.start()
             },
@@ -790,21 +796,21 @@ private fun FoodEntryEditor(
     }
 
     fun analyzePhoto(ref: String) {
-        val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context) ?: return
+        val key = AskClaude.apiKey(context) ?: return
         analyzing = true
         scope.launch(Dispatchers.IO) {
             var failed = false
             val result = try {
                 val bytes = loadScaledJpeg(File(photosDir(context), ref))
                     ?: error("Photo not found")
-                io.github.obdosok.diapilot.data.AskClaude.describeFood(
+                AskClaude.describeFood(
                     key, bytes,
                     caption = name.ifBlank { null },
                     context = context,
                 ).text
             } catch (e: Exception) {
                 failed = true
-                io.github.obdosok.diapilot.data.AskClaude.errorText(context, e)
+                AskClaude.errorText(context, e)
             }
             withContext(Dispatchers.Main) {
                 analyzing = false
@@ -835,7 +841,7 @@ private fun FoodEntryEditor(
         val file = File(photosDir(context), "IMG_${System.currentTimeMillis()}.jpg")
         pendingPhoto = file
         takePicture.launch(
-            FileProvider.getUriForFile(context, io.github.obdosok.diapilot.AppIdentity.FILE_PROVIDER_AUTHORITY, file),
+            FileProvider.getUriForFile(context, AppIdentity.FILE_PROVIDER_AUTHORITY, file),
         )
     }
     val speak = rememberSpeechInput { spoken ->
@@ -1028,7 +1034,7 @@ private fun FoodEntryEditor(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 // LLM: Vision when a photo is attached, text-only otherwise.
-                if (io.github.obdosok.diapilot.data.AskClaude.apiKey(context) != null) {
+                if (AskClaude.apiKey(context) != null) {
                     TextButton(
                         enabled = !analyzing && (name.isNotBlank() || mediaRef != null),
                         onClick = {
@@ -1037,15 +1043,15 @@ private fun FoodEntryEditor(
                             scope.launch(Dispatchers.IO) {
                                 var failed = false
                                 val result = try {
-                                    io.github.obdosok.diapilot.data.AskClaude.estimateCarbs(
-                                        io.github.obdosok.diapilot.data.AskClaude.apiKey(context)!!,
+                                    AskClaude.estimateCarbs(
+                                        AskClaude.apiKey(context)!!,
                                         listOf(name, comment).filter { it.isNotBlank() }
                                             .joinToString(" — "),
                                         context = context,
                                     )
                                 } catch (e: Exception) {
                                     failed = true
-                                    io.github.obdosok.diapilot.data.AskClaude.errorText(context, e)
+                                    AskClaude.errorText(context, e)
                                 }
                                 withContext(Dispatchers.Main) {
                                     analyzing = false
@@ -1211,7 +1217,7 @@ private fun FoodEntryEditor(
                             val backgroundText = e.background?.let {
                                 stringResource(
                                     R.string.food_library_episode_background,
-                                    io.github.obdosok.diapilot.i18n.FoodText.background(backgroundContext, it),
+                                    FoodText.background(backgroundContext, it),
                                 )
                             }
                             Text(

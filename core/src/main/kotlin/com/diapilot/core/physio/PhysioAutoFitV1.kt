@@ -16,42 +16,21 @@ import kotlin.math.sqrt
 /**
  * ONE FITTER, USED BY BOTH THE LAPTOP BENCH AND THE PHONE.
  *
- * The laptop bench (`tools/EpisodeServer`) grew a coordinate descent over these
- * knobs, and the phone now needs the same thing so fitting can happen on the device
- * without pulling a database. Writing it twice is not an option: two fitters
- * over the same knobs WILL diverge, and the divergence will not announce itself
- * — it will show up as «the phone suggests a different peak than the bench did»
- * with no way to tell which one is the model. That is discipline #7 arriving
- * before the mistake instead of after it, for once.
+ * Two fitters over the same knobs would diverge without announcing it, so the
+ * search, the loss and the tuning all live here and both callers are thin: each
+ * supplies episodes read from its own database and neither owns any of the
+ * mathematics.
  *
- * So the search, the loss and the tuning all live here, and both callers are
- * thin: the bench supplies episodes read from a pulled DB, the phone supplies
- * episodes read from its own, and neither owns any of the mathematics.
+ * The three metrics are reported separately and never collapsed — [Metric.SHAPE]
+ * is blind to a constant offset, [Metric.BIAS] to everything else, and
+ * [Metric.BALANCE] is their sum offered as a third choice rather than the only
+ * one. A known confound the caller must show: with food still under-delivered,
+ * BIAS pulls ISF down to correct a mean the food should have carried, so an ISF
+ * read off that arm is partly a food deficit wearing an insulin label (M-86,
+ * audit finding M3).
  *
- * WHAT IT FITS, and each is a knob the week's measurements made contestable:
- *
- * | knob | why it is here |
- * |---|---|
- * | `isf` | the amplitude; measured 2.41-2.50 from tagged corrections |
- * | `onsetMin` `fullSpeedMin` `phaseMin` `tailMin` | the insulin shape, read directly off the device |
- * | `emptyingKcalPerHour` `carbSieving` | the gastric queue |
- * | `carbSpread` | how far apart fast/medium/slow stand |
- * | `trustRamp` | `backboneWeight`; 1.00 ships, and it withholds half the physiology at h=60 (M-83) |
- *
- * THREE METRICS, REPORTED SEPARATELY AND NEVER COLLAPSED. They fail differently
- * and a single number hides which failure happened:
- *
- *  - [Metric.SHAPE] — residual spread with its own mean removed. «When», not
- *    «how much». Blind to a constant offset.
- *  - [Metric.BIAS] — that mean. Blind to everything else.
- *  - [Metric.BALANCE] — their sum, which is what a person usually means by
- *    «closest», offered as a third choice rather than as the only one.
- *
- * A KNOWN CONFOUND, stated because the caller must show it: with food still
- * under-delivered, BIAS pulls ISF DOWN to correct a mean the food should have
- * carried (M-86 — shape wanted 2.0-2.2 on the same episode where bias wanted
- * 1.74). An ISF read off the bias or balance arm is partly a food deficit
- * wearing an insulin label.
+ * What it fits, why each axis exists, and the corridor it searches in:
+ * `docs/forecast-engine.md` §4.
  */
 object PhysioAutoFitV1 {
 
@@ -85,7 +64,8 @@ object PhysioAutoFitV1 {
     /**
      * A tuning point. Nulls are not allowed here — the fitter always works with
      * concrete numbers; it is the SETTINGS layer that distinguishes «not set»
-     * from «set to the shipped value».
+     * from «set to the shipped value». What each axis means, and the
+     * measurement behind it: `docs/forecast-engine.md` §4.3.
      */
     data class Knobs(
         val isf: Double,
@@ -94,41 +74,14 @@ object PhysioAutoFitV1 {
         val phaseMin: Double,
         val tailMin: Double,
         /**
-         * SHARE OF THE DOSE ARRIVING AFTER THE ACTIVE PHASE — an axis that used to be missing.
+         * SHARE OF THE DOSE ARRIVING AFTER THE ACTIVE PHASE — the axis that
+         * makes "insulin acts longer" testable, because [tailMin] alone only
+         * spreads a fixed share wider and weakens the late action.
          *
-         * Without it, the hypothesis "insulin acts longer" was untestable, and
-         * that only became clear once someone tried to test it. The `tailMin`
-         * knob does not change the strength of the late action, only its
-         * SPREAD: the share is fixed at `InsulinShapeV1.TAIL_SHARE = 0.20`, so
-         * stretching the tail spreads that same 20% wider and makes the late
-         * action WEAKER. Measured: stretching 130 -> 300 moves the bias
-         * −0.15 -> +0.14, i.e. in the direction opposite to what was wanted.
-         *
-         * Two external reviews recommended "stretch the tail to
-         * 240-300 so the model sees late drops". The correct axis for
-         * that is this one: it moves dose mass into the later hours without
-         * touching the area under the curve.
-         *
-         * The claim that this axis "does NOT substitute for ISF" turned out to be
-         * WRONG. The area under the CDF is invariant by construction:
-         * `synthesizePlateau` normalizes on its own integral and pins the last
-         * node to 1.0 at `tailMin`, so the full dose is delivered by minute 129
-         * regardless of the share. Yet the bias at minute 180 still moves by
-         * 1.07 mmol (−1.95 at a share of 0.10 vs −0.88 at 0.50, bench
-         * `isfshape`) — a magnitude quite comparable to an ISF step.
-         *
-         * So the engine is sensitive to the PATH, not only the total, and a
-         * suspect is named: `HybridForecastEngine.backgroundDelta` contains
-         * `- stateReversion * (current - targetGlucose)`, where `current` is the
-         * running predicted line (`steppedBackgroundFeedback`). A different
-         * trajectory for the same delivered dose gives a different accumulated
-         * pullback.
-         *
-         * THE MECHANISM IS NOT CONFIRMED — the sign this reasoning predicts does
-         * not match what was observed, and reasoning from code instead of
-         * measuring already cost real time (discipline #1). The MAGNITUDE is
-         * measured; reading it as "a share free of ISF" is wrong, and both axes
-         * need to be fitted with that in mind.
+         * It does NOT substitute for ISF cleanly: the area under the CDF is
+         * invariant, yet the bias still moves with the share, so the engine is
+         * sensitive to the PATH and not only to the total. The mechanism behind
+         * that is named but NOT confirmed — see `docs/forecast-engine.md` §4.3.
          */
         val tailShare: Double = com.diapilot.core.physio.InsulinShapeV1.TAIL_SHARE,
         val emptyingKcalPerHour: Double,
@@ -137,79 +90,37 @@ object PhysioAutoFitV1 {
         val trustRamp: Double,
         /**
          * Moves mass between the carb bases: `+0.2` makes every dish a fifth
-         * more «fast», with the remainder re-shared between medium and slow in
-         * their old proportion. Distinct from [carbSpread], which moves the
-         * BASES apart rather than the weights between them — one asks «is this
-         * dish fast», the other «how different is fast from slow at all».
+         * more «fast». Distinct from [carbSpread], which moves the BASES apart
+         * rather than the weights between them — §4.3.
          */
             val fastShift: Double = 0.0,
         /**
-         * Scalar on `grams x CS`. THE AXIS THIS FITTER WAS MISSING.
-         *
-         * Until this axis was added, nothing here could change how much glucose a meal
-         * delivers — `kcal`, `sieve`, `spread` and `fastShift` all move WHEN it
-         * arrives. So on an episode where the drawn line was flat and reality
-         * arced up, the only reachable lever was ISF, and the walk-forward duly
-         * pinned ISF to the floor of its measured corridor on every window.
-         * That was read as «the loss wants weak insulin». It was the loss
-         * reaching for the nearest knob to the one it needed.
+         * Scalar on `grams x CS`. THE AXIS THIS FITTER WAS MISSING: without it
+         * the only lever that could lift a too-flat line was ISF, and the
+         * walk-forward pinned ISF to its corridor floor.
+         * See `docs/forecast-engine.md` §4.3.
          */
         val foodAmp: Double = 1.0,
         /**
          * HOW MUCH GLUCOSE ACTIVITY REMOVES — an axis that was missing despite
-         * the mechanism already existing.
-         *
-         * `backgroundDelta` computes `-activityDirect * exposure * 5/30` per
-         * step, i.e. removal proportional to exposure. The coefficient was
-         * zeroed in `personModelAt`, and two external reviews called this out as
-         * a silent gap: exposure is recorded, the median line never uses it.
-         *
-         * Measured on a corpus of episodes with activity, controlling for dose
-         * and carbs: the bias at minute 180 grows with exposure by **+5.63 mmol
-         * per unit** (R² 0.374), i.e. the model overshoots reality more the more
-         * activity there was. Over the typical exposure range this is on the
-         * order of +1 to +2 mmol.
-         *
-         * THE RANGE CEILING WAS CHOSEN FROM THE MEASUREMENT, not from a prior
-         * number in the artifact. That number had been «fitted as part of a
-         * different factorization» and did not pass the versioned gates;
-         * reviving it would mean fitting to an answer nobody had checked.
+         * the mechanism already existing, and whose range ceiling comes from the
+         * measurement rather than from a number in the artifact.
+         * See `docs/forecast-engine.md` §4.3.
          */
         val activityDirect: Double = 0.0,
-        /** Time axis of the carb triangles; >1 makes food arrive LATER. Reality
-         *  peaks at ~125 min while insulin peaks at ~51, and a model whose food
-         *  peaks near its insulin cancels itself — which no amplitude can fix,
-         *  because raising both sides of a subtraction changes nothing. */
+        /** Time axis of the carb triangles; >1 makes food arrive LATER. A model
+         *  whose food peaks near its insulin cancels itself — §4.3. */
         val carbTimeScale: Double = 1.0,
         /** How long food keeps arriving, with its onset and peak held. The axis
          *  the search was missing: see `HybridForecastEngine.foodTailScale`. */
         val foodTailScale: Double = 1.0,
         /**
-         * THE THREE POPULATION TRIANGLES, one axis per landmark.
-         *
-         * These used to be literals inside the engine, so the only
-         * handles on carbohydrate SHAPE were [carbSpread] (how far fast and slow
-         * stand from medium) and [carbTimeScale] (stretch all three at once).
-         * Both are functions OF these numbers, so the fitter could scale a wrong
-         * shape but never change it — and «wrong shape» is exactly what M-78/79
-         * measured: beer, ice cream and a smoothie drawn with one peak.
-         *
-         * THEY MAKE [carbSpread] AND [carbTimeScale] REDUNDANT, exactly. Spread
-         * is fast/slow relative to medium; time-scale is a common multiplier.
-         * Both are reachable by moving these nine, so freeing all of them at
-         * once gives the search two extra directions along which the loss is
-         * flat — the classic unidentifiable fit, and the same failure the
-         * insulin/food ordering rule exists to prevent. [fitOne] therefore locks
-         * spread and time-scale whenever any triangle axis is free, and says so.
+         * THE THREE POPULATION TRIANGLES, one axis per landmark. They make
+         * [carbSpread] and [carbTimeScale] exactly redundant, so [fitOne] locks
+         * those whenever any triangle axis is free, and says so. Defaults come
+         * from `CarbTrianglesV1.SHIPPED`, never duplicated here.
+         * See `docs/forecast-engine.md` §4.3.
          */
-        // DEFAULTS ARE TAKEN FROM THE SHIPPED TRIANGLES, NOT DUPLICATED.
-        //
-        // Twelve literals used to live here — 5/25/75, 10/55/180, 15/95/330 and
-        // macro shares 0.45/0.75/1.00 — and those were values from before two
-        // later tuning passes. The copy drifted from the original, and any bench
-        // that did not set the triangles explicitly was fitting a model the
-        // device does not run (discipline #7).
-        // See `CarbTrianglesV1.SHIPPED`.
         val fastDelayMin: Double = CarbTrianglesV1.SHIPPED.fastDelayMin,
         val fastPeakMin: Double = CarbTrianglesV1.SHIPPED.fastPeakMin,
         val fastEndMin: Double = CarbTrianglesV1.SHIPPED.fastEndMin,
@@ -221,17 +132,10 @@ object PhysioAutoFitV1 {
         val slowEndMin: Double = CarbTrianglesV1.SHIPPED.slowEndMin,
         /**
          * How strongly each carb type yields to the gastric terms — fat,
-         * protein and fibre. All three are 0.48 since M-120 — equalising them
-         * scored -0.004 with 12 days better against 5 — and the per-type field
-         * stays so they can diverge again without a migration. The wording here
-         * said «Shipped 0.45 / 0.75 / 1.00» at one point, which was the
-         * duplicate's value, not the shipped one.
-         *
-         * Fittable because it MOVES the curve on real meals and is not reachable
-         * from any other axis: measured on a 40 g meal with 20 g fat, 20 g
-         * protein and 5 g fibre, taking the medium share from 0 to 1.5 shifts
-         * 90%-delivered from 134 to 213 minutes. On a lean dish it does nothing
-         * at all — the term it scales is zero — so the axis is self-limiting.
+         * protein and fibre. Equal since M-120, and the per-type field stays so
+         * they can diverge again without a migration. Fittable because it moves
+         * the curve on real meals and no other axis reaches it — self-limiting
+         * on a lean dish. See `docs/forecast-engine.md` §4.3.
          */
         val fastMacroShare: Double = CarbTrianglesV1.SHIPPED.fastMacroShare,
         val medMacroShare: Double = CarbTrianglesV1.SHIPPED.mediumMacroShare,
@@ -249,32 +153,17 @@ object PhysioAutoFitV1 {
         val real: List<Double?>,
         val label: String = "",
         /**
-         * Movement behind the anchor, from [com.diapilot.core.analysis.ActivityExposureV1].
-         *
-         * Defaults to zero so every existing caller compiles unchanged — and
-         * that default is exactly the bug it fixes, so a caller that leaves it
-         * is declaring «this episode had no movement», not forgetting to ask.
+         * Movement behind the anchor, from
+         * [com.diapilot.core.analysis.ActivityExposureV1]. Defaults to zero, so
+         * a caller that leaves it is declaring «this episode had no movement»
+         * — forecast-engine.md §4.6.
          */
         val activityExposure: Double = 0.0,
         /**
-         * WHAT OPENED THIS EPISODE — food or an injection.
-         *
-         * There used to be exactly one kind: a candidate opened on a FOOD RECORD,
-         * requiring 25 g of carbs and a bolus inside the window. The consequence
-         * was measured on the corpus: of its episodes NOT ONE started at night —
-         * all fell between 10:00 and 21:00. So everything ever fitted on this
-         * corpus (ISF, insulin shape, food amplitude, the gastric queue)
-         * optimized the daytime post-meal regime and was blind to the night.
-         *
-         * And the night carries all of the user's hypoglycemia events, the
-         * worst cases in the corpus, and the whole complaint about insulin tail
-         * length: the nadir arrives roughly 3-4 hours after the last bolus,
-         * beyond the modeled curve.
-         *
-         * [INSULIN] is the second, dual kind: it opens on a DOSE, requires the
-         * absence of food in the window, and is judged by the DROP rather than
-         * the rise. It is the same identifiability trick used elsewhere: insulin
-         * is measured where food is not acting.
+         * WHAT OPENED THIS EPISODE — food or an injection. [Kind.INSULIN] opens
+         * on a dose with no food in the window and is judged by the DROP, which
+         * is how the night got into a corpus that had only daytime meals.
+         * See `docs/forecast-engine.md` §4.6.
          */
         val kind: Kind = Kind.MEAL,
     ) {

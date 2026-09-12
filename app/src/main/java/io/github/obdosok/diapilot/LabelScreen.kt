@@ -68,12 +68,23 @@ import com.diapilot.core.collector.scanMeals
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
+import io.github.obdosok.diapilot.data.FoodBasis
+import io.github.obdosok.diapilot.data.FoodCalculationRegistry
+import io.github.obdosok.diapilot.data.HybridFoodReadout
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.i18n.FoodText
 import io.github.obdosok.diapilot.i18n.TokenText
 import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.i18n.unitLabel
 import io.github.obdosok.diapilot.ui.AnalysisScreen
+import io.github.obdosok.diapilot.ui.AnnotationEditor
+import io.github.obdosok.diapilot.ui.AnnotationRow
+import io.github.obdosok.diapilot.ui.FoodLibraryDialog
 import io.github.obdosok.diapilot.ui.GlucoseChart
+import io.github.obdosok.diapilot.ui.HistoryDatePicker
+import io.github.obdosok.diapilot.ui.PhotoThumbPublic
+import io.github.obdosok.diapilot.ui.pickDateTime
 import io.github.obdosok.diapilot.ui.theme.DiaPilotTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -143,7 +154,7 @@ private fun historyFilterLabel(f: HistoryFilter): String = stringResource(
 // other beer regardless of how it was typed.
 /** The same intrinsic food response v11 feeds into the forward forecast. */
 private fun hybridFoodLine(
-    rows: List<io.github.obdosok.diapilot.data.HybridFoodReadout>,
+    rows: List<HybridFoodReadout>,
     mgdl: Boolean,
     context: Context,
 ): String? {
@@ -182,14 +193,14 @@ private fun hybridFoodLine(
             carbs,
             fmtCs(csDisplay, if (mgdl) 2 else 3),
             com.diapilot.core.analysis.fmtBg(total, mgdl),
-            io.github.obdosok.diapilot.i18n.unitLabel(mgdl),
+            unitLabel(mgdl),
         )
     else text.getString(
         R.string.label_screen_food_forecast_only,
         com.diapilot.core.analysis.fmtBg(total, mgdl),
-        io.github.obdosok.diapilot.i18n.unitLabel(mgdl),
+        unitLabel(mgdl),
     )
-    fun timingEvidence(row:io.github.obdosok.diapilot.data.HybridFoodReadout):String=when(row.timingSource){
+    fun timingEvidence(row:HybridFoodReadout):String=when(row.timingSource){
         // SAY WHAT IS BEHIND THE TIMING. The card described the structural
         // mixture without ever saying how much of the user's own history
         // stands behind it — and for this branch the answer is none: the
@@ -223,9 +234,9 @@ private fun hybridFoodLine(
         "physiological-prior","physiological_prior"->
             text.getString(R.string.label_screen_food_physio_template)
         else->when(row.timingBasis){
-            io.github.obdosok.diapilot.data.FoodBasis.DISH_PROFILE->text.getString(R.string.label_screen_basis_dish_profile)
-            io.github.obdosok.diapilot.data.FoodBasis.GLOBAL_CS->text.getString(R.string.label_screen_basis_global_cs)
-            io.github.obdosok.diapilot.data.FoodBasis.MACROS_DURATION->text.getString(R.string.label_screen_basis_macros_duration)
+            FoodBasis.DISH_PROFILE->text.getString(R.string.label_screen_basis_dish_profile)
+            FoodBasis.GLOBAL_CS->text.getString(R.string.label_screen_basis_global_cs)
+            FoodBasis.MACROS_DURATION->text.getString(R.string.label_screen_basis_macros_duration)
             else->row.timingBasis
         }
     }
@@ -398,8 +409,8 @@ internal fun Stage10MealReceipt(
     annotationIds:List<Long>,
     modifier:Modifier=Modifier,
 ) {
-    val snapshot by io.github.obdosok.diapilot.data.FoodCalculationRegistry.episodeFlow.collectAsState()
-    val boundary=annotationIds.mapNotNull(io.github.obdosok.diapilot.data.FoodCalculationRegistry::get)
+    val snapshot by FoodCalculationRegistry.episodeFlow.collectAsState()
+    val boundary=annotationIds.mapNotNull(FoodCalculationRegistry::get)
         .firstOrNull{it.nextMealAtMs!=null&&it.realisedFractionAtNext!=null}
     boundary?.let{b->
         val fraction=b.realisedFractionAtNext!!.coerceIn(0.0,1.0)
@@ -412,7 +423,7 @@ internal fun Stage10MealReceipt(
             style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=modifier,
         )
     }
-    val cluster=io.github.obdosok.diapilot.data.FoodCalculationRegistry.let{registry->annotationIds.mapNotNull(registry::get).firstOrNull{it.clusterMembers>1}}
+    val cluster=FoodCalculationRegistry.let{registry->annotationIds.mapNotNull(registry::get).firstOrNull{it.clusterMembers>1}}
     cluster?.let{c->
         val clusterGrams = c.clusterCarbsG?.let { "%.0f".format(java.util.Locale.ROOT, it) } ?: "?"
         val clusterText=when(c.timingScope){
@@ -517,11 +528,11 @@ internal fun LabelScreen(
     onRefreshRequest: () -> Unit = {},
     onReconcilePlan: suspend () -> List<com.diapilot.core.analysis.LabelFix> = { emptyList() },
     onApplyReconcile: (List<com.diapilot.core.analysis.LabelFix>) -> Unit = {},
-    onDecomposePlan: suspend () -> List<io.github.obdosok.diapilot.DishDecomp> = { emptyList() },
-    onLlmDecomposePlan: suspend () -> List<io.github.obdosok.diapilot.DishDecomp> = { emptyList() },
-    onApplyDecompose: (List<io.github.obdosok.diapilot.DishDecomp>) -> Unit = {},
-    onNutritionPlan: suspend () -> List<io.github.obdosok.diapilot.NutritionFill> = { emptyList() },
-    onApplyNutrition: (List<io.github.obdosok.diapilot.NutritionFill>) -> Unit = {},
+    onDecomposePlan: suspend () -> List<DishDecomp> = { emptyList() },
+    onLlmDecomposePlan: suspend () -> List<DishDecomp> = { emptyList() },
+    onApplyDecompose: (List<DishDecomp>) -> Unit = {},
+    onNutritionPlan: suspend () -> List<NutritionFill> = { emptyList() },
+    onApplyNutrition: (List<NutritionFill>) -> Unit = {},
     onSearchStart: () -> Unit = {},
     onLoadMoreHistory: () -> Unit = {},
     onHistoryJump: (Long) -> Unit = {},
@@ -535,12 +546,12 @@ internal fun LabelScreen(
         mutableStateOf<List<com.diapilot.core.analysis.LabelFix>?>(null)
     }
     var decompPlan by remember {
-        mutableStateOf<List<io.github.obdosok.diapilot.DishDecomp>?>(null)
+        mutableStateOf<List<DishDecomp>?>(null)
     }
     var decompBusy by remember { mutableStateOf(false) }
     var nutritionBusy by remember { mutableStateOf(false) }
     var nutritionPlan by remember {
-        mutableStateOf<List<io.github.obdosok.diapilot.NutritionFill>?>(null)
+        mutableStateOf<List<NutritionFill>?>(null)
     }
     val scope = rememberCoroutineScope()
     var showLibrary by remember { mutableStateOf(false) }
@@ -1020,13 +1031,13 @@ internal fun LabelScreen(
                 )
             }
             if (showHistoryDate) {
-                io.github.obdosok.diapilot.ui.HistoryDatePicker(
+                HistoryDatePicker(
                     onPick = { showHistoryDate = false; it?.let(onHistoryJump) },
                     onDismiss = { showHistoryDate = false },
                 )
             }
             if (showLibrary) {
-                io.github.obdosok.diapilot.ui.FoodLibraryDialog(
+                FoodLibraryDialog(
                     foodMemory = state.foodMemory,
                     carbsByFood = state.carbsByFood,
                     recentFoodTexts = state.recentFoodTexts,
@@ -1171,7 +1182,7 @@ internal fun LabelScreen(
                         val note = item.note
                         if (note != null) {
                             androidx.compose.ui.window.Dialog(onDismissRequest = { editingMeal = null }) {
-                                io.github.obdosok.diapilot.ui.AnnotationEditor(
+                                AnnotationEditor(
                                     annotation = note,
                                     onSave = { ts, text, media ->
                                         editingMeal = null
@@ -1214,7 +1225,7 @@ internal fun LabelScreen(
                     item.extraNotes.forEach { n ->
                         if (editingNote == n.id) {
                             androidx.compose.ui.window.Dialog(onDismissRequest = { editingNote = null }) {
-                                io.github.obdosok.diapilot.ui.AnnotationEditor(
+                                AnnotationEditor(
                                     annotation = n,
                                     onSave = { ts, text, media ->
                                         editingNote = null
@@ -1244,7 +1255,7 @@ internal fun LabelScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             item.note?.mediaRef?.let {
-                                io.github.obdosok.diapilot.ui.PhotoThumbPublic(it, item.label ?: "")
+                                PhotoThumbPublic(it, item.label ?: "")
                                 Text("  ")
                             }
                             // Two-tier: bright primary (what & how many carbs),
@@ -1358,7 +1369,7 @@ internal fun LabelScreen(
                         // and the meal still reads as one card (which is also
                         // what the model now learns from — one session).
                         item.extraNotes.forEach { n ->
-                            io.github.obdosok.diapilot.ui.AnnotationRow(
+                            AnnotationRow(
                                 n,
                                 onClick = { editingNote = n.id },
                                 modifier = Modifier.padding(start = 20.dp, bottom = 4.dp),
@@ -1521,7 +1532,7 @@ internal fun LabelScreen(
                                     Text(
                                         "🕐 ${basalFmt.format(Date(editBasalTs))} ✎",
                                         modifier = Modifier.clickable {
-                                            io.github.obdosok.diapilot.ui.pickDateTime(basalCtx, editBasalTs) {
+                                            pickDateTime(basalCtx, editBasalTs) {
                                                 editBasalTs = it
                                             }
                                         },
@@ -1551,7 +1562,7 @@ internal fun LabelScreen(
                     (listOf(item.annotation) + item.mates).forEach { n ->
                         if (editingNote == n.id) {
                             androidx.compose.ui.window.Dialog(onDismissRequest = { editingNote = null }) {
-                                io.github.obdosok.diapilot.ui.AnnotationEditor(
+                                AnnotationEditor(
                                     annotation = n,
                                     onSave = { ts, text, media ->
                                         editingNote = null
@@ -1577,7 +1588,7 @@ internal fun LabelScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                       Column(Modifier.padding(vertical = 4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            io.github.obdosok.diapilot.ui.AnnotationRow(
+                            AnnotationRow(
                                 item.annotation,
                                 onClick = { editingNote = item.annotation.id },
                                 modifier = Modifier.weight(1f),
@@ -1586,7 +1597,7 @@ internal fun LabelScreen(
                         }
                         // Session-mates: the rest of this meal, one card.
                         item.mates.forEach { n ->
-                            io.github.obdosok.diapilot.ui.AnnotationRow(
+                            AnnotationRow(
                                 n,
                                 onClick = { editingNote = n.id },
                                 modifier = Modifier.padding(start = 16.dp),
@@ -1644,7 +1655,7 @@ internal fun LabelScreen(
                             Text(
                                 "🩸 ${timeFmt.format(Date(item.tsMs))} · " + text.getString(R.string.label_screen_meter_label) + " " +
                                     "${com.diapilot.core.analysis.fmtBg(item.reading.mmol, state.mgdl)} " +
-                                    io.github.obdosok.diapilot.i18n.unitLabel(state.mgdl),
+                                    unitLabel(state.mgdl),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier
                                     .weight(1f)
@@ -1711,7 +1722,7 @@ internal fun LabelScreen(
                     androidx.compose.material3.OutlinedTextField(
                         value = meterText,
                         onValueChange = { meterText = it },
-                        label = { Text(io.github.obdosok.diapilot.i18n.unitLabel(state.mgdl)) },
+                        label = { Text(unitLabel(state.mgdl)) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -1845,11 +1856,11 @@ private fun MealCard(
                     TextButton(onClick = onCancel) { Text(stringResource(R.string.label_screen_cancel)) }
                 }
             }
-            val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+            val mgdl = Units.isMgdl(context)
             Text(
                 "${com.diapilot.core.analysis.fmtBg(meal.preBg, mgdl)} → " +
                     "${com.diapilot.core.analysis.fmtBg(meal.peakBg, mgdl)} " +
-                    stringResource(R.string.label_screen_bg_rise_duration, io.github.obdosok.diapilot.i18n.unitLabel(mgdl), meal.timeToPeakMin) +
+                    stringResource(R.string.label_screen_bg_rise_duration, unitLabel(mgdl), meal.timeToPeakMin) +
                     (meal.bolusUnits?.let { " · " + stringResource(R.string.label_screen_bolus_dose, it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -1973,8 +1984,8 @@ private class EditComp(name: String, count: Int, grams: Double?) {
  */
 @Composable
 private fun DecomposeDialog(
-    plan: List<io.github.obdosok.diapilot.DishDecomp>,
-    onApply: (List<io.github.obdosok.diapilot.DishDecomp>) -> Unit,
+    plan: List<DishDecomp>,
+    onApply: (List<DishDecomp>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val checked = remember(plan) { mutableStateListOf<Boolean>().apply { repeat(plan.size) { add(true) } } }

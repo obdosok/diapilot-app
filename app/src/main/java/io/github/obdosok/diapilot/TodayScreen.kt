@@ -56,8 +56,16 @@ import com.diapilot.core.collector.scanMeals
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
-import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.DishDialogRuntime
+import io.github.obdosok.diapilot.data.FoodCalculationRegistry
+import io.github.obdosok.diapilot.data.FoodCalculationV1
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.i18n.FoodText
+import io.github.obdosok.diapilot.i18n.TokenText
+import io.github.obdosok.diapilot.i18n.TwinText
+import io.github.obdosok.diapilot.i18n.unitLabel
 import io.github.obdosok.diapilot.ui.AnalysisScreen
+import io.github.obdosok.diapilot.ui.AnnotationEditor
 import io.github.obdosok.diapilot.ui.GlucoseChart
 import io.github.obdosok.diapilot.ui.theme.DiaPilotTheme
 import kotlinx.coroutines.Dispatchers
@@ -105,13 +113,14 @@ internal fun TodayScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val graph = LocalAppGraph.current
     val now = System.currentTimeMillis()
     // What-if simulator: superpose a hypothetical bolus/meal onto the live
     // prediction. A research lens, NOT a bolus calculator — the app never
     // solves for a dose, the user drags and reads. Hoisted here because the
     // overlay is drawn by the chart further down the layout.
     var showFoodSuggest by remember { mutableStateOf(false) }
-    var foodCalculation by remember { mutableStateOf<io.github.obdosok.diapilot.data.FoodCalculationV1?>(null) }
+    var foodCalculation by remember { mutableStateOf<FoodCalculationV1?>(null) }
     // The arrow is derived from the SHOWN delta, with no hysteresis of its own.
     //
     // There used to be a two-read confirm here to stop the glyph twitching, but
@@ -247,7 +256,7 @@ internal fun TodayScreen(
             editNoteId = null
         } else {
             androidx.compose.ui.window.Dialog(onDismissRequest = { editNoteId = null }) {
-                io.github.obdosok.diapilot.ui.AnnotationEditor(
+                AnnotationEditor(
                     annotation = note,
                     onSave = { ts, t, m -> editNoteId = null; onUpdateNote(note, ts, t, m) },
                     onDelete = { editNoteId = null; onDeleteNote(note) },
@@ -333,7 +342,7 @@ internal fun TodayScreen(
                             state.deltaMmol?.let {
                                 append(com.diapilot.core.analysis.fmtBgDelta(it, state.mgdl))
                             }
-                            append("  ${io.github.obdosok.diapilot.i18n.unitLabel(state.mgdl)}")
+                            append("  ${unitLabel(state.mgdl)}")
                             val ageMin = (now - r.tsMs) / 60_000
                             if (ageMin >= com.diapilot.core.PersonalParams.DEFAULT.ageNoiseMin) {
                                 append(" · ")
@@ -346,7 +355,7 @@ internal fun TodayScreen(
                     // Acceleration nuance — what the arrow alone can't tell.
                     state.trendNuance?.let {
                         Text(
-                            io.github.obdosok.diapilot.i18n.TwinText.nuance(
+                            TwinText.nuance(
                                 androidx.compose.ui.platform.LocalContext.current, it,
                             ),
                             style = MaterialTheme.typography.labelSmall,
@@ -397,14 +406,14 @@ internal fun TodayScreen(
         // dish's accepted structure as a dated revision and teaches the
         // wording as an alias, "no" silences this wording for this dish.
         run {
-            io.github.obdosok.diapilot.data.DishDialogRuntime.load(context)
-            io.github.obdosok.diapilot.data.DishDialogRuntime.moves.toList().forEach { move ->
+            DishDialogRuntime.load(context)
+            DishDialogRuntime.moves.toList().forEach { move ->
                 androidx.compose.material3.Card(Modifier.fillMaxWidth()) {
                     Column(
                         Modifier.padding(10.dp),
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
                     ) {
-                        if (move.kind == io.github.obdosok.diapilot.data.DishDialogRuntime.KIND_ASSUMPTION) {
+                        if (move.kind == DishDialogRuntime.KIND_ASSUMPTION) {
                             Text(
                                 stringResource(
                                     R.string.today_screen_dish_assumption_head,
@@ -436,14 +445,14 @@ internal fun TodayScreen(
                                 androidx.compose.material3.FilledTonalButton(
                                     enabled = answer.isNotBlank(),
                                     onClick = {
-                                        io.github.obdosok.diapilot.data.DishDialogRuntime.answerAssumption(
-                                            context, io.github.obdosok.diapilot.data.Stores.get(context), move, answer,
+                                        DishDialogRuntime.answerAssumption(
+                                            context, graph.store, move, answer,
                                         )
                                         onRefresh()
                                     },
                                 ) { Text(stringResource(R.string.today_screen_dish_assumption_save)) }
                                 androidx.compose.material3.TextButton(onClick = {
-                                    io.github.obdosok.diapilot.data.DishDialogRuntime.dismiss(context, move)
+                                    DishDialogRuntime.dismiss(context, move)
                                 }) { Text("✕") }
                             }
                         } else {
@@ -463,16 +472,16 @@ internal fun TodayScreen(
                                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
                             ) {
                                 androidx.compose.material3.FilledTonalButton(onClick = {
-                                    io.github.obdosok.diapilot.data.DishDialogRuntime.confirmDish(
-                                        context, io.github.obdosok.diapilot.data.Stores.get(context), move,
+                                    DishDialogRuntime.confirmDish(
+                                        context, graph.store, move,
                                     )
                                     onRefresh()
                                 }) { Text(stringResource(R.string.today_screen_dish_confirm_yes)) }
                                 androidx.compose.material3.TextButton(onClick = {
-                                    io.github.obdosok.diapilot.data.DishDialogRuntime.rejectDish(context, move)
+                                    DishDialogRuntime.rejectDish(context, move)
                                 }) { Text(stringResource(R.string.today_screen_dish_confirm_no)) }
                                 androidx.compose.material3.TextButton(onClick = {
-                                    io.github.obdosok.diapilot.data.DishDialogRuntime.dismiss(context, move)
+                                    DishDialogRuntime.dismiss(context, move)
                                 }) { Text("✕") }
                             }
                         }
@@ -505,11 +514,11 @@ internal fun TodayScreen(
                     } else {
                         onAddNote(s.triggerTsMs, name, null, "food", grams)
                     }
-                    io.github.obdosok.diapilot.data.Settings.dismissFoodSuggestion(context, s.triggerTsMs)
+                    Settings.dismissFoodSuggestion(context, s.triggerTsMs)
                     onRefresh()
                 },
                 onDecline = { s ->
-                    io.github.obdosok.diapilot.data.Settings.dismissFoodSuggestion(context, s.triggerTsMs)
+                    Settings.dismissFoodSuggestion(context, s.triggerTsMs)
                     onRefresh()
                 },
                 onDismiss = { showFoodSuggest = false },
@@ -528,7 +537,7 @@ internal fun TodayScreen(
                 com.diapilot.core.analysis.CalibrationNeed.BOTH ->
                     stringResource(R.string.today_screen_calibration_need_both)
             }
-            val correctionLabel = io.github.obdosok.diapilot.i18n.TokenText.bolusPurpose(context, com.diapilot.core.analysis.BolusPurpose.CORRECTION)
+            val correctionLabel = TokenText.bolusPurpose(context, com.diapilot.core.analysis.BolusPurpose.CORRECTION)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -823,7 +832,7 @@ internal fun TodayScreen(
                 onDeleteNote = onDeleteNoteById,
                 onDeleteBasal = onDeleteBasal,
                 onOpenNote = { editNoteId = it },
-                onExplainFood = { id -> foodCalculation=io.github.obdosok.diapilot.data.FoodCalculationRegistry.get(id) },
+                onExplainFood = { id -> foodCalculation=FoodCalculationRegistry.get(id) },
                 focusTs = focusTs,
                 onFocusHandled = onFocusHandled,
                 onInspectForecast = onInspectForecast,
@@ -882,7 +891,7 @@ internal fun TodayScreen(
                     Text(
                         stringResource(
                             R.string.today_screen_calc_uncertainty,
-                            io.github.obdosok.diapilot.data.FoodCalculationRegistry.uncertaintyText(
+                            FoodCalculationRegistry.uncertaintyText(
                                 androidx.compose.ui.platform.LocalContext.current, c,
                             ),
                         ),
@@ -1131,7 +1140,7 @@ private fun FoodSuggestDialog(
                         append(fmt.format(java.util.Date(s.triggerTsMs)))
                         append(" · ")
                         append(
-                            io.github.obdosok.diapilot.i18n.FoodText.suggestTrigger(
+                            FoodText.suggestTrigger(
                                 androidx.compose.ui.platform.LocalContext.current, s.trigger,
                             ),
                         )

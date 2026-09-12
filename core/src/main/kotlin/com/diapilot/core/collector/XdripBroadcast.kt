@@ -47,16 +47,46 @@ private fun Any?.asLongOrNull(): Long? = when (this) {
 }
 
 /**
+ * The range a broadcast glucose value may carry, mg/dL — what a CGM can report
+ * at all. Wider than any alert threshold on purpose: this is a sanity bound on
+ * an unauthenticated sender, not a clinical judgement.
+ */
+val BG_BROADCAST_MGDL_RANGE = 20.0..600.0
+
+/**
+ * How stale a broadcast timestamp may be. This channel carries the LIVE value —
+ * a reading lands within a second of the sensor grid — and history is
+ * back-filled over the web service instead, so anything older than a few grid
+ * steps is not a late broadcast.
+ */
+const val BG_BROADCAST_MAX_AGE_MS = 20L * 60_000
+
+/** How far ahead of the receiver's clock a timestamp may sit: enough for two
+ *  clocks to disagree, not enough to park a value in the future where it would
+ *  stay the freshest reading for hours. */
+const val BG_BROADCAST_MAX_AHEAD_MS = 5L * 60_000
+
+/**
  * Normalize xDrip BgEstimate intent extras into a [Reading].
  *
- * Requires a positive glucose value and a timestamp; returns null otherwise.
+ * Bounded on BOTH axes, because the sender is not authenticated: the receiver
+ * is exported (xDrip is configured with an explicit consumer list) and any app
+ * on the phone can send this intent. The worst case is not a false alarm but a
+ * suppressed real one — a forged value becomes the forecast anchor — so a value
+ * outside [BG_BROADCAST_MGDL_RANGE], or a timestamp outside
+ * `now - BG_BROADCAST_MAX_AGE_MS .. now + BG_BROADCAST_MAX_AHEAD_MS`, yields
+ * null and the broadcast is dropped whole.
+ *
+ * [nowMs] is a parameter, not a clock read here: this module reads no clock, so
+ * the window is reproducible in a replay and in a test.
  */
-fun parseBgBroadcast(extras: Map<String, Any?>?): Reading? {
+fun parseBgBroadcast(extras: Map<String, Any?>?, nowMs: Long): Reading? {
     if (extras.isNullOrEmpty()) return null
     val mgdl = extras[EXTRA_BG].asDoubleOrNull() ?: return null
-    if (mgdl <= 0) return null
+    if (!mgdl.isFinite() || mgdl !in BG_BROADCAST_MGDL_RANGE) return null
     val tsMs = extras[EXTRA_TIME].asLongOrNull() ?: return null
     if (tsMs <= 0) return null
+    if (tsMs < nowMs - BG_BROADCAST_MAX_AGE_MS || tsMs > nowMs + BG_BROADCAST_MAX_AHEAD_MS) return null
     val trend = (extras[EXTRA_SLOPE_NAME] as? String)?.takeIf { it.isNotEmpty() }
     return Reading(tsMs = tsMs, mgdl = mgdl, mmol = mgdl / MGDL_PER_MMOL, trend = trend)
 }

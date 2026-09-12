@@ -9,6 +9,7 @@ import com.diapilot.core.physio.SegmentLandmarkReaderV1
 import com.diapilot.core.physio.SegmentLandmarksV1
 import com.diapilot.core.physio.isTrustedDosePurposeV1
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.i18n.PhysioText
 import io.github.obdosok.diapilot.i18n.localized
 import java.time.Instant
 import java.time.ZoneId
@@ -221,9 +222,9 @@ object InsulinProfileRuntime {
         val p = state.profile
         val curve = state.curve
         fun coercedText(moved: List<com.diapilot.core.physio.CoercedLandmark>) =
-            context?.let { io.github.obdosok.diapilot.i18n.PhysioText.coerced(it, moved) } ?: moved.joinToString(", ")
+            context?.let { PhysioText.coerced(it, moved) } ?: moved.joinToString(", ")
         fun conflictText(c: com.diapilot.core.physio.OrderingConflict) =
-            context?.let { io.github.obdosok.diapilot.i18n.PhysioText.orderingConflict(it, c) } ?: c.toString()
+            context?.let { PhysioText.orderingConflict(it, c) } ?: c.toString()
         if (context == null) {
             // Developer log line only (see the call site below) — plain English
             // in its data form, no resources: there is no Context to resolve them.

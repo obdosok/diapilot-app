@@ -20,221 +20,51 @@ data class HybridInsulinLandmarks(
  *
  * It does not read a database, clock, preferences, or live glucose after the
  * supplied anchor. That makes blind replay and Python/Kotlin parity testable.
+ *
+ * The engineering record behind the constructor below — why the model has this
+ * shape, what each knob means, what was measured and rejected — is
+ * `docs/forecast-engine.md`; the knobs are section 2.
  */
 class HybridForecastEngine(
     private val model: HybridPersonModel,
     private val macroTiming: MacroTimingParamsV1 = MacroTimingParamsV1(),
-    /**
-     * HOW CARBOHYDRATE LEAVES THE STOMACH — defaulted from the ARM above, not
-     * from a constant, so the two cannot disagree.
-     *
-     * This used to be two loose parameters (`emptyingKcalPerHour`, then
-     * `carbSieving`), each defaulting to a value rather than to the arm. That
-     * shape is what let the caloric queue reach the forecast while six other
-     * physio consumers kept the gram queue, and it needed a factory plus a
-     * parity test to hold the line. Now forgetting the argument yields the
-     * arm's own physiology, and the only way to get the other one is to ask for
-     * it by name — which the studies do, deliberately, when sweeping it.
-     */
+    /** How carbohydrate leaves the stomach. Defaulted from the arm rather than
+     *  from a constant, so the two cannot disagree — forecast-engine.md §2.2. */
     private val appearance: CarbAppearancePolicyV1 = CarbAppearancePolicyV1.PHYSIO_SHIPPED,
-    /**
-     * Keep the pre-queue fat/protein priors in the shape's DELAY and TAIL.
-     *
-     * KEPT ON, and that is the measured decision, not inertia.
-     *
-     * Dropping these priors does improve the trajectory (60-minute bias +1.52
-     * -> +1.34 mmol over 157 meals), but `FoodDynamicsPhysioV1Test` caught what
-     * the aggregate cannot see: without the fat tail the queue's throttle turns
-     * delivery into a long flat ramp, and the argmax of the rate falls at the
-     * START of it. A fatty meal then peaks at 27 min against a lean one at 58 —
-     * fatty food peaking EARLIER than lean, which is worse than the double
-     * count it was meant to fix, and it is the landmark the card shows the user.
-     *
-     * So the knob stays, off, until the peak landmark is derived from something
-     * that a throttle cannot invert (the median-arrival crossing already exists
-     * for exactly this reason — see food-model.md §4).
-     *
-     * The historical note on keying, kept because it cost a test run: keying it on
-     * `appearance.caloric` was the first attempt and `CarbSievingTest` refused
-     * it within the hour: sieving 1.0 is still a caloric queue, so the priors
-     * survived there while the gram queue kept them too, and the pinned
-     * identity «sieving 1.0 == gram queue» broke. The physiology does not
-     * depend on which arithmetic meters the stomach, so neither does this.
-     *
-     * Only `physioFeatureShapes` reads it, so the v11 arm behind the alert,
-     * widget and watch is untouched — it never enters this branch.
-     *
-     * Measured over 157 logged meals (stand `fatsweep`): dropping
-     * these priors alone moves the 60-minute bias +1.52 -> +1.34 mmol; together
-     * with retiring the fat->peak slope, +1.52 -> +1.05.
-     */
+    /** Keep the pre-queue fat/protein priors in the shape's delay and tail.
+     *  Kept on, and that is the measured decision — forecast-engine.md §2.3. */
     private val gastricMacroPrior: Boolean = true,
-    /**
-     * SWEEP KNOBS for the fat/protein gastric prior. 1.0 is the shipped value,
-     * so a caller that omits them gets exactly the behaviour that ships.
-     *
-     * Why they are separate: the diagnosis they exist to test says
-     * fat delays the START too much, not that it lasts too long. On a McDonald's
-     * burger — 50 g carbohydrate, 35 g fat, split 92% fast — the shipped prior
-     * delivers 2.79 mmol by 60 min where the same meal with fat zeroed delivers
-     * 4.38, and a comparison trace rose 5.9 mmol in 69 minutes. Scaling the delay and
-     * the tail together could not tell «too slow to start» from «too long to
-     * finish», and those want opposite corrections.
-     *
-     * The knob is a SCALE rather than a replacement coefficient on purpose: at
-     * 0.0 the term is exactly the `queueMetersMacros` case that already exists,
-     * so the sweep's endpoints are both already-shipped behaviours and only the
-     * interior is new.
-     */
+    /** Sweep knobs for the fat/protein gastric prior; 1.0 ships, and the delay
+     *  and the tail move apart on purpose — forecast-engine.md §2.4. */
     private val macroGastricScale: Double = 1.0,
     private val macroTailScale: Double = 1.0,
-    /**
-     * SWEEP KNOB: how far apart the three carbohydrate bases stand. 1.0 ships.
-     *
-     * The user's claim, and it is NOT «carb type does not matter»:
-     * «the difference between them is smaller than the model thinks — the
-     * priors are population averages, and they are wrong». The three triangles — fast 5/25/75, medium 10/55/180, slow
-     * 15/95/330 — are population constants never fitted on the user (a known open
-     * gap). If reality separates the user's fast and slow carbohydrate
-     * less than those numbers do, every mixture weight is amplified by a spread
-     * that is too wide.
-     *
-     * That also explains why the WEIGHTS measured as the strongest lever
-     * (M-74): a lever is powerful in proportion to how far apart its ends sit.
-     * Moving weights could never distinguish «type matters» from «the priors
-     * exaggerate type»; this knob separates them by collapsing the bases toward
-     * the MEDIUM one without touching a single weight.
-     *
-     * At 1.0 nothing changes; at 0.0 all three share the medium curve and
-     * carbohydrate type stops existing.
-     */
+    /** How far apart the three carbohydrate bases stand; 1.0 ships, 0.0 makes
+     *  carbohydrate type stop existing — forecast-engine.md §2.5. */
     private val carbSpread: Double = 1.0,
-    /**
-     * HOW FAST THE USER'S CARBOHYDRATE APPEARS, relative to the population triangles.
-     *
-     * The three bases — fast 5/25/75, medium 10/55/180, slow 15/95/330 — are a
-     * POPULATION prior and have never been measured on the user, unlike the insulin
-     * landmarks, which are read from the user's own doses segment by segment. The
-     * shortfall hunt (A-45) ran out of other suspects: the amplitude is whole,
-     * the caloric queue is flat across a factor of ten, carb TYPE moves the
-     * two-hour delivery by one point, and the fat/protein prior turned out to
-     * trade fatty episodes against lean ones rather than fix either (A-46).
-     * What is left is the base triangles themselves being slower than the user's gut.
-     *
-     * This scales their TIME AXIS — delay, peak and end together, all three
-     * bases equally — so 0.8 means «the user's carbohydrate arrives a fifth sooner
-     * than the textbook». It deliberately does NOT touch amplitude: how much
-     * arrives is `grams x CS` and that part measures correct.
-     *
-     * Scaling all three by one number rather than fitting nine is the point:
-     * one parameter, measurable on a corpus this small, and it cannot quietly
-     * become a per-dish fudge.
-     */
+    /** Time axis of the population triangles, all three equally; amplitude
+     *  untouched — forecast-engine.md §2.6. */
     private val carbTimeScale: Double = 1.0,
-    /**
-     * SCALES HOW MUCH GLUCOSE A MEAL DELIVERS — `grams x CS x this`.
-     *
-     * Added because the walk-forward stand could not ask the
-     * question it was measuring. Its fit had ten axes and NONE of them touched
-     * food amplitude, so the only lever that could lift a too-flat line was
-     * ISF — and with ISF held in its measured corridor the search pinned to the
-     * corridor FLOOR on every window. That reads as «the loss wants weak
-     * insulin»; it actually means «the loss was denied the knob it needed».
-     *
-     * Deliberately a SCALAR on the existing amplitude, not a replacement for
-     * `carbSens`: it has been measured three times on real data (F-03 opened, closed on
-     * the phone corpus, re-measured; A-18 killed the size gradient), and the
-     * only surviving deviation is +25% on large meals via the tail. A scalar
-     * that lands near 1.0 confirms that record; one that lands at the ceiling
-     * says the deficit is not amplitude at all.
-     *
-     * RESCUE IS EXEMPT. The corpus rule forbids learning amplitude on
-     * dextrose — at hypo the liver contributes and the grams are not the whole
-     * story — so a rescue inside a scored window must not be scaled by a knob
-     * fitted on meals.
-     */
+    /** Scales how much glucose a meal delivers, `grams x CS x this`. Rescue is
+     *  exempt — forecast-engine.md §2.7. */
     private val foodAmpScale: Double = 1.0,
-    /**
-     * A/B SWITCH FOR THE BACKGROUND FIX, so the change can be measured against
-     * itself rather than asserted.
-     *
-     * `true` (default) steps the reversion with the trajectory. `false`
-     * reproduces the behaviour shipped before this fix — the anchor level held
-     * constant for the whole horizon — and exists ONLY so a stand can run both
-     * arms on the same episodes. It is not a setting and must not become one:
-     * the old branch is a defect, kept alive exactly as long as it takes to
-     * publish the difference it makes.
-     */
+    /** A/B switch for the background fix. Not a setting, and must not become
+     *  one — forecast-engine.md §2.11. */
     private val steppedBackgroundFeedback: Boolean = true,
-    /**
-     * SWEEP-ONLY HANDLES ON TERMS THAT NEVER HAD ONE.
-     *
-     * An inventory of the physio food path found six mechanisms
-     * with no knob at all, so none of them had ever been swept and none could
-     * appear in any hypothesis verdict. Three of the four `MacroTimingParamsV1`
-     * fields turned out to be unreachable for parsed food in the same audit —
-     * measured, not argued: they returned the base score to three decimals at
-     * every value including +30 min per 10 g. A term that cannot be moved
-     * cannot be evidence, and a term nobody moved is not evidence either.
-     *
-     * These four exist to find out which of the six can move the SHAPE at all.
-     * Every default is the neutral value, so nothing ships changed; a knob that
-     * earns a place becomes a real parameter afterwards, and the rest stay
-     * constants with a measurement behind them instead of a guess.
-     *
-     * `formStretchScale` scales the DEVIATION from 1.0, so 0 collapses the
-     * physical-form stretch to «all foods stretch alike» and 2 doubles the
-     * spread between a liquid and a solid. The others are plain multipliers.
-     */
+    /** Sweep-only handles on food terms that never had one. Every default is
+     *  the neutral value — forecast-engine.md §2.10. */
     private val formStretchScale: Double = 1.0,
     private val formDelayScale: Double = 1.0,
     private val fiberScale: Double = 1.0,
     private val peakGastricShare: Double = 0.35,
-    /**
-     * THE THREE BASE TRIANGLES, SEPARATELY — the last unexplored surface.
-     *
-     * `carbTimeScale` moves all three together, which is the right knob when
-     * the question is «does the user's carbohydrate arrive sooner than the textbook».
-     * It cannot answer «is the FAST basis right while the SLOW one is not», and
-     * that question has never been asked: the nine numbers behind
-     * fast(5/25/75), medium(10/55/180) and slow(15/95/330) have never moved
-     * except uniformly.
-     *
-     * One scale per basis rather than nine free numbers: three parameters are
-     * estimable on this corpus, nine are not, and a per-basis time dilation is
-     * the same physical statement as `carbTimeScale` made three times.
-     *
-     * `macroShareScale` touches the other untouched term — how much of the
-     * macro delay each basis receives (.45 fast, .75 medium, 1.0 slow).
-     */
+    /** The three base triangles separately, plus the share of the macro delay
+     *  each basis receives — forecast-engine.md §2.9. */
     private val carbTriangles: CarbTrianglesV1 = CarbTrianglesV1(),
     private val fastTimeScale: Double = 1.0,
     private val mediumTimeScale: Double = 1.0,
     private val slowTimeScale: Double = 1.0,
     private val macroShareScale: Double = 1.0,
-    /**
-     * HOW LONG FOOD KEEPS ARRIVING, INDEPENDENT OF WHEN IT STARTS AND PEAKS.
-     *
-     * Added because the fit was paying for its absence with the
-     * INSULIN tail. Measured on the corpus: the model under-calls the excursion
-     * by a flat 1.86-1.94 mmol at every phase/tail pair tried, and the deficit
-     * sits in the 120+ band. The two knobs that could have fixed it did not:
-     * `foodAmp` has the largest leverage of any axis (4.68) and the fit leaves
-     * it at 1.04; `carbTimeScale` sits at 0.99. Neither is used because both
-     * have the WRONG SHAPE — one lifts the whole curve, the other slides the
-     * whole curve, and the early band is already the best of the three (0.539).
-     *
-     * So the search took the nearest thing it did have: a longer insulin tail,
-     * which removes less glucose late and props the line up. That is why the
-     * fitted tail lands at 156 against an observed end of action of 85-100, and
-     * why the shape domain (`tail > peak + phase + 15`) then makes the user's own
-     * reading literally unreachable.
-     *
-     * This scales the END of each base triangle only — delay and peak untouched
-     * — so it can lengthen the arrival without moving its start. If the fit
-     * takes it and releases the insulin tail toward the observed 90-100, the
-     * compensation is confirmed and the debt is paid in the right place.
-     */
+    /** How long food keeps arriving, with onset and peak held. The term the
+     *  insulin tail was paying for — forecast-engine.md §2.8. */
     private val foodTailScale: Double = 1.0,
 ) {
     private val emptyingKcalPerHour: Double? get() = appearance.emptyingKcalPerHour

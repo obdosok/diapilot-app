@@ -16,7 +16,9 @@ import androidx.core.content.ContextCompat
 import com.diapilot.core.collector.MealEvent
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.i18n.unitLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,10 +79,10 @@ object MealNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+        val mgdl = Units.isMgdl(context)
         val from = com.diapilot.core.analysis.fmtBg(meal.preBg, mgdl)
         val to = com.diapilot.core.analysis.fmtBg(meal.peakBg, mgdl)
-        val unit = io.github.obdosok.diapilot.i18n.unitLabel(mgdl)
+        val unit = unitLabel(mgdl)
         val body = meal.bolusUnits
             ?.let { text.getString(R.string.meal_notifier_text_bolus, from, to, unit, it) }
             ?: text.getString(R.string.meal_notifier_text_no_bolus, from, to, unit)

@@ -13,6 +13,12 @@ import com.diapilot.core.collector.parsePebbleBg
 import com.diapilot.core.collector.parseSgvEntries
 import com.diapilot.core.collector.parseTreatments
 import com.diapilot.core.collector.scanMeals
+import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.FoodEraSettings
+import io.github.obdosok.diapilot.data.HealthConnectSync
+import io.github.obdosok.diapilot.data.LedgerRetention
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,8 +47,8 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         // Ledger retention, at most once a day and failing open. It lives here
         // rather than on a screen refresh because it is maintenance, not state:
         // the UI must never wait on a DELETE that touches a million rows.
-        (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let {
-            io.github.obdosok.diapilot.data.LedgerRetention.runIfDue(applicationContext, it)
+        (store as? SqliteCollectorStore)?.let {
+            LedgerRetention.runIfDue(applicationContext, it)
         }
 
         // Deep backfill: once per install (xDrip keeps weeks of history — grab
@@ -57,13 +63,13 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
 
         // Own-BLE mode: glucose comes from OUR sensor link only; xDrip's
         // scale must not leak into the store (5-minute sawtooth otherwise).
-        val ownBle = io.github.obdosok.diapilot.data.Settings.ownBleEnabled(applicationContext)
+        val ownBle = Settings.ownBleEnabled(applicationContext)
 
         // Equipment watchdog: in own-BLE mode a silent stall (nonce desync,
         // BT off, sensor gone) must become a notification, not an empty
         // chart discovered an hour later. The notifier no-ops on fresh data.
         if (ownBle) {
-            StreamStallNotifier.maybeNotify(applicationContext, io.github.obdosok.diapilot.R.string.stream_stall_notifier_reason_stopped)
+            StreamStallNotifier.maybeNotify(applicationContext, R.string.stream_stall_notifier_reason_stopped)
         }
 
         // 1. Glucose backfill from sgv.json (confirmed reachable in the phone browser).
@@ -110,9 +116,22 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
             val json = fetchFirst(TREATMENT_PATHS.map { "$BASE_URL$it?count=$treatmentsCount" })
             if (json != null) {
                 val events = parseTreatments(jsonToMaps(json))
-                events.forEach(store::upsertInsulin)
+                // ONE FUSE FOR EVERY INSULIN INPUT. Port 17580 is a socket, not
+                // a trusted peer: with xDrip stopped any app holding INTERNET
+                // can bind it and answer this poll. Every dose therefore passes
+                // the same guard the LLM path passes before it reaches IOB, the
+                // forecast and the hypo alert.
+                val accepted = com.diapilot.core.analysis.acceptedInsulinEvents(events)
+                accepted.forEach(store::upsertInsulin)
+                if (accepted.size != events.size) {
+                    // Count only — the refused dose is medical payload.
+                    Log.w(TAG, "dose guard refused ${events.size - accepted.size} treatments")
+                }
                 // Deletion sync: within the span the response covers, anything we
                 // have locally that xDrip no longer returns was deleted there.
+                // It reads the FULL parsed list on purpose: a refused dose was
+                // still reported by the source, and treating its timestamp as
+                // "no longer there" would delete the local row it collides with.
                 if (events.isNotEmpty()) {
                     val minTs = events.minOf { it.tsMs }
                     val fetched = events.mapTo(HashSet()) { it.tsMs }
@@ -140,7 +159,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
 
         // 4. Physiology from Health Connect (no-op until permissions granted).
         try {
-            io.github.obdosok.diapilot.data.HealthConnectSync.sync(applicationContext, store)
+            HealthConnectSync.sync(applicationContext, store)
         } catch (e: Exception) {
             Log.w(TAG, "HC sync failed: ${e.message}")
         }
@@ -192,7 +211,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         // button is knowable from the onset hour), backed by a global
         // frequent label — not two globals, which mostly offered dinner
         // dishes at breakfast.
-        val era=io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs
+        val era=FoodEraSettings.current().startMs
         val topLabels = store.labeledMeals(500).filter { it.event.onsetMs>=era }
             .groupingBy { it.labelName }.eachCount().entries.sortedByDescending { it.value }.map { it.key }.take(2)
         val notes = store.annotations(era, now)
@@ -223,11 +242,26 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         return null
     }
 
+    /**
+     * The `api-secret` header value, or null when the user configured none.
+     * Read once per run: the secret is decrypted through the keystore, and this
+     * worker makes several requests.
+     */
+    private val apiSecret: String? by lazy {
+        com.diapilot.core.collector.xdripApiSecretHeader(
+            Settings.xdripApiSecret(applicationContext),
+        )
+    }
+
     private fun fetch(url: String): String? {
         val conn = URL(url).openConnection() as HttpURLConnection
         return try {
             conn.connectTimeout = 5_000
             conn.readTimeout = 10_000
+            // Hashed, never the plaintext secret — the format xDrip expects.
+            apiSecret?.let {
+                conn.setRequestProperty(com.diapilot.core.collector.XDRIP_API_SECRET_HEADER, it)
+            }
             if (conn.responseCode != 200) {
                 Log.d(TAG, "$url -> HTTP ${conn.responseCode}")
                 null

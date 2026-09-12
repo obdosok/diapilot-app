@@ -30,10 +30,30 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.MGDL_PER_MMOL_F
+import io.github.obdosok.diapilot.AppIdentity
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.collect.AlarmPlayer
+import io.github.obdosok.diapilot.collect.DiagState
+import io.github.obdosok.diapilot.collect.HypoAlertNotifier
+import io.github.obdosok.diapilot.collect.Libre2PairLog
+import io.github.obdosok.diapilot.collect.LockScreenOverlay
+import io.github.obdosok.diapilot.data.BackupRestore
 import io.github.obdosok.diapilot.data.FoodEraSettings
+import io.github.obdosok.diapilot.data.HybridModelStore
+import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+import io.github.obdosok.diapilot.data.InsulinProfileRuntime
+import io.github.obdosok.diapilot.data.Libre2State
+import io.github.obdosok.diapilot.data.ManualInsulinRuntime
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.PhysioRuntime
+import io.github.obdosok.diapilot.data.PreEraPurge
 import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.WatchApiToken
+import io.github.obdosok.diapilot.i18n.LanguageCard
+import io.github.obdosok.diapilot.i18n.PhysioText
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.i18n.unitLabel
 import kotlinx.coroutines.launch
@@ -45,6 +65,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit = {}) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     var mgdl by remember { mutableStateOf(Units.isMgdl(context)) }
     var watchServer by remember { mutableStateOf(Settings.watchServerEnabled(context)) }
     // The food-era start shown in the model card and edited next to the purge.
@@ -97,7 +118,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 )
                 var modelStatus by remember {
                     mutableStateOf(
-                        io.github.obdosok.diapilot.data.HybridModelStore.status(context),
+                        HybridModelStore.status(context),
                     )
                 }
                 var modelMessage by remember { mutableStateOf<String?>(null) }
@@ -117,7 +138,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                             requireNotNull(input) {
                                                 context.localized().getString(R.string.settings_screen_file_unavailable)
                                             }
-                                            io.github.obdosok.diapilot.data.HybridModelStore.install(
+                                            HybridModelStore.install(
                                                 context,
                                                 input,
                                                 "manual-import",
@@ -167,7 +188,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 val restored = kotlinx.coroutines.withContext(
                                     kotlinx.coroutines.Dispatchers.IO,
                                 ) {
-                                    io.github.obdosok.diapilot.data.HybridModelStore.rollback(context)
+                                    HybridModelStore.rollback(context)
                                 }
                                 if (restored == null) {
                                     modelMessage =
@@ -198,7 +219,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
             }
         }
 
-        io.github.obdosok.diapilot.i18n.LanguageCard(modifier = Modifier.fillMaxWidth())
+        LanguageCard(modifier = Modifier.fillMaxWidth())
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -308,30 +329,30 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 // SQLite, so it is produced off the composition thread.
                 val insulinView by androidx.compose.runtime.produceState<InsulinCardView?>(null) {
                     value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val store = io.github.obdosok.diapilot.data.Stores.get(context)
+                        val store = graph.store
                         val now = System.currentTimeMillis()
                         // The SAME object the forecast runs on â€” not a second
                         // reading of the same question. See InsulinProfileRuntime.
-                        val profileState = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+                        val profileState = (store as? SqliteCollectorStore)
                             ?.let { sq ->
                                 runCatching {
-                                    io.github.obdosok.diapilot.data.InsulinProfileRuntime
+                                    InsulinProfileRuntime
                                         .state(store, sq.readableDatabase, now)
                                 }.getOrNull()
                             }
                         val artifact =
-                            runCatching { io.github.obdosok.diapilot.data.PhysioRuntime.artifact(store, now) }.getOrNull()
+                            runCatching { PhysioRuntime.artifact(store, now) }.getOrNull()
                         val model = artifact?.let {
                             val hour = java.util.Calendar.getInstance()
                                 .get(java.util.Calendar.HOUR_OF_DAY).toDouble()
                             runCatching { it.personModelAt(hour) }.getOrNull()
-                        } ?: io.github.obdosok.diapilot.data.HybridRuntimeMetrics.model()
+                        } ?: HybridRuntimeMetrics.model()
                         // The ISF-deviations card was removed along with the episode
                         // pipeline it used to read from.
                         val deviations = emptyList<String>()
                         InsulinCardView(
                             model, artifact, profileState?.curve, deviations,
-                            profileState?.let { io.github.obdosok.diapilot.data.InsulinProfileRuntime.explain(it, context) },
+                            profileState?.let { InsulinProfileRuntime.explain(it, context) },
                             profileState?.refusals.orEmpty(),
                         )
                     }
@@ -440,7 +461,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             Text(
                                 stringResource(
                                     R.string.settings_screen_refusal_line,
-                                    io.github.obdosok.diapilot.i18n.PhysioText.landmarkRefusal(context, reason),
+                                    PhysioText.landmarkRefusal(context, reason),
                                     n,
                                 ),
                                 style = MaterialTheme.typography.labelSmall,
@@ -468,7 +489,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     // knows when their insulin starts.
                     var manualTick by remember { mutableStateOf(0) }
                     val stored = remember(manualTick) {
-                        io.github.obdosok.diapilot.data.ManualInsulinRuntime.params(context)
+                        ManualInsulinRuntime.params(context)
                     }
                     fun show(v: Double?) = v?.let { "%.0f".format(java.util.Locale.ROOT, it) } ?: ""
                     var onsetIn by remember(manualTick) { mutableStateOf(show(stored.onsetMin)) }
@@ -524,7 +545,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 plateauEndMin = num(plateauIn),
                                 tailMin = num(tailIn), isfMmolPerU = isf,
                             )
-                            io.github.obdosok.diapilot.data.ManualInsulinRuntime.setParams(context, entered)
+                            ManualInsulinRuntime.setParams(context, entered)
                             manualTick++
                             manualNote = if (entered.any) {
                                 context.localized().getString(R.string.settings_screen_saved_recalculating)
@@ -533,7 +554,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             }
                         }) { Text(stringResource(R.string.settings_screen_apply)) }
                         androidx.compose.material3.TextButton(onClick = {
-                            io.github.obdosok.diapilot.data.ManualInsulinRuntime.setParams(
+                            ManualInsulinRuntime.setParams(
                                 context, com.diapilot.core.physio.ManualInsulinParamsV1.EMPTY,
                             )
                             manualTick++
@@ -545,7 +566,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     // field does something it does not.
                     val manualResolution = remember(manualTick, insulinModel, measuredCurve, measuredIsf) {
                         runCatching {
-                            io.github.obdosok.diapilot.data.ManualInsulinRuntime.resolve(
+                            ManualInsulinRuntime.resolve(
                                 insulinModel, stored, measuredCurve, measuredIsf,
                             )
                         }.getOrNull()
@@ -698,8 +719,8 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     TextButton(onClick = {
-                        val hasVib = io.github.obdosok.diapilot.collect.AlarmPlayer.hasVibrator(context)
-                        io.github.obdosok.diapilot.collect.AlarmPlayer.alarm(
+                        val hasVib = AlarmPlayer.hasVibrator(context)
+                        AlarmPlayer.alarm(
                             context, withSound = Settings.hypoAlertSound(context), seconds = 3,
                         )
                         android.widget.Toast.makeText(
@@ -856,7 +877,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     )
                 }
                 val bleState = remember(ownBle) {
-                    io.github.obdosok.diapilot.data.Libre2State.load(context)
+                    Libre2State.load(context)
                 }
                 Text(
                     if (bleState != null) {
@@ -893,13 +914,13 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 LaunchedEffect(diagTick) {
                     diag = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val now = System.currentTimeMillis()
-                        val store = io.github.obdosok.diapilot.data.Stores.get(context)
+                        val store = graph.store
                         fun age(ts: Long): String =
                             if (ts <= 0) "â€”" else context.localized().getString(R.string.settings_screen_age_minutes_ago, (now - ts) / 60_000)
-                        val d = io.github.obdosok.diapilot.collect.DiagState
+                        val d = DiagState
                         val lastMain = store.lastReading()
                         val lastMinute = store.lastMinuteReading()
-                        val cal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
+                        val cal = MinuteCalCache.get(store, context)
                         buildList {
                             add(
                                 context.localized().getString(
@@ -925,18 +946,18 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 } ?: context.localized().getString(R.string.settings_screen_calibration_none),
                             )
                             add(
-                                io.github.obdosok.diapilot.data.Settings.libreSensorStartMs(context)
+                                Settings.libreSensorStartMs(context)
                                     .takeIf { it > 0 }
                                     ?.let {
                                         context.localized().getString(
                                             R.string.settings_screen_sensor_line_with_day,
-                                            io.github.obdosok.diapilot.data.Settings.libreSensorSerial(context) ?: "â€”",
+                                            Settings.libreSensorSerial(context) ?: "â€”",
                                             (now - it) / 86_400_000.0,
                                         )
                                     }
                                     ?: context.localized().getString(
                                         R.string.settings_screen_sensor_line,
-                                        io.github.obdosok.diapilot.data.Settings.libreSensorSerial(context) ?: "â€”",
+                                        Settings.libreSensorSerial(context) ?: "â€”",
                                     ),
                             )
                             add(context.localized().getString(R.string.settings_screen_service_started_line, age(d.serviceStartedMs)))
@@ -954,7 +975,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             add(
                                 context.localized().getString(
                                     R.string.settings_screen_pairs_stage4_line,
-                                    io.github.obdosok.diapilot.collect.Libre2PairLog.stats(context),
+                                    Libre2PairLog.stats(context),
                                 ),
                             )
                         }
@@ -1000,12 +1021,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     exportStatus = context.localized().getString(R.string.settings_screen_exporting)
                     exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         exportStatus = try {
-                            val name = io.github.obdosok.diapilot.AppIdentity.manualExportName(
+                            val name = AppIdentity.manualExportName(
                                 java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.ROOT)
                                     .format(java.util.Date()),
                             )
-                            val store = io.github.obdosok.diapilot.data.Stores.get(context)
-                                as io.github.obdosok.diapilot.data.SqliteCollectorStore
+                            val store = graph.store
+                                as SqliteCollectorStore
                             if (android.os.Build.VERSION.SDK_INT >= 29) {
                                 val values = android.content.ContentValues().apply {
                                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
@@ -1043,7 +1064,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 // --- The food-era start: the first day learning may read. It
                 // defaults to the first-run date; moving it is the user's call.
                 var purgePreview by remember {
-                    mutableStateOf<io.github.obdosok.diapilot.data.PreEraPurge.Result?>(null)
+                    mutableStateOf<PreEraPurge.Result?>(null)
                 }
                 var purgeStatus by remember { mutableStateOf<String?>(null) }
                 var purging by remember { mutableStateOf(false) }
@@ -1093,11 +1114,11 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     onClick = {
                         purgeStatus = null
                         exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            val boundary = io.github.obdosok.diapilot.data.PreEraPurge.boundary(context)
+                            val boundary = PreEraPurge.boundary(context)
                                 ?: return@launch
-                            val store = io.github.obdosok.diapilot.data.Stores.get(context)
-                                as io.github.obdosok.diapilot.data.SqliteCollectorStore
-                            purgePreview = io.github.obdosok.diapilot.data.PreEraPurge.preview(store, boundary)
+                            val store = graph.store
+                                as SqliteCollectorStore
+                            purgePreview = PreEraPurge.preview(store, boundary)
                         }
                     },
                 ) { Text(stringResource(R.string.settings_screen_purge_before_era, foodEraLabel)) }
@@ -1140,12 +1161,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 purgeStatus = context.localized().getString(R.string.settings_screen_purging)
                                 exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     purgeStatus = try {
-                                        val store = io.github.obdosok.diapilot.data.Stores.get(context)
-                                            as io.github.obdosok.diapilot.data.SqliteCollectorStore
+                                        val store = graph.store
+                                            as SqliteCollectorStore
                                         val boundary = requireNotNull(
-                                            io.github.obdosok.diapilot.data.PreEraPurge.boundary(context),
+                                            PreEraPurge.boundary(context),
                                         ) { context.localized().getString(R.string.settings_screen_purge_era_not_selected) }
-                                        val r = io.github.obdosok.diapilot.data.PreEraPurge.purge(store, boundary)
+                                        val r = PreEraPurge.purge(store, boundary)
                                         context.resources.getQuantityString(
                                             R.plurals.settings_screen_purge_result,
                                             r.total, r.total, r.freedBytes / 1_048_576,
@@ -1194,7 +1215,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                                 restoreStatus = context.localized().getString(R.string.settings_screen_restoring)
                                 exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     try {
-                                        restoreStatus = io.github.obdosok.diapilot.data.BackupRestore
+                                        restoreStatus = BackupRestore
                                             .restore(context, uri)
                                         kotlinx.coroutines.delay(1500)   // let the text render
                                         android.os.Process.killProcess(android.os.Process.myPid())
@@ -1213,16 +1234,16 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 }
                 // --- Companion server: live remote dashboard + backup target.
                 var compUrl by remember {
-                    mutableStateOf(io.github.obdosok.diapilot.data.Settings.companionUrl(context) ?: "")
+                    mutableStateOf(Settings.companionUrl(context) ?: "")
                 }
                 var compToken by remember {
-                    mutableStateOf(io.github.obdosok.diapilot.data.Settings.companionToken(context) ?: "")
+                    mutableStateOf(Settings.companionToken(context) ?: "")
                 }
                 androidx.compose.material3.OutlinedTextField(
                     value = compUrl,
                     onValueChange = {
                         compUrl = it
-                        io.github.obdosok.diapilot.data.Settings.setCompanionUrl(context, it)
+                        Settings.setCompanionUrl(context, it)
                     },
                     label = { Text(stringResource(R.string.settings_screen_companion_url_label)) },
                     placeholder = { Text("http://host:8787") },
@@ -1233,7 +1254,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     value = compToken,
                     onValueChange = {
                         compToken = it
-                        io.github.obdosok.diapilot.data.Settings.setCompanionToken(context, it)
+                        Settings.setCompanionToken(context, it)
                     },
                     label = { Text(stringResource(R.string.settings_screen_companion_token_label)) },
                     singleLine = true,
@@ -1255,13 +1276,13 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 // SAF directory (e.g. Google Drive) â€” the cloud app syncs it,
                 // the data never touches any third-party server of ours.
                 var cloudUri by remember {
-                    mutableStateOf(io.github.obdosok.diapilot.data.BackupRestore.cloudFolder(context))
+                    mutableStateOf(BackupRestore.cloudFolder(context))
                 }
                 val cloudLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                     androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
                 ) { uri ->
                     if (uri != null) {
-                        io.github.obdosok.diapilot.data.BackupRestore.setCloudFolder(context, uri)
+                        BackupRestore.setCloudFolder(context, uri)
                         cloudUri = uri
                     }
                 }
@@ -1280,12 +1301,43 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 }
                 if (cloudUri != null) {
                     androidx.compose.material3.TextButton(onClick = {
-                        io.github.obdosok.diapilot.data.BackupRestore.setCloudFolder(context, null)
+                        BackupRestore.setCloudFolder(context, null)
                         cloudUri = null
                     }) { Text(stringResource(R.string.settings_screen_disable_cloud_copy)) }
                 }
                 Text(
                     stringResource(R.string.settings_screen_backup_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.settings_screen_xdrip_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                var xdripSecret by remember {
+                    mutableStateOf(Settings.xdripApiSecret(context) ?: "")
+                }
+                OutlinedTextField(
+                    value = xdripSecret,
+                    onValueChange = {
+                        xdripSecret = it
+                        Settings.setXdripApiSecret(context, it)
+                    },
+                    label = { Text(stringResource(R.string.settings_screen_xdrip_secret_label)) },
+                    singleLine = true,
+                    // Masked, with a password keyboard: no suggestions, and the
+                    // IME does not learn the secret into its dictionary.
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.settings_screen_xdrip_secret_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1316,7 +1368,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                 )
                 if (watchServer) {
                     TextButton(onClick = {
-                        io.github.obdosok.diapilot.collect.HypoAlertNotifier.postWatchTest(context)
+                        HypoAlertNotifier.postWatchTest(context)
                         android.widget.Toast.makeText(
                             context,
                             context.localized().getString(R.string.settings_screen_watch_test_toast),
@@ -1325,6 +1377,48 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                     }) { Text(stringResource(R.string.settings_screen_watch_test_vibro)) }
                     Text(
                         stringResource(R.string.settings_screen_watch_test_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    // --- The per-installation token for the two guarded
+                    // endpoints. Shown MASKED: it is a credential, and a
+                    // settings screen ends up in screenshots. The copy action
+                    // is how a client gets configured.
+                    Text(
+                        stringResource(R.string.settings_screen_watch_token_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    val watchToken = remember {
+                        WatchApiToken.getOrCreate(context)
+                    }
+                    if (watchToken == null) {
+                        Text(
+                            stringResource(R.string.settings_screen_watch_token_unavailable),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Text(
+                            WatchApiToken.masked(watchToken),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = {
+                            copySecretToClipboard(
+                                context,
+                                context.localized().getString(R.string.settings_screen_watch_token_title),
+                                watchToken,
+                            )
+                            android.widget.Toast.makeText(
+                                context,
+                                context.localized().getString(R.string.settings_screen_watch_token_copied),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }) { Text(stringResource(R.string.settings_screen_watch_token_copy)) }
+                    }
+                    Text(
+                        stringResource(R.string.settings_screen_watch_token_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1383,11 +1477,11 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         onCheckedChange = {
                             overlay = it
                             Settings.setOverlayEnabled(context, it)
-                            if (!it) io.github.obdosok.diapilot.collect.LockScreenOverlay.hide(context)
+                            if (!it) LockScreenOverlay.hide(context)
                         },
                     )
                 }
-                val canDraw = io.github.obdosok.diapilot.collect.LockScreenOverlay.canDraw(context)
+                val canDraw = LockScreenOverlay.canDraw(context)
                 if (overlay && !canDraw) {
                     Text(
                         stringResource(R.string.settings_screen_overlay_permission_needed),
@@ -1530,7 +1624,7 @@ data class InsulinCardView(
      *
      * A dose that behaved unlike the profile carries a covariate; the app's job
      * is to pair the two and say so. It never acts on them â€” see
-     * [io.github.obdosok.diapilot.data.IsfDeviationRuntime].
+     * [IsfDeviationRuntime].
      */
     val deviations: List<String> = emptyList(),
     /** One line: what is measured, or precisely what is missing. */
@@ -1539,3 +1633,21 @@ data class InsulinCardView(
      * compensated meal" is one of them and must be visible. */
     val refusals: Map<com.diapilot.core.physio.LandmarkRefusal, Int> = emptyMap(),
 )
+
+/**
+ * Copies a credential to the clipboard, marked sensitive.
+ *
+ * The flag is what keeps the value out of the clipboard preview the system
+ * shows on paste and out of clipboard-history surfaces; the constant is only
+ * declared from API 33, so the documented name is used verbatim and older
+ * versions simply ignore an extra they do not know.
+ */
+private fun copySecretToClipboard(context: android.content.Context, label: String, value: String) {
+    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+        as? android.content.ClipboardManager ?: return
+    val clip = android.content.ClipData.newPlainText(label, value)
+    clip.description.extras = android.os.PersistableBundle().apply {
+        putBoolean("android.content.extra.IS_SENSITIVE", true)
+    }
+    clipboard.setPrimaryClip(clip)
+}

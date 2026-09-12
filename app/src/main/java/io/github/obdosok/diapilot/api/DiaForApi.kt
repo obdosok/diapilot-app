@@ -10,6 +10,7 @@ import com.diapilot.core.api.Fact
 import com.diapilot.core.collector.CollectorStore
 import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
 
 /**
@@ -206,7 +207,7 @@ object DiaForApi {
         val app = context.applicationContext
         val handOff = System.currentTimeMillis() - CATCHUP_WINDOW_MS
         val oldest = js.meta(KEY_BACKFILL_CURSOR)?.toLongOrNull()
-            ?: (Stores.get(app) as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+            ?: (Stores.get(app) as? SqliteCollectorStore)
                 ?.oldestFactMs()
             ?: return                       // nothing stored yet — the live pass covers it
         // Start AT the floor, not at the oldest row: walking from an old import

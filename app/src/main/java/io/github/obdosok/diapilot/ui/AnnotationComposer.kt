@@ -49,9 +49,23 @@ import androidx.core.content.FileProvider
 import com.diapilot.core.collector.Annotation
 import com.diapilot.core.collector.BolusPoint
 import com.diapilot.core.analysis.NoteTag
+import io.github.obdosok.diapilot.AppIdentity
+import io.github.obdosok.diapilot.DEXTROSE_TABLET_G
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.AskClaude
+import io.github.obdosok.diapilot.data.DishAliasRuntime
+import io.github.obdosok.diapilot.data.DishDialogRuntime
+import io.github.obdosok.diapilot.data.FoodStructureProposalRuntime
+import io.github.obdosok.diapilot.data.OpenFoodFacts
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.i18n.CommandText
+import io.github.obdosok.diapilot.i18n.FoodText
 import io.github.obdosok.diapilot.i18n.TokenText
 import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.i18n.unitLabel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -322,6 +336,7 @@ fun AnnotationComposer(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     var expanded by remember { mutableStateOf(alwaysOpen) }
     var text by remember { mutableStateOf("") }
     // A picked composite logs under its OWN NAME (text); its ingredients ride
@@ -376,7 +391,7 @@ fun AnnotationComposer(
     // Barcode → label facts (Open Food Facts). The scan only PREFILLS the
     // label+weight evidence fields — visible, editable, and inert until the user confirms.
     var scannedProduct by remember {
-        mutableStateOf<io.github.obdosok.diapilot.data.OpenFoodFacts.Product?>(null)
+        mutableStateOf<OpenFoodFacts.Product?>(null)
     }
     var scanBusy by remember { mutableStateOf(false) }
     var scanStatus by remember { mutableStateOf<String?>(null) }
@@ -399,23 +414,23 @@ fun AnnotationComposer(
     // confirmed facts) ride into every parse, so hummus is the user's own
     // known-weight hummus, and a bread question once answered is never guessed again.
     var knownComponents by remember {
-        mutableStateOf<List<io.github.obdosok.diapilot.data.AskClaude.KnownComponent>>(emptyList())
+        mutableStateOf<List<AskClaude.KnownComponent>>(emptyList())
     }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             knownDishes = runCatching {
-                io.github.obdosok.diapilot.data.FoodStructureProposalRuntime.knownDishes(context)
+                FoodStructureProposalRuntime.knownDishes(context)
             }.getOrDefault(emptyList())
             acceptedDishIds = runCatching {
-                io.github.obdosok.diapilot.data.FoodStructureProposalRuntime.acceptedDishIds(
-                    io.github.obdosok.diapilot.data.Stores.get(context) as io.github.obdosok.diapilot.data.SqliteCollectorStore,
+                FoodStructureProposalRuntime.acceptedDishIds(
+                    graph.store as SqliteCollectorStore,
                 )
             }.getOrDefault(emptySet())
             knownComponents = runCatching {
-                (io.github.obdosok.diapilot.data.Stores.get(context) as io.github.obdosok.diapilot.data.SqliteCollectorStore)
+                (graph.store as SqliteCollectorStore)
                     .foodLibrary()
                     .map {
-                        io.github.obdosok.diapilot.data.AskClaude.KnownComponent(
+                        AskClaude.KnownComponent(
                             it.name, it.grams, it.comment,
                         )
                     }
@@ -478,18 +493,18 @@ fun AnnotationComposer(
     }
 
     fun analyzeHeldPhoto(ref: String) {
-        val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context) ?: return
+        val key = AskClaude.apiKey(context) ?: return
         photoAnalyzing = true
         val caption = text
         val pc = foodPersonalContext(
             caption, carbsByFood, recentFoodCarbs, foodMemories,
-            io.github.obdosok.diapilot.data.Units.isMgdl(context),
+            Units.isMgdl(context),
         )
         // The photo path finally SEES the user's history: the known dishes
         // travel in the request, and the question becomes "which of these, or
         // none" instead of a from-scratch parse of a dish logged many times before.
         val forVision = knownDishes.map {
-            io.github.obdosok.diapilot.data.AskClaude.KnownDishForVision(
+            AskClaude.KnownDishForVision(
                 it.proposed.id, it.proposed.title, it.typicalCarbsG,
             )
         }
@@ -498,14 +513,14 @@ fun AnnotationComposer(
             var failed = false
             val r = try {
                 val bytes = loadScaledJpeg(File(photosDir(context), ref)) ?: error("Photo not found")
-                io.github.obdosok.diapilot.data.AskClaude.describeFood(
+                AskClaude.describeFood(
                     key, bytes, caption = caption, personalContext = pc,
                     knownDishes = forVision, knownComponents = knownComponents,
                     context = context,
                 )
             } catch (e: Exception) {
                 failed = true
-                io.github.obdosok.diapilot.data.AskClaude.VisionResult(io.github.obdosok.diapilot.data.AskClaude.errorText(context, e))
+                AskClaude.VisionResult(AskClaude.errorText(context, e))
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 photoAnalyzing = false
@@ -540,7 +555,7 @@ fun AnnotationComposer(
                 scanBusy = true
                 scanStatus = context.localized().getString(R.string.annotation_composer_barcode_searching, ean)
                 aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    val product = io.github.obdosok.diapilot.data.OpenFoodFacts.lookup(ean)
+                    val product = OpenFoodFacts.lookup(ean)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         scanBusy = false
                         if (product == null || !product.usable) {
@@ -579,11 +594,11 @@ fun AnnotationComposer(
         val p = scannedProduct ?: return@LaunchedEffect
         val w = labelWeightText.trim().replace(',', '.').toDoubleOrNull() ?: return@LaunchedEffect
         if (w <= 0.0) return@LaunchedEffect
-        io.github.obdosok.diapilot.data.OpenFoodFacts.portion(p.proteinPer100g, w)
+        OpenFoodFacts.portion(p.proteinPer100g, w)
             ?.let { foodProteinText = "%.1f".format(it) }
-        io.github.obdosok.diapilot.data.OpenFoodFacts.portion(p.fatPer100g, w)
+        OpenFoodFacts.portion(p.fatPer100g, w)
             ?.let { foodFatText = "%.1f".format(it) }
-        io.github.obdosok.diapilot.data.OpenFoodFacts.portion(p.kcalPer100g, w)
+        OpenFoodFacts.portion(p.kcalPer100g, w)
             ?.let { foodKcalText = "%.0f".format(it) }
     }
 
@@ -717,7 +732,7 @@ fun AnnotationComposer(
                 content.trim(), knownDishes, acceptedDishIds,
                 picked = pendingDish?.takeIf { content.trim() == pendingDishWording },
                 isRejected = { id ->
-                    io.github.obdosok.diapilot.data.DishAliasRuntime.isRejected(context, id, content.trim())
+                    DishAliasRuntime.isRejected(context, id, content.trim())
                 },
             )
         } else com.diapilot.core.analysis.DishRecognitionV1.Resolution.None
@@ -753,12 +768,12 @@ fun AnnotationComposer(
         }
         val askMove = resolution as? com.diapilot.core.analysis.DishRecognitionV1.Resolution.Ask
         askMove?.let { ask ->
-            io.github.obdosok.diapilot.data.DishDialogRuntime.ask(
+            DishDialogRuntime.ask(
                 context,
-                io.github.obdosok.diapilot.data.DishDialogRuntime.Move(
+                DishDialogRuntime.Move(
                     tsMs = tsMs, noteContent = content.trim(),
                     dishId = ask.candidate.dish.proposed.id,
-                    question = io.github.obdosok.diapilot.i18n.FoodText.dishQuestion(
+                    question = FoodText.dishQuestion(
                         context, com.diapilot.core.analysis.DishRecognitionV1.question(ask.candidate),
                     ),
                     createdMs = System.currentTimeMillis(),
@@ -772,13 +787,13 @@ fun AnnotationComposer(
             com.diapilot.core.analysis.parseFoodAssumptions(analysis)
                 .firstOrNull { !com.diapilot.core.analysis.hasClarification(analysis, it.component) }
                 ?.let { g ->
-                    io.github.obdosok.diapilot.data.DishDialogRuntime.ask(
+                    DishDialogRuntime.ask(
                         context,
-                        io.github.obdosok.diapilot.data.DishDialogRuntime.Move(
+                        DishDialogRuntime.Move(
                             tsMs = tsMs, noteContent = content.trim().ifEmpty { NoteTag.PHOTO.key },
                             dishId = g.component.orEmpty(),
                             question = g.what + (g.impact?.let { " — $it" } ?: ""),
-                            kind = io.github.obdosok.diapilot.data.DishDialogRuntime.KIND_ASSUMPTION,
+                            kind = DishDialogRuntime.KIND_ASSUMPTION,
                             createdMs = System.currentTimeMillis(),
                         ),
                     )
@@ -827,7 +842,7 @@ fun AnnotationComposer(
         val dir = File(context.filesDir, "photos").apply { mkdirs() }
         val file = File(dir, "IMG_${System.currentTimeMillis()}.jpg")
         pendingPhoto = file
-        val uri = FileProvider.getUriForFile(context, io.github.obdosok.diapilot.AppIdentity.FILE_PROVIDER_AUTHORITY, file)
+        val uri = FileProvider.getUriForFile(context, AppIdentity.FILE_PROVIDER_AUTHORITY, file)
         takePicture.launch(uri)
     }
 
@@ -1104,7 +1119,7 @@ fun AnnotationComposer(
                         // notes, food memory): substring match, tap = add as a
                         // part — the meal composes from known dishes, grams sum
                         // themselves, and each row reminds what the dish does.
-                        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+                        val mgdl = Units.isMgdl(context)
                         val universe = remember(foodLabels, carbsByFood, foodMemories, recentFoodTexts) {
                             (foodLabels + carbsByFood.keys + foodMemories.keys + recentFoodTexts)
                                 .distinctBy { it.lowercase() }
@@ -1665,7 +1680,7 @@ fun AnnotationComposer(
                             Text(stringResource(R.string.annotation_composer_recipe_version_hint), style = MaterialTheme.typography.labelSmall)
                             if (text.isNotBlank()) {
                                 TextButton(onClick = {
-                                    io.github.obdosok.diapilot.data.Stores.get(context)
+                                    graph.store
                                         .latestStandardRecipeEvidence(text)?.input?.let { saved ->
                                             recipeVersionText = saved.recipeVersion ?: "v1"
                                             recipeTotalCarbsText = saved.recipeTotalCarbsG?.toString() ?: ""
@@ -1735,7 +1750,7 @@ fun AnnotationComposer(
                         // No photo at hand? The LLM often knows the carbs of a
                         // named product ("a Magnum bar", "a bottle of beer") from text alone.
                         var aiBusy by remember { mutableStateOf(false) }
-                        if (io.github.obdosok.diapilot.data.AskClaude.apiKey(context) != null) {
+                        if (AskClaude.apiKey(context) != null) {
                             aiAnswer?.let {
                                 Text(
                                     it,
@@ -1756,7 +1771,7 @@ fun AnnotationComposer(
                                         val desc = composed()
                                         val pc = foodPersonalContext(
                                             desc, carbsByFood, recentFoodCarbs, foodMemories,
-                                            io.github.obdosok.diapilot.data.Units.isMgdl(context),
+                                            Units.isMgdl(context),
                                         )
                                         val photoRef = (
                                             parts.keys.mapNotNull { photoByFood[it] } +
@@ -1765,17 +1780,17 @@ fun AnnotationComposer(
                                         aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                             var failed = false
                                             val r = try {
-                                                val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context)!!
+                                                val key = AskClaude.apiKey(context)!!
                                                 val bytes = photoRef?.let {
                                                     loadScaledJpeg(File(photosDir(context), it))
                                                 }
                                                 if (bytes != null) {
-                                                    io.github.obdosok.diapilot.data.AskClaude.describeFood(
+                                                    AskClaude.describeFood(
                                                         key, bytes, caption = desc, personalContext = pc,
                                                         context = context,
                                                     ).text
                                                 } else {
-                                                    io.github.obdosok.diapilot.data.AskClaude.estimateCarbs(
+                                                    AskClaude.estimateCarbs(
                                                         key, desc, personalContext = pc,
                                                         knownComponents = knownComponents,
                                                         context = context,
@@ -1783,7 +1798,7 @@ fun AnnotationComposer(
                                                 }
                                             } catch (e: Exception) {
                                                 failed = true
-                                                io.github.obdosok.diapilot.data.AskClaude.errorText(context, e)
+                                                AskClaude.errorText(context, e)
                                             }
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                 aiBusy = false
@@ -2066,7 +2081,7 @@ fun AnnotationComposer(
                                                 stringResource(R.string.annotation_composer_minutes_ago, agoMin)
                                             }
                                             val bg = bgAtShot[b.tsMs]?.let {
-                                                com.diapilot.core.analysis.fmtBg(it, io.github.obdosok.diapilot.data.Units.isMgdl(context))
+                                                com.diapilot.core.analysis.fmtBg(it, Units.isMgdl(context))
                                             }
                                             val purposeLabel = TokenText.bolusPurpose(context, b.purpose)
                                             Text(
@@ -2110,7 +2125,7 @@ fun AnnotationComposer(
                     // --- Meter: a manual glucometer reading ---------------------
                     4 -> {
                         var bgText by remember { mutableStateOf("") }
-                        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+                        val mgdl = Units.isMgdl(context)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(
                                 value = bgText,
@@ -2120,7 +2135,7 @@ fun AnnotationComposer(
                                     Text(
                                         stringResource(
                                             R.string.annotation_composer_meter_label,
-                                            io.github.obdosok.diapilot.i18n.unitLabel(mgdl),
+                                            unitLabel(mgdl),
                                         ),
                                     )
                                 },
@@ -2156,7 +2171,7 @@ fun AnnotationComposer(
                     }
                     // --- Command: natural-language data entry -------------------
                     5 -> {
-                        val hasKey = io.github.obdosok.diapilot.data.AskClaude.apiKey(context) != null
+                        val hasKey = AskClaude.apiKey(context) != null
                         Text(
                             stringResource(R.string.annotation_composer_command_hint),
                             style = MaterialTheme.typography.labelSmall,
@@ -2184,14 +2199,14 @@ fun AnnotationComposer(
                                     cmdBusy = true; cmdError = null
                                     aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val r = try {
-                                            val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context)!!
-                                            parseCommandJson(io.github.obdosok.diapilot.data.AskClaude.parseCommand(key, cmdText))
+                                            val key = AskClaude.apiKey(context)!!
+                                            parseCommandJson(AskClaude.parseCommand(key, cmdText))
                                         } catch (e: Exception) {
                                             null
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                             cmdBusy = false
-                                            val mgdl2 = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+                                            val mgdl2 = Units.isMgdl(context)
                                             if (r == null || r.action == "none" || r.describe(mgdl2, context) == null) {
                                                 cmdError = notUnderstoodMsg
                                             } else {
@@ -2208,7 +2223,7 @@ fun AnnotationComposer(
                                                 if (block != null) {
                                                     cmdError = blockedTemplate.format(
                                                         r.describe(mgdl2, context),
-                                                        io.github.obdosok.diapilot.i18n.CommandText.block(context, block),
+                                                        CommandText.block(context, block),
                                                     )
                                                 } else cmdParsed = r
                                             }
@@ -2234,7 +2249,7 @@ fun AnnotationComposer(
                             Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                         }
                         cmdParsed?.let { pc ->
-                            val mgdl2 = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+                            val mgdl2 = Units.isMgdl(context)
                             Card(
                                 colors = androidx.compose.material3.CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -2263,7 +2278,7 @@ fun AnnotationComposer(
                                                 // its tag key (the store canonicalizes), the default is
                                                 // a workout, and the rescue note is "dextrose ×1".
                                                 "activity" -> onAdd(ts, pc.activity ?: NoteTag.WORKOUT.key, null, "tag", null)
-                                                "dextrose" -> onAdd(ts, com.diapilot.core.analysis.rescueNote(1), null, "food", io.github.obdosok.diapilot.DEXTROSE_TABLET_G)
+                                                "dextrose" -> onAdd(ts, com.diapilot.core.analysis.rescueNote(1), null, "food", DEXTROSE_TABLET_G)
                                             }
                                             cmdParsed = null; cmdText = ""
                                             resetAll()
@@ -2429,6 +2444,7 @@ fun AnnotationEditor(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     // A stored tag ("walk · 40 min") is edited in the UI language; saving stores
     // it back as the key (the store canonicalizes tag-shaped notes).
     var text by remember(annotation.id) { mutableStateOf(TokenText.noteTag(context, annotation.content)) }
@@ -2454,7 +2470,7 @@ fun AnnotationEditor(
         }
     }
     val currentEvidence = remember(annotation.id) {
-        io.github.obdosok.diapilot.data.Stores.get(context).carbEvidenceKnownAt(annotation.id, Long.MAX_VALUE)
+        graph.store.carbEvidenceKnownAt(annotation.id, Long.MAX_VALUE)
     }
     val initialInput = currentEvidence?.input
     var evidenceMode by remember(annotation.id) { mutableStateOf(when (initialInput?.source) {
@@ -2636,7 +2652,7 @@ fun AnnotationEditor(
                     val file = File(photosDir(context), "IMG_${System.currentTimeMillis()}.jpg")
                     pendingPhoto = file
                     takePicture.launch(
-                        FileProvider.getUriForFile(context, io.github.obdosok.diapilot.AppIdentity.FILE_PROVIDER_AUTHORITY, file),
+                        FileProvider.getUriForFile(context, AppIdentity.FILE_PROVIDER_AUTHORITY, file),
                     )
                 }) { Text("📷") }
             }
@@ -3063,7 +3079,7 @@ fun AnnotationEditor(
 
             // No photo: the LLM can still price a described product/dish.
             if (mediaRef == null && annotation.kind == "food" &&
-                io.github.obdosok.diapilot.data.AskClaude.apiKey(context) != null
+                AskClaude.apiKey(context) != null
             ) {
                 analysis?.let { a ->
                     TextButton(onClick = { showAnalysis = !showAnalysis }) {
@@ -3081,17 +3097,17 @@ fun AnnotationEditor(
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         var failed = false
                         val result = try {
-                            io.github.obdosok.diapilot.data.AskClaude.estimateCarbs(
-                                io.github.obdosok.diapilot.data.AskClaude.apiKey(context)!!, text,
+                            AskClaude.estimateCarbs(
+                                AskClaude.apiKey(context)!!, text,
                                 context = context,
                             )
                         } catch (e: Exception) {
                             failed = true
-                            io.github.obdosok.diapilot.data.AskClaude.errorText(context, e)
+                            AskClaude.errorText(context, e)
                         }
                         var grams: Double? = null
                         if (!failed) {
-                            val store = io.github.obdosok.diapilot.data.Stores.get(context)
+                            val store = graph.store
                             store.setAnnotationAnalysis(annotation.id, result)
                             grams = com.diapilot.core.analysis.parseCarbsEstimate(result)
                             grams?.let { store.setAnnotationCarbs(annotation.id, it, source = "llm") }
@@ -3120,7 +3136,7 @@ fun AnnotationEditor(
             }
             // Claude Vision: describe the food photo; the note text goes along as
             // a caption, so typing a clarification + regenerate refines the result.
-            if (mediaRef != null && io.github.obdosok.diapilot.data.AskClaude.apiKey(context) != null) {
+            if (mediaRef != null && AskClaude.apiKey(context) != null) {
                 fun analyze() {
                     analyzing = true
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -3128,19 +3144,19 @@ fun AnnotationEditor(
                         val result = try {
                             val bytes = loadScaledJpeg(File(photosDir(context), mediaRef!!))
                                 ?: error("Photo not found")
-                            io.github.obdosok.diapilot.data.AskClaude.describeFood(
-                                io.github.obdosok.diapilot.data.AskClaude.apiKey(context)!!, bytes,
+                            AskClaude.describeFood(
+                                AskClaude.apiKey(context)!!, bytes,
                                 caption = text,
                                 context = context,
                             ).text
                         } catch (e: Exception) {
                             failed = true
-                            io.github.obdosok.diapilot.data.AskClaude.errorText(context, e)
+                            AskClaude.errorText(context, e)
                         }
                         // Paid for once — cache on the annotation itself.
                         var parsedFromVision: Double? = null
                         if (!failed) {
-                            val store = io.github.obdosok.diapilot.data.Stores.get(context)
+                            val store = graph.store
                             store.setAnnotationAnalysis(annotation.id, result)
                             parsedFromVision =
                                 com.diapilot.core.analysis.parseCarbsEstimate(result)
@@ -3193,23 +3209,23 @@ fun AnnotationEditor(
                     onAssign = { id ->
                         assigningConcept = null
                         Thread {
-                            val st = io.github.obdosok.diapilot.data.Stores.get(context)
-                                as? io.github.obdosok.diapilot.data.SqliteCollectorStore
+                            val st = graph.store
+                                as? SqliteCollectorStore
                             st?.upsertConceptAlias(raw, id)
                             st?.let { com.diapilot.core.analysis.setUserConceptAliases(it.conceptAliases()) }
                             // The donor corpus maps names→concepts too — rebuild
                             // it or the fix never reaches the model.
-                            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+                            TwinCache.invalidate()
                         }.start()
                     },
                     onReset = {
                         assigningConcept = null
                         Thread {
-                            val st = io.github.obdosok.diapilot.data.Stores.get(context)
-                                as? io.github.obdosok.diapilot.data.SqliteCollectorStore
+                            val st = graph.store
+                                as? SqliteCollectorStore
                             st?.deleteConceptAlias(raw)
                             st?.let { com.diapilot.core.analysis.setUserConceptAliases(it.conceptAliases()) }
-                            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+                            TwinCache.invalidate()
                         }.start()
                     },
                     onDismiss = { assigningConcept = null },
@@ -3224,7 +3240,7 @@ fun AnnotationEditor(
                 val newRecipeVersionMsg = stringResource(R.string.annotation_composer_new_recipe_version_needed)
                 TextButton(onClick = saveAnnotation@ {
                     if (text.isNotBlank() || mediaRef != null) {
-                        val store = io.github.obdosok.diapilot.data.Stores.get(context)
+                        val store = graph.store
                         // Total carbs = sum of the component carbs when a split
                         // exists; the manual field otherwise.
                         val total = if (compRows.isNotEmpty()) {

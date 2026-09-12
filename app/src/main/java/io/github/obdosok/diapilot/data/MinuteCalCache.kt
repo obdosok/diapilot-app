@@ -4,6 +4,7 @@ import android.content.Context
 import com.diapilot.core.analysis.MinuteCalibration
 import com.diapilot.core.analysis.fitMinuteCalibration
 import com.diapilot.core.collector.CollectorStore
+import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 
 /**
  * Rolling minute→main calibration, refit at most every [TTL_MS] over the
@@ -47,7 +48,7 @@ object MinuteCalCache {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(
-            io.github.obdosok.diapilot.collect.TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE,
+            TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE,
         )
 
     private fun persist(context: Context, cal: MinuteCalibration, now: Long) {

@@ -8,6 +8,7 @@ import com.diapilot.core.hybrid.HybridBolusEvent
 import com.diapilot.core.hybrid.hybridFoodEventFromNote
 import com.diapilot.core.physio.FitEpisodeBuilderV1
 import com.diapilot.core.physio.PhysioAutoFitV1
+import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -165,7 +166,7 @@ object PhysioAutoFitRuntime {
         }.getOrNull() ?: return null
         val timing = PhysioAutoFitV1.boundsAround(measured)
         val label = context.localized().getString(
-            io.github.obdosok.diapilot.R.string.physio_auto_fit_runtime_safety_label,
+            R.string.physio_auto_fit_runtime_safety_label,
             measured.onsetMin,
             measured.peakMin,
             (measured.plateauEndMin ?: (measured.peakMin + 30.0)) - measured.peakMin,

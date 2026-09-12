@@ -1,7 +1,8 @@
 package io.github.obdosok.diapilot.data
 
-import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
+import io.github.obdosok.diapilot.i18n.localized
 import android.content.Context
 import com.diapilot.core.hybrid.HybridPersonModel
 import com.diapilot.core.physio.InsulinShapeLandmarksV1
@@ -96,7 +97,7 @@ object PhysioTuning {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(
-            io.github.obdosok.diapilot.collect.TreatmentsPollWorker.PREFS,
+            TreatmentsPollWorker.PREFS,
             Context.MODE_PRIVATE,
         )
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 
 /**
  * Persisted Libre 2 BLE streaming context — the DiaPilot analog of xDrip's
@@ -27,7 +28,7 @@ object Libre2State {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(
-            io.github.obdosok.diapilot.collect.TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE,
+            TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE,
         )
 
     fun save(context: Context, s: State) {

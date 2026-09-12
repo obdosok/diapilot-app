@@ -2,6 +2,22 @@ package io.github.obdosok.diapilot.collect
 
 import android.content.Context
 import android.util.Log
+import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
+import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.displayHistory
+import io.github.obdosok.diapilot.data.forecastAnchor
+import io.github.obdosok.diapilot.data.tir24h
+import io.github.obdosok.diapilot.i18n.StatusText
+import io.github.obdosok.diapilot.i18n.TokenText
+import io.github.obdosok.diapilot.i18n.TwinText
 import io.github.obdosok.diapilot.i18n.localized
 import org.json.JSONArray
 import org.json.JSONObject
@@ -24,8 +40,8 @@ object CompanionSync {
 
     /** Called on every fresh minute of data (collector heartbeat). */
     fun pushIfDue(context: Context) {
-        val url = io.github.obdosok.diapilot.data.Settings.companionUrl(context) ?: return
-        val token = io.github.obdosok.diapilot.data.Settings.companionToken(context) ?: return
+        val url = Settings.companionUrl(context) ?: return
+        val token = Settings.companionToken(context) ?: return
         val now = System.currentTimeMillis()
         if (now - lastPushMs < PUSH_PERIOD_MS) return
         lastPushMs = now
@@ -65,11 +81,11 @@ object CompanionSync {
      * 8 KB copy buffer.
      */
     fun uploadBackup(context: Context) {
-        val url = io.github.obdosok.diapilot.data.Settings.companionUrl(context) ?: return
-        val token = io.github.obdosok.diapilot.data.Settings.companionToken(context) ?: return
+        val url = Settings.companionUrl(context) ?: return
+        val token = Settings.companionToken(context) ?: return
         try {
-            val store = io.github.obdosok.diapilot.data.Stores.get(context)
-                as? io.github.obdosok.diapilot.data.SqliteCollectorStore ?: return
+            val store = Stores.get(context)
+                as? SqliteCollectorStore ?: return
             val spool = java.io.File.createTempFile("dpbackup", ".sqlite", context.cacheDir)
             try {
                 spool.outputStream().use { store.exportSnapshot(it) }
@@ -153,16 +169,16 @@ object CompanionSync {
     /** The same lenses as the widget/watch — the dashboard must agree. */
     private fun buildSnapshot(context: Context, now: Long): JSONObject? {
         val text = context.localized()
-        val store = io.github.obdosok.diapilot.data.Stores.get(context)
-        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
-        val minuteCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
+        val store = Stores.get(context)
+        val mgdl = Units.isMgdl(context)
+        val minuteCal = MinuteCalCache.get(store, context)
 
         // Meter-correction lens — SAME as the widget/phone header (cached);
         // without it the dashboard shows the raw sensor scale.
-        val meterCal = io.github.obdosok.diapilot.data.MeterCalCache.get(store, context)
+        val meterCal = MeterCalCache.get(store, context)
         fun lens(ts: Long, mmol: Double): Double = meterCal?.correctedAt(ts, mmol) ?: mmol
 
-        val sharedAnchor = io.github.obdosok.diapilot.data.forecastAnchor(
+        val sharedAnchor = forecastAnchor(
             store, context, now,
         ) ?: return null
         val bgTs = sharedAnchor.reading.tsMs
@@ -181,10 +197,10 @@ object CompanionSync {
             ?: com.diapilot.core.twin.trendReadout(minutePts, now)
 
         // Forecast — the ONE shared engine (not re-recorded: mirrors "main").
-        val model = io.github.obdosok.diapilot.data.TwinCache.getForForecast(store, context)
+        val model = TwinCache.getForForecast(store, context)
         val forecast = if (model != null) {
             try {
-                io.github.obdosok.diapilot.data.Forecaster.forecast(
+                Forecaster.forecast(
                     store, model, now, anchorTsMs = bgTs, anchorMmol = bgMmol,
                     minutePoints = minutePts,
                 )?.points ?: emptyList()
@@ -193,7 +209,7 @@ object CompanionSync {
             }
         } else emptyList()
 
-        val iob = io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+        val iob = HybridRuntimeMetrics
             .surfaceIobUnits(store, context, now) ?: 0.0
         val lastBolus = store.boluses(now - 8L * 3_600_000, now)
             .filter { !com.diapilot.core.analysis.isPrimePurpose(it.purpose) }.lastOrNull()
@@ -203,14 +219,14 @@ object CompanionSync {
                 if (isNotEmpty()) append(" · ")
                 val min = (now - b.tsMs) / 60_000
                 val durationText = if (min < 60) {
-                    text.getString(io.github.obdosok.diapilot.R.string.companion_sync_minutes_compact, min)
+                    text.getString(R.string.companion_sync_minutes_compact, min)
                 } else {
                     text.getString(
-                        io.github.obdosok.diapilot.R.string.companion_sync_hours_minutes_compact,
+                        R.string.companion_sync_hours_minutes_compact,
                         min / 60, min % 60,
                     )
                 }
-                append(text.getString(io.github.obdosok.diapilot.R.string.companion_sync_insulin_line, b.units, durationText))
+                append(text.getString(R.string.companion_sync_insulin_line, b.units, durationText))
             }
         }
 
@@ -219,7 +235,7 @@ object CompanionSync {
         val settleIdx = com.diapilot.core.analysis.settleIndex(future.map { it.mmol })
         val settlePt = settleIdx?.let { future[it] }
         val statusLine = settlePt?.let { p ->
-            io.github.obdosok.diapilot.i18n.StatusText.lines(
+            StatusText.lines(
                 context,
                 com.diapilot.core.analysis.statusSummary(
                     com.diapilot.core.analysis.StatusInput(
@@ -231,7 +247,7 @@ object CompanionSync {
                         mgdl = mgdl,
                     ),
                 ),
-            ).joinToString(io.github.obdosok.diapilot.i18n.StatusText.SEPARATOR)
+            ).joinToString(StatusText.SEPARATOR)
         } ?: ""
 
         // Events: food/notes + boluses over the last 3h, newest first.
@@ -242,19 +258,19 @@ object CompanionSync {
                 .filter { it.kind != "tag" || it.content.isNotBlank() }
                 .map { a ->
                     val time = fmt.format(java.util.Date(a.tsMs))
-                    val content = io.github.obdosok.diapilot.i18n.TokenText.noteTag(context, a.content)
+                    val content = TokenText.noteTag(context, a.content)
                     val line = a.estCarbs?.let { c ->
-                        text.getString(io.github.obdosok.diapilot.R.string.companion_sync_event_note_with_carbs, time, content, c)
-                    } ?: text.getString(io.github.obdosok.diapilot.R.string.companion_sync_event_note, time, content)
+                        text.getString(R.string.companion_sync_event_note_with_carbs, time, content, c)
+                    } ?: text.getString(R.string.companion_sync_event_note, time, content)
                     a.tsMs to line
                 } +
                 store.boluses(now - 3L * 3_600_000, now)
                     .map { b ->
                         val time = fmt.format(java.util.Date(b.tsMs))
-                        val purpose = io.github.obdosok.diapilot.i18n.TokenText.bolusPurpose(context, b.purpose)
+                        val purpose = TokenText.bolusPurpose(context, b.purpose)
                         val line = purpose?.let { p ->
-                            text.getString(io.github.obdosok.diapilot.R.string.companion_sync_event_bolus_with_purpose, time, b.units, p)
-                        } ?: text.getString(io.github.obdosok.diapilot.R.string.companion_sync_event_bolus, time, b.units)
+                            text.getString(R.string.companion_sync_event_bolus_with_purpose, time, b.units, p)
+                        } ?: text.getString(R.string.companion_sync_event_bolus, time, b.units)
                         b.tsMs to line
                     }
             )
@@ -264,7 +280,7 @@ object CompanionSync {
 
         // 3h history downsampled to ~5-min steps — through the same lens.
         val history = JSONArray()
-        val hist = io.github.obdosok.diapilot.data.displayHistory(
+        val hist = displayHistory(
             store, context, now - 3L * 3_600_000, now,
         ).map { it.tsMs to it.mmol }
         var lastKept = 0L
@@ -284,9 +300,9 @@ object CompanionSync {
             )
         }
 
-        val rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
-        val rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
-        val tir = io.github.obdosok.diapilot.data.tir24h(store, context, now, rangeLo, rangeHi)
+        val rangeLo = Settings.rangeLoMmol(context)
+        val rangeHi = Settings.rangeHiMmol(context)
+        val tir = tir24h(store, context, now, rangeLo, rangeHi)
         return JSONObject()
             .put("mgdl", mgdl)
             .put("bg_mmol", bgMmol)
@@ -295,7 +311,7 @@ object CompanionSync {
                 com.diapilot.core.trendGlyph(com.diapilot.core.trendName(it))
             } ?: "")
             .put("delta_mmol", trend?.delta5Mmol)
-            .put("nuance", trend?.nuance?.let { io.github.obdosok.diapilot.i18n.TwinText.nuance(context, it) } ?: "")
+            .put("nuance", trend?.nuance?.let { TwinText.nuance(context, it) } ?: "")
             .put("status_line", statusLine)
             .put("insulin_line", insulinLine)
             .put("range_lo", rangeLo)

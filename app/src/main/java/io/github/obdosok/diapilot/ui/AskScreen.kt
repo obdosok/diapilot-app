@@ -35,9 +35,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.AskClaude
-import io.github.obdosok.diapilot.data.Stores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AskScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     val scope = rememberCoroutineScope()
     var apiKey by remember { mutableStateOf(AskClaude.apiKey(context)) }
     AskClaude.History.load(context)
@@ -99,7 +100,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
         val q = question.trim()
         if (q.isEmpty() || busy) return
         input = ""
-        AskClaude.sendAsync(context, Stores.get(context), q)
+        AskClaude.sendAsync(context, graph.store, q)
     }
 
     Column(modifier = modifier.fillMaxSize().imePadding()) {
@@ -115,7 +116,7 @@ fun AskScreen(modifier: Modifier = Modifier) {
             Row {
                 TextButton(
                     enabled = !busy,
-                    onClick = { AskClaude.sendDigest(context, Stores.get(context)) },
+                    onClick = { AskClaude.sendDigest(context, graph.store) },
                 ) { Text(stringResource(R.string.ask_screen_digest_button)) }
                 if (chat.isNotEmpty()) {
                     TextButton(onClick = { AskClaude.History.clear(context) }) { Text(stringResource(R.string.ask_screen_clear)) }

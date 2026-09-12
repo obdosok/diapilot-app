@@ -10,6 +10,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
+import io.github.obdosok.diapilot.data.Settings
 
 /**
  * A small floating BG chip drawn OVER the lock screen (xDrip-style), so the
@@ -32,7 +33,7 @@ object LockScreenOverlay {
     /** Show (or refresh) the chip. No-op if disabled, ungranted, or already up. */
     fun show(context: Context, text: String = lastText) {
         lastText = text
-        if (!io.github.obdosok.diapilot.data.Settings.overlayEnabled(context)) return
+        if (!Settings.overlayEnabled(context)) return
         if (!canDraw(context)) return
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
         try {

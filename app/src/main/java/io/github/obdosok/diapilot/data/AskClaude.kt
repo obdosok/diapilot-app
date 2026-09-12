@@ -7,6 +7,7 @@ import com.diapilot.core.analysis.labelStats
 import com.diapilot.core.collector.CollectorStore
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
+import io.github.obdosok.diapilot.i18n.IsfText
 import io.github.obdosok.diapilot.i18n.LlmLanguage
 import io.github.obdosok.diapilot.i18n.localized
 import kotlinx.coroutines.launch
@@ -178,7 +179,7 @@ ${LlmLanguage.replyInstruction(context)}"""
             val tod = m.byTod.filterValues { it.confidence != Confidence.INSUFFICIENT && it.median != null }
             if (tod.isNotEmpty()) {
                 sb.appendLine("- ISF by time of day: " + tod.entries.joinToString("; ") {
-                    "${io.github.obdosok.diapilot.i18n.IsfText.todPromptLabel(it.key)}: %.2f (n=${it.value.nValid})".format(it.value.median)
+                    "${IsfText.todPromptLabel(it.key)}: %.2f (n=${it.value.nValid})".format(it.value.median)
                 })
             }
         }

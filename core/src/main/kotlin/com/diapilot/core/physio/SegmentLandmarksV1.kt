@@ -3,39 +3,18 @@ package com.diapilot.core.physio
 import com.diapilot.core.collector.GlucosePoint
 
 /**
- * Read the insulin profile from SEGMENTS, not from whole clean episodes.
+ * Read the insulin profile from SEGMENTS, not from whole clean episodes: each
+ * landmark is admitted on its own horizon and the profile is assembled from
+ * per-landmark medians, so n differs per landmark and the tail stays openly
+ * thin.
  *
- * The user's proposal: "we can be smarter than searching for a whole clean
- * injection, and assemble the profile from segments instead. Here the onset is
- * visible — take it. Here the peak is visible — take it. Seeing the onset does
- * not even need an isolated episode: it is readable even with food on board."
+ * The onset is legible even with food on board, because it is measured against
+ * the pre-dose inertia — which also makes it «where insulin overcame the
+ * ongoing rise», so such samples carry a reduced weight and stay
+ * distinguishable in [LandmarkSampleV1.confoundedByFood].
  *
- * The measurement bears this out. Requiring ninety clean minutes to
- * establish a quantity that lives in the first thirty throws away most of the
- * evidence: on this device only 14 of 21 trusted doses own such a window, and
- * of those 14 the TAIL — the one landmark that genuinely needs the long
- * window — was censored on 2 anyway, while the onset was readable on all of
- * them. One admission rule for four quantities with different information
- * horizons is one rule too few.
- *
- * So each landmark is admitted on ITS OWN horizon, and the profile is assembled
- * from per-landmark medians. Two consequences worth stating plainly:
- *
- *  - **n now differs per landmark, and that is the honest result.** The early
- *    profile becomes well-determined while the tail stays openly thin — which
- *    is exactly what CGM can and cannot see (M-01: the residual 5–15% of action
- *    stretched over hours is below the instrument's resolution).
- *  - **The assembled profile is no single dose's profile.** Ordering is
- *    therefore checked after assembly and reported, never silently repaired.
- *
- * On reading the onset THROUGH food, which is the sharpest part of this idea:
- * the baseline here is the pre-dose inertia, so the break is measured against
- * the rise that was already happening. That is what makes it legible with food
- * on board. But it also means the onset found this way is «where insulin
- * overcame the ongoing rise», which is LATER than where insulin began to act —
- * the same two quantities M-02 separates. Doses with a fast pre-dose rise
- * therefore carry a reduced weight rather than being excluded, and the two
- * populations stay distinguishable in [LandmarkSampleV1.confoundedByFood].
+ * Why the reader has this shape, and what was measured to get there:
+ * `docs/forecast-engine.md` §3.
  */
 data class LandmarkSampleV1(
     val bolusTsMs: Long,
@@ -43,41 +22,24 @@ data class LandmarkSampleV1(
     /** How loudly this sample votes in the median. */
     val weight: Double,
     /**
-     * Is food acting anywhere in this dose's window?
-     *
-     * CORRECTED. This used to be "was the line already climbing when
-     * the dose landed", read off the pre-dose slope alone — and that misses the
-     * commonest case entirely. A bolus given BEFORE the meal sits on a flat
-     * line, so the backward-looking test called it quiet, while the food arrived
-     * immediately after and pushed every landmark later.
-     *
-     * Measured directly: split by pre-dose slope, the onset moved
-     * +0 min; split by whether food was logged within an hour, the SAME onset
-     * moved +10, the visible fall +12 and the peak +8. The confound was there
-     * all along; the flag was looking the wrong way down the time axis.
+     * Is food acting anywhere in this dose's window? Forward-looking, because
+     * a pre-meal bolus sits on a flat line and the backward-looking version
+     * called it quiet. See `docs/forecast-engine.md` §3.1.
      */
     val confoundedByFood: Boolean,
 )
 
 data class SegmentLandmarksV1(
     /**
-     * ACTION begins: the trajectory departs from its pre-dose inertia.
-     *
-     * With a climbing background this happens while glucose is still rising —
-     * the rise merely stops being a rise. It is the quantity the model's action
-     * curve starts from, because it is a property of the insulin.
+     * ACTION begins: the trajectory departs from its pre-dose inertia. A
+     * property of the insulin, so the action curve starts here.
+     * See `docs/forecast-engine.md` §3.2.
      */
     val onset: LandmarkSampleV1? = null,
     /**
-     * The VISIBLE fall begins: the line actually turns down.
-     *
-     * Decided with the user — carry both, do not choose. Measured
-     * directly the two differ by about ten minutes (14 vs ~25), and the gap
-     * is not error: it is the interval in which insulin is cancelling a rise
-     * that has not yet reversed. It is what the user reads off their own screen, so
-     * the app must be able to state it in those terms — but it is a property of
-     * insulin AND background together, so it must never be what the action
-     * curve is built on. See M-02.
+     * The VISIBLE fall begins: the line actually turns down. Carried beside
+     * [onset], never instead of it — it is a property of insulin AND
+     * background together. See M-02 and `docs/forecast-engine.md` §3.2.
      */
     val visibleFall: LandmarkSampleV1? = null,
     val peakRate: LandmarkSampleV1? = null,
@@ -85,52 +47,21 @@ data class SegmentLandmarksV1(
     val tailEnd: LandmarkSampleV1? = null,
     /**
      * The dose whose insulin OUTLASTED its window — a right-censored tail.
-     *
-     * M-22, measured directly: only 54 of 249 doses yield a
-     * tail at all, and 43 more reach the slowdown and are then dropped for
-     * never returning to the pre-dose rate inside the window. Dropping them is
-     * not neutral — those are precisely the LONG tails, so the surviving median
-     * is taken over the doses that happened to finish in time and reads short
-     * by construction. Widening the window moved the pooled median 113 -> 141,
-     * and the direct horizon reading (M-53) puts the true end at 240-300.
-     *
-     * The old comment here was right that reporting the window end AS the tail
-     * fabricates a landmark, so [tailEnd] still stays null. What is added is
-     * the LOWER BOUND: this dose's tail is at least this long. The aggregate
-     * then estimates the median with censoring rather than ignoring it.
+     * [tailEnd] stays null in that case; this is the lower bound, so the
+     * aggregate can estimate the median with censoring rather than ignore it.
+     * See M-22 and `docs/forecast-engine.md` §3.3.
      */
     val tailCensoredAtMin: Double? = null,
     /**
-     * The end of action read WITHOUT a background reference — «the rate stopped
-     * recovering» rather than «the rate came back to the pre-dose slope».
-     *
-     * The second defect of the estimator, M-54. `tailEnd` declares the end where
-     * the observed rate returns to `breakRate = baseSlope − floor`, i.e. to the
-     * slope the line had BEFORE the dose. That quantity belongs to insulin AND
-     * background together: if the background climbs while insulin still works —
-     * dawn, a late meal, the liver — the observed rate meets the old slope early
-     * and the dose is declared finished while it is still removing glucose. The
-     * user's own observation named it first: the end is the
-     * PLATEAU.
-     *
-     * A plateau is background-free. A rising background lifts the whole rate
-     * curve but does not make it FLAT, so «the rate stopped changing» survives
-     * exactly the confound that «the rate crossed a threshold» does not.
-     *
-     * Computed alongside and reported, never substituted: the shipped landmark
-     * keeps its old meaning until this one is measured against it.
+     * The end of action read WITHOUT a background reference — «the rate
+     * stopped recovering» rather than «the rate came back to the pre-dose
+     * slope». Computed alongside and reported, never substituted.
+     * See M-54 and `docs/forecast-engine.md` §3.4.
      */
     val tailPlateauMin: Double? = null,
     /**
-     * Why this dose contributed nothing — never a silent empty result.
-     *
-     * The user's question: "what if this is an ideal diabetic who perfectly
-     * compensates for food? The line barely moves — then we would never compute
-     * any timing at all." That is right, and the reader does
-     * refuse such a dose (a line that never breaks has no landmarks to read).
-     * The danger is that it refused in SILENCE, so a corpus could be dominated
-     * by the doses where compensation FAILED without anyone being able to see
-     * it. A refusal that names itself is a refusal that can be counted.
+     * Why this dose contributed nothing — never a silent empty result, so the
+     * refusals can be counted. See `docs/forecast-engine.md` §3.5.
      */
     val refusal: LandmarkRefusal? = null,
 ) {
@@ -158,18 +89,11 @@ enum class ProfileArmV1 { FOOD_FREE, POOLED }
 data class LandmarkMedianV1(val minute: Double, val samples: Int, val foodShare: Double)
 
 /**
- * A landmark that turned out to depend on whether the line was already climbing.
+ * A landmark that turned out to depend on whether the line was already
+ * climbing. [flat] is what the action curve is built on; [rising] is what the
+ * user sees when correcting on top of a meal.
  *
- * Measured directly over 210 doses: the break is
- * identical either way (21 vs 21 min) and so is the slowdown (68 vs 68), but the
- * PEAK moves +9 min and the visible fall +4 when food is on board. Insulin has
- * to cancel the rise before it can produce its steepest fall, so a pooled median
- * for those two is not a property of the insulin — it is a property of how many
- * meal boluses happen to be in the sample.
- *
- * [flat] is therefore what the action curve is built on, and [rising] is what
- * the user will actually see when correcting on top of a meal. Same
- * principle applied to the onset, arriving in two more places.
+ * See `docs/forecast-engine.md` §3.6 for the measurement.
  */
 data class ConditionedLandmarkV1(
     val flat: LandmarkMedianV1?,
@@ -178,16 +102,8 @@ data class ConditionedLandmarkV1(
 ) {
     /**
      * This landmark on a CHOSEN arm. The arm is decided once for the whole
-     * profile — see [SegmentLandmarkReaderV1.assemble].
-     *
-     * It used to be decided per landmark, and that produced two failures that
-     * only a replay over growing history exposed: at one point in the corpus's
-     * growth the onset fell back to the pooled arm (7 samples, one short) while the
-     * visible fall had already switched to the food-free one, so the profile
-     * compared 21 min against 14 and refused itself for being out of order. And
-     * later the onset crossed the threshold and JUMPED from 21 to 11 —
-     * which reads as the model changing its mind about the body rather than as
-     * one arm replacing another.
+     * profile — see [SegmentLandmarkReaderV1.assemble] and
+     * `docs/forecast-engine.md` §3.6 for the two failures that settled that.
      */
     fun on(arm: ProfileArmV1): LandmarkMedianV1? =
         if (arm == ProfileArmV1.FOOD_FREE) flat ?: pooled else pooled
@@ -205,11 +121,8 @@ data class ConditionedLandmarkV1(
 }
 
 data class AssembledProfileV1(
-    /**
-     * CONDITIONED, since the corrected flag showed it is not immune after all:
-     * split by pre-dose slope the onset moved +0, split by food actually acting
-     * it moves +10. The first split simply could not see a pre-meal bolus.
-     */
+    /** Conditioned too: the corrected food flag showed the onset is not
+     *  immune after all — forecast-engine.md §3.6. */
     val onset: ConditionedLandmarkV1,
     /** Background-dependent BY DEFINITION: it is the interaction. */
     val visibleFall: ConditionedLandmarkV1,
@@ -226,13 +139,9 @@ data class AssembledProfileV1(
     val tailConditioned: ConditionedLandmarkV1? = null,
 ) {
     /**
-     * The curve contract — and it starts from ACTION, not from the visible fall.
-     *
-     * Deliberately excludes [visibleFall]. Building the action CDF on «when the
-     * line turned down» would bake the user's typical background into the
-     * insulin: on a quiet night the same insulin turns the line down sooner, and
-     * the curve would then claim the insulin itself was faster. The visible fall
-     * is reported beside the curve, never inside it.
+     * The curve contract — and it starts from ACTION, not from the visible
+     * fall, which is a property of insulin and background together.
+     * See `docs/forecast-engine.md` §3.2.
      */
     val landmarks: InsulinShapeLandmarksV1?
         get() {
@@ -246,15 +155,8 @@ data class AssembledProfileV1(
 
     /**
      * How long insulin spends cancelling a rise before the line turns down —
-     * PAIRED: the median of per-dose differences.
-     *
-     * A difference of two medians is not this quantity. The two landmarks are
-     * pooled over different (and differently sized) sets of doses, so their
-     * medians can differ by five minutes while every dose that reports both
-     * shows zero. Measured directly, that is exactly
-     * what happens: medians 14 and 18, paired median 0 — the gap is not a
-     * property of the insulin, it is a property of the doses given while food
-     * was still climbing.
+     * PAIRED: the median of per-dose differences, never a difference of two
+     * medians. See `docs/forecast-engine.md` §3.7.
      */
     var cancellingRiseMin: Double? = null
         internal set

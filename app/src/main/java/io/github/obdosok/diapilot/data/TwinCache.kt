@@ -669,7 +669,7 @@ object TwinCache {
                 boluses,
                 kernel,
                 foods =
-                    io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
+                    FoodSources.historicalFoods(
                         store,
                         null,
                         riseScale = foodRiseScale,
@@ -689,7 +689,7 @@ object TwinCache {
                     boluses,
                     kernel,
                     foods =
-                        io.github.obdosok.diapilot.data.FoodSources.historicalFoods(
+                        FoodSources.historicalFoods(
                             store,
                             null,
                             riseScale = foodRiseScale,

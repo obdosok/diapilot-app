@@ -57,16 +57,20 @@ import com.diapilot.core.collector.GlucosePoint
 import com.diapilot.core.collector.MealEvent
 import com.diapilot.core.twin.PredictedPoint
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.i18n.FoodText
+import io.github.obdosok.diapilot.i18n.TokenText
+import io.github.obdosok.diapilot.i18n.UiText
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.i18n.resolve
+import io.github.obdosok.diapilot.i18n.unitLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
 
-internal fun conditionalBolusScenarioLabel(units: Double): io.github.obdosok.diapilot.i18n.UiText =
-    io.github.obdosok.diapilot.i18n.UiText.res(
+internal fun conditionalBolusScenarioLabel(units: Double): UiText =
+    UiText.res(
         R.string.glucose_chart_conditional_bolus_scenario,
         units
     )
@@ -1662,7 +1666,7 @@ fun GlucoseChart(
                                                 },
                                                 label = {
                                                     Text(
-                                                        io.github.obdosok.diapilot.i18n.TokenText
+                                                        TokenText
                                                             .bolusPurpose(context, p)!!
                                                     )
                                                 },
@@ -1800,7 +1804,7 @@ fun GlucoseChart(
                                     modifier =
                                         Modifier.pointerInput(Unit) {
                                             detectTapGestures {
-                                                io.github.obdosok.diapilot.ui.pickDateTime(
+                                                pickDateTime(
                                                     context,
                                                     bTs
                                                 ) {
@@ -2033,7 +2037,7 @@ private fun selectTapped(
         lines.add(
             SelLine(
                 it.tsMs,
-                "🏷 ${fmt.format(Date(it.tsMs))} · ${io.github.obdosok.diapilot.i18n.TokenText.noteTag(context, it.content)}" +
+                "🏷 ${fmt.format(Date(it.tsMs))} · ${TokenText.noteTag(context, it.content)}" +
                     (it.analysis?.let { a -> " — ${a.lineSequence().firstOrNull().orEmpty()}" } ?: ""),
                 SelRef.Note(it.id),
             ),
@@ -2067,7 +2071,7 @@ private fun selectTapped(
                 emoji, fmt.format(Date(note.tsMs)), fmt.format(Date(m.onsetMs)),
             )
         } else if (sys) {
-            "$emoji ${fmt.format(Date(displayTs))} · ${io.github.obdosok.diapilot.i18n.FoodText.mealLabel(context, label!!)}"
+            "$emoji ${fmt.format(Date(displayTs))} · ${FoodText.mealLabel(context, label!!)}"
         } else {
             "$emoji ${fmt.format(Date(displayTs))}"
         }
@@ -2098,7 +2102,7 @@ private fun selectTapped(
             SelLine(
                 b.tsMs,
                 text.getString(R.string.glucose_chart_sel_bolus_row, fmt.format(Date(b.tsMs)), b.units) +
-                    (b.purpose?.let { p -> " · ${io.github.obdosok.diapilot.i18n.TokenText.bolusPurpose(context, p)}" } ?: ""),
+                    (b.purpose?.let { p -> " · ${TokenText.bolusPurpose(context, p)}" } ?: ""),
                 SelRef.Bolus(b.tsMs, b.purpose),
             ),
         )
@@ -2131,7 +2135,7 @@ private fun selectTapped(
                     nearest.tsMs,
                     "${fmt.format(Date(nearest.tsMs))} · " +
                         "${com.diapilot.core.analysis.fmtBg(nearest.mmol, mgdl)} " +
-                        io.github.obdosok.diapilot.i18n.unitLabel(mgdl),
+                        unitLabel(mgdl),
                 ),
             ),
         )

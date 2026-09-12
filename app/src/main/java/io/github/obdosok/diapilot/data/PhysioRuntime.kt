@@ -6,6 +6,11 @@ import com.diapilot.core.twin.PredictedPoint
 import java.security.MessageDigest
 
 object PhysioRuntime {
+    /**
+     * One cache entry per model-input revision and causal minute. Every
+     * component was added after a bug; `docs/forecast-engine.md` §5 records
+     * which, and audit finding A4 records that nine of them is itself a symptom.
+     */
     private data class ArtifactCacheKey(
         val databaseIdentity: Int?,
         val dbPath: String?,
@@ -18,39 +23,17 @@ object PhysioRuntime {
          * ignored them would keep serving the curve the user just replaced. */
         val manualIdentity: String,
         /**
-         * THE SETTINGS-SCREEN TUNING, and it was missing.
-         *
-         * `HybridModelStore` installs `PhysioTuning.apply(model)` under the
-         * ARTIFACT'S OWN sha, because the tuning is applied at install rather
-         * than at read. So `modelSha256()` does not move when the user changes a knob,
-         * `manualIdentity` tracks a different feature entirely
-         * (`ManualInsulinRuntime`), and no ledger watermark shifts either —
-         * every component of this key stayed put while the model underneath it
-         * changed. The cache then served the PREVIOUS artifact, so the screen
-         * said "applied", Hybrid V11 obeyed, and PHYSIO quietly did not.
-         *
-         * A comment in `HybridDomain` claimed the overrides «enter the artifact
-         * hash». They do not — they ride on the model, which is a different
-         * thing, and this field is what makes the claim true for the cache.
+         * THE SETTINGS-SCREEN TUNING, and it was missing: the tuning is applied
+         * at install under the artifact's own sha, so every other component of
+         * this key stayed put while the model underneath it changed.
+         * See `docs/forecast-engine.md` §5.
          */
         val tuningIdentity: String,
         /**
          * The causal WATERMARK, not the raw cutoff: the newest known-at that is
-         * at or before `asOfMs` across the ledgers this artifact reads.
-         *
-         * Keyed on the exact millisecond the cache missed on every call, and the
-         * closed-episode rebuild asks for the artifact once per FOOD and BOLUS
-         * event — ~457 rebuilds per pass, each running the promotion state of 27
-         * hypotheses plus checkpoints, global CS and maintenance. Measured:
-         * a couple of seconds per episode window, over two minutes for a full pass.
-         *
-         * Bucketing to the day was tried first and is WRONG: it lets a later
-         * revision answer an earlier replay, which is precisely what
-         * `artifactIdentityIsAsOfStateAndLateRevisionCannotRewriteEarlierRun`
-         * exists to forbid — and that test caught it. The watermark is exact
-         * instead of approximate: two cutoffs with no ledger write between them
-         * cannot produce different artifacts, so sharing one is not a
-         * relaxation, it is the same answer computed once.
+         * at or before `asOfMs` across the ledgers this artifact reads. Exact
+         * rather than bucketed, because a bucket lets a later revision answer an
+         * earlier replay — see `docs/forecast-engine.md` §5.
          */
         val causalWatermark: Long,
     )

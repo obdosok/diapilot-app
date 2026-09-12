@@ -7,6 +7,7 @@ import android.util.Log
 import com.diapilot.core.collector.ACTION_BG
 import com.diapilot.core.collector.Reading
 import com.diapilot.core.collector.parseBgBroadcast
+import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.Stores
 
 /**
@@ -37,20 +38,29 @@ class XdripBgReceiver(
         /** Parse + store + opportunistic catch-up poll. Returns the reading, if valid. */
         fun handle(context: Context, intent: Intent): Reading? {
             if (intent.action != ACTION_BG) return null
+            // NO xDRIP, NO BROADCAST. This action has no permission behind it —
+            // with the app that legitimately sends it absent, every arriving
+            // intent comes from something else, and glucose is the forecast
+            // anchor. There is nothing to ignore selectively here.
+            if (!XdripApp.installed(context)) {
+                Log.w(TAG, "BgEstimate received while xDrip is not installed — dropped")
+                return null
+            }
             val extras = intent.extras ?: return null
             val map = extras.keySet().associateWith {
                 @Suppress("DEPRECATION")
                 extras.get(it)
             }
-            val reading = parseBgBroadcast(map)
+            val reading = parseBgBroadcast(map, System.currentTimeMillis())
             if (reading == null) {
-                Log.w(TAG, "Unparsed BgEstimate broadcast, keys=${map.keys}")
+                // Keys only: a value out of bounds is still a value.
+                Log.w(TAG, "BgEstimate broadcast refused, keys=${map.keys}")
                 return null
             }
             // Own-BLE mode: DiaPilot is the single glucose source. xDrip's
             // scale differs slightly from the minute calibration — mixing
             // them makes a 5-minute sawtooth and flips the delta sign.
-            if (io.github.obdosok.diapilot.data.Settings.ownBleEnabled(context)) {
+            if (Settings.ownBleEnabled(context)) {
                 Log.d(TAG, "own-BLE mode: xDrip reading ignored")
                 TreatmentsPollWorker.pollIfStale(context)
                 return null

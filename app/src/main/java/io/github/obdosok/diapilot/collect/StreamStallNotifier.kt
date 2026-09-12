@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Stores
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -69,7 +70,7 @@ object StreamStallNotifier {
      *  of the `stream_stall_notifier_reason_*` strings. */
     fun maybeNotify(context: Context, @androidx.annotation.StringRes reason: Int) {
         try {
-            val store = io.github.obdosok.diapilot.data.Stores.get(context)
+            val store = Stores.get(context)
             val now = System.currentTimeMillis()
             val freshest = maxOf(
                 store.lastSensorReading()?.tsMs ?: 0L,

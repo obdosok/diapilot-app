@@ -36,16 +36,19 @@ lives on the phone.
 - **Context notes** — injection site, sleep debt, illness, stress, alcohol,
   workout, walk, new sensor, new cartridge — as text, photo or voice, plus the
   purpose of each injection (correction, meal, top-up, air shot).
-- **Personal analytics**: insulin sensitivity (ISF) from clean corrections with
-  confidence levels and a time-of-day breakdown, the insulin action curve,
-  time in range, response profiles for specific dishes, and the effect of
-  context.
+- **Personal analytics** — see [Personal analytics: what learns and what does
+  not](#personal-analytics-what-learns-and-what-does-not) below for the honest
+  version. In short: the *shape* of insulin action is measured from the user's
+  own injections; insulin sensitivity is entered by hand with a daily balance
+  shown beside it; time in range, per-dish response profiles and the effect of
+  context notes are computed from recorded data.
 - **A digital twin**: a three-hour glucose forecast from a physiological
   "hybrid" model (insulin action, carbohydrate appearance, background drift)
   with an uncertainty band calibrated on the user's history. The insulin curve
   is measured from the user's own doses; ISF and the curve can also be set by
   hand. A what-if view shows how a hypothetical meal or dose would move the
-  forecast.
+  forecast. Why the model has this shape, and what every knob means:
+  [`docs/forecast-engine.md`](docs/forecast-engine.md).
 - **Real time**: a predictive low alert, a sustained-high alert, an early
   rapid-fall warning from the minute stream, an equipment alert when the data
   stream stalls, and observations such as "insulin in the last hours is acting
@@ -59,6 +62,91 @@ lives on the phone.
 - **Safety nets**: a daily automatic database backup, restore on a new phone,
   and an optional single-user companion server (`server/`) with a live
   dashboard and an off-device backup.
+
+## Screenshots
+
+<!--
+  Slots for the gallery. The images are not committed yet; each row below
+  becomes an image as soon as it can be captured without a single real glucose
+  reading, dose or note in frame. Which screens, in which language, what must
+  never be visible and how to capture them: docs/screenshots.md.
+-->
+
+| | | |
+|---|---|---|
+| **Today** — the value, the trend, the three-hour forecast with its band<br/>_(`docs/screenshots/today.png` — not captured yet)_ | **What-if** — a hypothetical dose or meal moving the line<br/>_(`docs/screenshots/chart-whatif.png` — not captured yet)_ | **Predictive low alert** — with a carbohydrate suggestion<br/>_(`docs/screenshots/hypo-alert.png` — not captured yet)_ |
+| **Labelling a meal** — a reply from the notification, chips for frequent dishes<br/>_(`docs/screenshots/label-meal.png` — not captured yet)_ | **Analysis** — the measured insulin action curve, time in range<br/>_(`docs/screenshots/analysis.png` — not captured yet)_ | **The model section** — manual ISF, measured timings, calibration status<br/>_(`docs/screenshots/settings-model.png` — not captured yet)_ |
+
+See [`docs/screenshots.md`](docs/screenshots.md) for the capture procedure and
+the list of things that must never appear in an image.
+
+## Status
+
+**Phase A — readable by a code reviewer; not yet ready for a stranger's
+phone.** The forecast, the alerts and the collection chain run daily on one
+device. There is no onboarding and no uncalibrated mode: on a fresh install the
+bundled synthetic example person drives the forecast until the user replaces
+its numbers by hand. Do not install this expecting a finished product.
+
+- **[`docs/audit.md`](docs/audit.md)** — an external read of this snapshot:
+  every known defect by number, with severity and a file reference. Security,
+  model, architecture, and release readiness. Read it before the code.
+- **[`docs/roadmap.md`](docs/roadmap.md)** — where this is going, in two
+  tracks, with the gate each phase has to pass.
+- **[`CHANGELOG.md`](CHANGELOG.md)** — what each release changed, and the known
+  issues it shipped with.
+
+The things a reader should know up front, all of them from the audit:
+insulin sensitivity is hand-entered rather than learned (M8, and the section
+below); the measured insulin tail is short because the instrument's window is
+(M1); there is no first-run calibration screen (M2); the offline food-note
+parser reads Russian under an English UI (P1); and the release build is still
+signed with the debug keystore (S8).
+
+## Install
+
+**No signed release yet.** Signed APKs and GitHub Releases land in phase B —
+see the roadmap's O-B row. Until then the only supported way in is to build
+from source, which the [Building](#building) section below covers.
+
+When releases start, this section will carry the download link, the signing
+fingerprint to verify against, and the minimum Android version. The app is not
+on Google Play; whether it ever is depends on the store track in the roadmap,
+and it will never ship the predictive features there — that split is the
+roadmap's whole subject.
+
+## Personal analytics: what learns and what does not
+
+The single most misleading thing a project like this can do is imply that it
+learns more than it does. So, precisely:
+
+**Measured from the user's own data.** The *shape* of insulin action — onset,
+peak, the slowdown, and the end of action — is read landmark by landmark from
+every trusted injection, each landmark on its own horizon, with the sample count
+shown beside it. Also measured: the meter-to-sensor calibration, time in range,
+per-dish response profiles, and the effect of context notes.
+
+**Entered by hand.** Insulin sensitivity (ISF). The pipeline that measured ISF
+from clean corrections **was removed**, and earlier versions of this README
+claimed it was still there — that was the overstatement this section exists to
+correct. What the app does instead is show a **daily insulin/carbohydrate
+balance** beside the value the user has pinned, so a value that is clearly wrong
+becomes visible; switching the forecast over to that computed value is opt-in
+and off by default. Carbohydrate sensitivity is hand-set too: a body-weight
+prior exists in the code, but nothing yet feeds it the weight the user typed.
+
+**Proposed, never applied on its own.** Auto-fit reads the last episodes and
+*suggests* values into the tuning fields, inside a corridor around what was
+measured. Nothing moves until the user taps Apply, and each knob can be locked.
+
+**Not modelled at all.** Protein and fat change the timing of a meal, never its
+amplitude. Activity scales insulin action in the structure but ships with the
+coefficient at zero.
+
+The reasoning behind each of those, with the measurements:
+[`docs/insulin-model.md`](docs/insulin-model.md) for the measurement cycle,
+[`docs/forecast-engine.md`](docs/forecast-engine.md) for the model's shape and
+knobs.
 
 ## Architecture
 
@@ -81,6 +169,11 @@ server/  Optional single-user companion (FastAPI): live dashboard + backup targe
 The boundary between core and platform has held since the first commit: all
 the mathematics is testable on the JVM without a phone (about 830 unit tests in
 `:core`, about 210 in `:app`), and it leaves room for Kotlin Multiplatform.
+
+A ten-minute tour with a diagram is
+[`docs/architecture.md`](docs/architecture.md); the engineering record of the
+forecast itself is [`docs/forecast-engine.md`](docs/forecast-engine.md); what
+was removed and why is [`docs/history.md`](docs/history.md).
 
 The UI has five tabs: Today, History, Analysis, Chat and More (settings).
 
@@ -116,8 +209,10 @@ DiaPilot --> widget, lock-screen chip, notifications
     recent events, aggregates) or the photo being analysed, not the database;
   - barcode lookups in Open Food Facts, which send the barcode only;
   - pushes to a companion server the user runs and configures (URL + token).
-- Cleartext HTTP is allowed only to loopback and one LAN host listed in
-  `network_security_config.xml`.
+- Cleartext HTTP is allowed to loopback only. `network_security_config.xml`
+  permits `127.0.0.1` and nothing else, so a companion server reached over the
+  home LAN needs its own host added there literally, or an HTTPS tunnel in
+  front of it (audit S9).
 - The daily automatic backup, once switched on in Settings, is written to the
   public Downloads folder, on purpose, so it survives an uninstall. Anything
   with access to Downloads can read it.

@@ -30,13 +30,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import com.diapilot.core.physio.PhysioAutoFitV1
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.AdaptiveIsfRuntime
 import io.github.obdosok.diapilot.data.HybridModelStore
-import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.data.IsfSource
+import io.github.obdosok.diapilot.data.ManualInsulinRuntime
 import io.github.obdosok.diapilot.data.PhysioAutoFitController
 import io.github.obdosok.diapilot.data.PhysioAutoFitRuntime
+import io.github.obdosok.diapilot.data.PhysioRuntime
 import io.github.obdosok.diapilot.data.PhysioTuning
 import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.i18n.localized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -66,6 +71,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit = {}) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     var benchPaste by remember { mutableStateOf("") }
     var triStatus by remember { mutableStateOf("") }
     // Twelve editable strings seeded from what is ACTUALLY applied — the imported
@@ -101,13 +107,13 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
     // actually applied to the model. Pressing "Apply" on untouched fields
     // becomes a no-op.
     val liveInsulin = remember {
-        io.github.obdosok.diapilot.data.PhysioRuntime
-            .artifact(io.github.obdosok.diapilot.data.Stores.get(context))
+        PhysioRuntime
+            .artifact(graph.store)
             ?.personModelAt(12.0, emptySet())?.insulin
     }
     val shownShape = remember {
-        io.github.obdosok.diapilot.data.ManualInsulinRuntime.shapeForCard(
-            stored = io.github.obdosok.diapilot.data.ManualInsulinRuntime.params(context),
+        ManualInsulinRuntime.shapeForCard(
+            stored = ManualInsulinRuntime.params(context),
             legacyOnset = initial.onsetMin,
             legacyPeak = initial.fullSpeedMin,
             legacyPhase = initial.phaseMin,
@@ -124,7 +130,7 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
     // ISF lives in P1 now, not in `initial` — seeding it from the retired store
     // showed an empty field while a pinned value was being applied.
     var isf by remember {
-        mutableStateOf(s2(io.github.obdosok.diapilot.data.ManualInsulinRuntime.params(context).isfMmolPerU))
+        mutableStateOf(s2(ManualInsulinRuntime.params(context).isfMmolPerU))
     }
     var kcal by remember { mutableStateOf(s(initial.emptyingKcalPerHour)) }
     var sieve by remember { mutableStateOf(s2(initial.carbSieving)) }
@@ -182,9 +188,9 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
         // Peak is taken from the field, or from the applied value when the
         // field is empty: without it there is nothing to turn the duration
         // into, and silently dropping it would repeat the same defect.
-        io.github.obdosok.diapilot.data.ManualInsulinRuntime.setParams(
+        ManualInsulinRuntime.setParams(
             context,
-            io.github.obdosok.diapilot.data.ManualInsulinRuntime.shapeFromCard(
+            ManualInsulinRuntime.shapeFromCard(
                 onsetMin = num(on),
                 peakMin = num(pk),
                 phaseDurationMin = num(phase),
@@ -272,8 +278,8 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             // shape could silently diverge with no way to see it. Now the form
             // and the ISF come from the installed model, while the queue, the
             // sieve and the spread come from settings, where they actually live.
-            val liveShape = io.github.obdosok.diapilot.data.PhysioRuntime
-                .artifact(io.github.obdosok.diapilot.data.Stores.get(context))
+            val liveShape = PhysioRuntime
+                .artifact(graph.store)
                 ?.personModelAt(12.0, emptySet())?.insulin
             Text(
                 stringResource(
@@ -570,8 +576,8 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                 >(null, isf) {
                 value = withContext(Dispatchers.IO) {
                     runCatching {
-                        val store = io.github.obdosok.diapilot.data.Stores.get(context)
-                        val a = io.github.obdosok.diapilot.data.PhysioRuntime.artifact(
+                        val store = graph.store
+                        val a = PhysioRuntime.artifact(
                             store, System.currentTimeMillis(),
                         ) ?: return@runCatching null
                         Triple(
@@ -592,10 +598,10 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
             // user's own forecasts right — so putting them anywhere but next
             // to each other makes the choice unmeasurable by eye.
             val adaptive = remember(isf) {
-                io.github.obdosok.diapilot.data.AdaptiveIsfRuntime.state(context)
+                AdaptiveIsfRuntime.state(context)
             }
             var source by remember {
-                mutableStateOf(io.github.obdosok.diapilot.data.IsfSource.choice(context))
+                mutableStateOf(IsfSource.choice(context))
             }
             Row(
                 Modifier.fillMaxWidth(),
@@ -625,19 +631,19 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                     modifier = Modifier.weight(1f),
                 )
                 androidx.compose.material3.Switch(
-                    checked = source == io.github.obdosok.diapilot.data.IsfSource.Choice.ADAPTIVE,
+                    checked = source == IsfSource.Choice.ADAPTIVE,
                     // A switch with nothing behind it would silently keep the
                     // hand value while claiming otherwise — see IsfSource.
                     enabled = adaptive != null,
                     onCheckedChange = { on ->
-                        source = if (on) io.github.obdosok.diapilot.data.IsfSource.Choice.ADAPTIVE
-                        else io.github.obdosok.diapilot.data.IsfSource.Choice.MANUAL
-                        io.github.obdosok.diapilot.data.IsfSource.set(context, source)
+                        source = if (on) IsfSource.Choice.ADAPTIVE
+                        else IsfSource.Choice.MANUAL
+                        IsfSource.set(context, source)
                     },
                 )
             }
             Text(
-                if (source == io.github.obdosok.diapilot.data.IsfSource.Choice.ADAPTIVE) {
+                if (source == IsfSource.Choice.ADAPTIVE) {
                     stringResource(R.string.physio_tuning_section_isf_source_adaptive_note)
                 } else {
                     stringResource(R.string.physio_tuning_section_isf_source_manual_note)
@@ -673,11 +679,11 @@ fun PhysioTuningSection(modifier: Modifier = Modifier, onShowOnChart: (Long) -> 
                             // job is to hand ISF back. Timings are preserved: this
                             // button is about ISF only.
                             isf = ""
-                            val kept = io.github.obdosok.diapilot.data.ManualInsulinRuntime.params(context)
-                            io.github.obdosok.diapilot.data.ManualInsulinRuntime.setParams(
+                            val kept = ManualInsulinRuntime.params(context)
+                            ManualInsulinRuntime.setParams(
                                 context, kept.copy(isfMmolPerU = null),
                             )
-                            io.github.obdosok.diapilot.data.PhysioTuning.setIsfMmol(context, null)
+                            PhysioTuning.setIsfMmol(context, null)
                         }) { Text(stringResource(R.string.physio_tuning_section_switch_to_adaptive_button)) }
                         TextButton(onClick = {
                             isf = "%.3f".format(java.util.Locale.ROOT, learned)

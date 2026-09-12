@@ -5,6 +5,7 @@ import com.diapilot.core.collector.GlucosePoint
 import com.diapilot.core.twin.ForecastInputs
 import com.diapilot.core.twin.ForecastResult
 import com.diapilot.core.twin.PersonalModel
+import io.github.obdosok.diapilot.UiMaintenanceQueue
 
 /**
  * The app-side adapter for the core ForecastEngine: gathers the causal
@@ -150,7 +151,7 @@ object Forecaster {
         // and cannot run against each other on the same SQLite file.
         if (recordAs == "main" && store is SqliteCollectorStore) {
             val ctx = store.appContext
-            io.github.obdosok.diapilot.UiMaintenanceQueue.schedule {
+            UiMaintenanceQueue.schedule {
                 try {
                     // NOT DURING THE OPENING BURST.
                     //

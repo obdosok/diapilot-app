@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Libre2State
 import io.github.obdosok.diapilot.i18n.localized
 import java.util.UUID
 
@@ -216,7 +217,7 @@ class LibreBleClient(private val context: Context) {
 
     private fun connect() {
         if (!running) return
-        val state = io.github.obdosok.diapilot.data.Libre2State.load(context)
+        val state = Libre2State.load(context)
         if (state == null || state.mac.isBlank()) {
             status = context.localized().getString(R.string.libre_ble_client_status_no_mac)
             return
@@ -322,8 +323,8 @@ class LibreBleClient(private val context: Context) {
                 if (packetsThisSession > 0) {
                     // Productive session: lock in the index that worked, then
                     // advance once for the next connection.
-                    io.github.obdosok.diapilot.data.Libre2State.load(context)?.let { st ->
-                        io.github.obdosok.diapilot.data.Libre2State.save(
+                    Libre2State.load(context)?.let { st ->
+                        Libre2State.save(
                             context, st.copy(connectionIndex = probedIndex + 1),
                         )
                     }
@@ -421,7 +422,7 @@ class LibreBleClient(private val context: Context) {
                 return
             }
             g.setCharacteristicNotification(data, true)
-            val state = io.github.obdosok.diapilot.data.Libre2State.load(context)
+            val state = Libre2State.load(context)
             if (state == null) {
                 Log.w(TAG, "no credentials — reconnecting")
                 g.disconnect()
@@ -518,7 +519,7 @@ class LibreBleClient(private val context: Context) {
 
     /** The encrypted 46-byte packet → OOP2; the decode lands in CollectorService. */
     private fun sendToOop2(packet: ByteArray, tsMs: Long) {
-        val state = io.github.obdosok.diapilot.data.Libre2State.load(context) ?: return
+        val state = Libre2State.load(context) ?: return
         val intent = Intent(ACTION_LIBRE_BLE_DATA).apply {
             putExtra("com.eveningoutpost.dexdrip.Extras.DATA_BUFFER", packet)
             putExtra("com.eveningoutpost.dexdrip.Extras.TIMESTAMP", tsMs)

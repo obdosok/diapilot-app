@@ -11,6 +11,13 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.trustedHistory
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -109,10 +116,10 @@ object HypoAlertNotifier {
     // Thresholds/cadences live in core HypoAlertLogic (unit-tested).
 
     private fun snoozeMs(context: Context): Long =
-        io.github.obdosok.diapilot.data.Settings.hypoSnoozeMin(context) * 60_000L
+        Settings.hypoSnoozeMin(context) * 60_000L
 
     private fun persistMs(context: Context): Long =
-        io.github.obdosok.diapilot.data.Settings.hypoPersistMin(context) * 60_000L
+        Settings.hypoPersistMin(context) * 60_000L
 
     /** Latest dextrose rescue (logged note) within [windowMs], else null. */
     private fun recentDextroseMs(
@@ -126,8 +133,8 @@ object HypoAlertNotifier {
     fun maybeNotify(context: Context, store: com.diapilot.core.collector.CollectorStore) {
         try {
             val text = context.localized()
-            val hypoOn = io.github.obdosok.diapilot.data.Settings.hypoAlertEnabled(context)
-            val hyperOn = io.github.obdosok.diapilot.data.Settings.hyperAlertEnabled(context)
+            val hypoOn = Settings.hypoAlertEnabled(context)
+            val hyperOn = Settings.hyperAlertEnabled(context)
             // Disabled alerts must also stop the watch signal.
             if (!hypoOn) alertActive = false
             if (!hypoOn && !hyperOn) return
@@ -139,7 +146,7 @@ object HypoAlertNotifier {
             val lastMain = store.lastSensorReading() ?: return
 
             // Freshest calibrated anchor (same promotion as the header).
-            val minuteCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
+            val minuteCal = MinuteCalCache.get(store, context)
             val lm = store.lastMinuteReading()
             var anchorTs = lastMain.tsMs
             var anchorMmol = lastMain.mmol
@@ -151,7 +158,7 @@ object HypoAlertNotifier {
             // Without it the alert showed a raw 39 while the screen (and the
             // value the user trusts) showed a calibrated 62 — and the threshold
             // was judged on the wrong scale.
-            io.github.obdosok.diapilot.data.MeterCalCache.get(store, context)?.let {
+            MeterCalCache.get(store, context)?.let {
                 anchorMmol = it.correctedAt(anchorTs, anchorMmol)
             }
             if (now - anchorTs > 10 * 60_000) return  // stale reading — can't judge
@@ -161,10 +168,10 @@ object HypoAlertNotifier {
             // even when the twin is unbuilt or the forecast is untrustworthy
             // (the old hard returns here meant a confirmed 43 mg/dl could be
             // silent). forecastOk gates only the prediction and the hyper side.
-            val model = io.github.obdosok.diapilot.data.TwinCache.getForForecast(store, context)
+            val model = TwinCache.getForForecast(store, context)
             val result = if (model != null) {
                 try {
-                    io.github.obdosok.diapilot.data.Forecaster.forecast(
+                    Forecaster.forecast(
                         store, model, now,
                         anchorTsMs = anchorTs, anchorMmol = anchorMmol,
                         minutePoints = if (minuteCal != null) {
@@ -173,7 +180,7 @@ object HypoAlertNotifier {
                         } else emptyList(),
                         horizonMin = 50.0,
                         recordAs = "hypo_alert",
-                        plausibilityGate = io.github.obdosok.diapilot.data.Settings.plausibilityGate(context),
+                        plausibilityGate = Settings.plausibilityGate(context),
                         // THREE FOOD TOGGLES REMOVED: they only led into the
                         // legacy food layer, which is no longer on the
                         // forecast path. The alert and the screen now count
@@ -197,7 +204,7 @@ object HypoAlertNotifier {
                 result.health != com.diapilot.core.twin.ForecastHealth.STALE &&
                 result.health != com.diapilot.core.twin.ForecastHealth.INSUFFICIENT_DATA
             val prediction = if (forecastOk) result!!.points else emptyList()
-            val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+            val mgdl = Units.isMgdl(context)
             val fmtT = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
             val pp = com.diapilot.core.PersonalParams.DEFAULT
 
@@ -206,10 +213,10 @@ object HypoAlertNotifier {
             // sequences); this block only maps prefs↔state, composes the
             // texts and drives the notification + AlarmPlayer.
             if (hypoOn) {
-                val threshold = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
+                val threshold = Settings.rangeLoMmol(context)
                 val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
                 val night = hour in 0..6
-                val sound = io.github.obdosok.diapilot.data.Settings.hypoAlertSound(context)
+                val sound = Settings.hypoAlertSound(context)
                 val hit = if (forecastOk) com.diapilot.core.twin.findPredictedHypo(
                     prediction, anchorTs, anchorMmol, threshold,
                     // EXPLICIT TOGGLE, default OFF — see Settings.nightCorridorLow.
@@ -218,7 +225,7 @@ object HypoAlertNotifier {
                     // many alerts against zero genuine night lows.
                     useCorridorLow = night &&
                         result!!.health == com.diapilot.core.twin.ForecastHealth.TRUSTED &&
-                        io.github.obdosok.diapilot.data.Settings.nightCorridorLow(context),
+                        Settings.nightCorridorLow(context),
                 ) else null
                 val lastMeter = store.meterReadings(now - 30L * 60_000, now).lastOrNull()
                 val state = com.diapilot.core.twin.HypoAlertState(
@@ -241,17 +248,17 @@ object HypoAlertNotifier {
                         thresholdMmol = threshold,
                         predictedHit = hit != null,
                         night = night,
-                        nightGentle = io.github.obdosok.diapilot.data.Settings.hypoNightGentle(context),
+                        nightGentle = Settings.hypoNightGentle(context),
                         soundOn = sound,
                         lastMeterMmol = lastMeter?.mmol,
                         lastMeterTsMs = lastMeter?.tsMs ?: 0,
                         lastDextroseTsMs = recentDextroseMs(store, now, snoozeMs(context)),
-                        dextroseSnoozeEnabled = io.github.obdosok.diapilot.data.Settings.hypoDextroseSnooze(context),
+                        dextroseSnoozeEnabled = Settings.hypoDextroseSnooze(context),
                         snoozeMs = snoozeMs(context),
                         persistMs = persistMs(context),
-                        lowRefireMs = io.github.obdosok.diapilot.data.Settings.hypoLowRefireMin(context) * 60_000L,
+                        lowRefireMs = Settings.hypoLowRefireMin(context) * 60_000L,
                         cooldownMs = COOLDOWN_MS,
-                        appOpenedAtMs = io.github.obdosok.diapilot.data.Settings.appOpenedAtMs(context),
+                        appOpenedAtMs = Settings.appOpenedAtMs(context),
                         sensorSuspect = result?.sensorSuspect != null,
                     ),
                 )
@@ -269,7 +276,7 @@ object HypoAlertNotifier {
                     .putLong(PREF_LAST_PASS, decision.state.lastPassMs)
                     .apply()
 
-                val protocol = io.github.obdosok.diapilot.data.Settings.hypoProtocol(context)
+                val protocol = Settings.hypoProtocol(context)
                 val protocolLine = protocol?.takeIf { it.isNotBlank() }
                     ?.let { text.getString(R.string.hypo_alert_notifier_protocol_line, it) }
                     ?: text.getString(R.string.hypo_alert_notifier_protocol_default)
@@ -423,7 +430,7 @@ object HypoAlertNotifier {
                 now - prefs.getLong(PREF_LAST_SUSTAINED, 0)
                 >= com.diapilot.core.twin.SustainedHigh.COOLDOWN_MIN * 60_000
             ) {
-                val tail = io.github.obdosok.diapilot.data.trustedHistory(
+                val tail = trustedHistory(
                     store, context, now - 6L * 3_600_000, now,
                 ).map { it.tsMs to it.mmol }
                 com.diapilot.core.twin.SustainedHigh.evaluate(tail, now)?.let { v ->
@@ -447,7 +454,7 @@ object HypoAlertNotifier {
             if (hyperOn && forecastOk &&
                 now - prefs.getLong(PREF_LAST_HIGH, 0) >= (pp.hyperCooldownMin * 60_000).toLong()
             ) {
-                val ceiling = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
+                val ceiling = Settings.rangeHiMmol(context)
                 val hit = com.diapilot.core.twin.findPredictedHigh(
                     prediction, anchorTs, anchorMmol, ceiling,
                 )

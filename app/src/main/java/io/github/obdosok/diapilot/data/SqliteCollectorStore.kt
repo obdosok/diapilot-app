@@ -954,24 +954,47 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
 
     // --- hard core -------------------------------------------------------
 
+    /**
+     * ONE SOURCE OWNS A TIMESTAMP.
+     *
+     * The upsert used to rewrite whatever sat at `ts_ms` whoever wrote it, so a
+     * single forged broadcast could restate an hour of history at timestamps of
+     * its choosing. A writer may now only revise its OWN row: the `DO UPDATE`
+     * carries `WHERE source IS excluded.source` (`IS`, not `=`, so a legacy row
+     * with a NULL source matches a NULL source and nothing else), and a
+     * different source finds the slot taken and is dropped.
+     *
+     * The first writer therefore wins, which is also what the 5-minute grid is
+     * documented to be — the FROZEN real-time record, with the web-service
+     * backfill filling gaps rather than restating landed points.
+     *
+     * The arrival row is written under the same condition: it records that a
+     * fact was OBSERVED, and a value that was not stored was not observed by
+     * the model.
+     */
     override fun upsertReading(reading: Reading) {
         val db = writableDatabase
         db.execSQL(
             "INSERT INTO glucose_readings VALUES (?,?,?,?,?) " +
-                "ON CONFLICT(ts_ms) DO UPDATE SET mgdl=excluded.mgdl, mmol=excluded.mmol",
+                "ON CONFLICT(ts_ms) DO UPDATE SET mgdl=excluded.mgdl, mmol=excluded.mmol " +
+                "WHERE glucose_readings.source IS excluded.source",
             arrayOf<Any?>(reading.tsMs, reading.mgdl, reading.mmol, reading.trend, reading.source),
         )
         val observed = System.currentTimeMillis()
         val live =
             reading.source != "libre_nfc" && kotlin.math.abs(observed - reading.tsMs) <= 10 * 60_000L
         db.execSQL(
-            "INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) VALUES(?,?,?,?,?)",
+            "INSERT OR IGNORE INTO physio_cgm_arrivals_v2(ts_ms,fact_hash,observed_at_ms,source,live) " +
+                "SELECT ?,?,?,?,? WHERE EXISTS " +
+                "(SELECT 1 FROM glucose_readings WHERE ts_ms=? AND source IS ?)",
             arrayOf<Any?>(
                 reading.tsMs,
                 PhysioArrivalIdentity.glucose(reading),
                 observed,
                 reading.source,
-                if (live) 1 else 0
+                if (live) 1 else 0,
+                reading.tsMs,
+                reading.source,
             )
         )
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
+import io.github.obdosok.diapilot.R
 
 /**
  * This context with the app language applied — use it for every string built
@@ -60,8 +61,8 @@ object AppLocaleFormats {
     fun sync(context: Context) {
         val res = context.localized()
         com.diapilot.core.analysis.BgFormat.decimalComma = res.isRussianUi()
-        mmolLabel = res.getString(io.github.obdosok.diapilot.R.string.unit_mmol_l)
-        mgdlLabel = res.getString(io.github.obdosok.diapilot.R.string.unit_mg_dl)
+        mmolLabel = res.getString(R.string.unit_mmol_l)
+        mgdlLabel = res.getString(R.string.unit_mg_dl)
     }
 
     fun unitLabel(mgdl: Boolean): String = if (mgdl) mgdlLabel else mmolLabel

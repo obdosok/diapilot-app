@@ -4,7 +4,20 @@ import android.content.Context
 import android.os.BatteryManager
 import android.util.Log
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.api.DiaForApi
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.WatchApiToken
+import io.github.obdosok.diapilot.data.displayHistory
+import io.github.obdosok.diapilot.data.forecastAnchor
+import io.github.obdosok.diapilot.data.tir24h
+import io.github.obdosok.diapilot.i18n.StatusText
 import io.github.obdosok.diapilot.i18n.localized
 import org.json.JSONObject
 import java.net.InetAddress
@@ -30,6 +43,15 @@ import java.util.Locale
  * insulin history from. It shares the socket and nothing else — `/info.json`
  * behaviour is unchanged, including its long poll, its text/plain body and its
  * field-for-field payload.
+ *
+ * Loopback is not a permission (any app holding `INTERNET` reaches 127.0.0.1),
+ * so the two endpoints that are not the frozen watch feed are gated — see
+ * [com.diapilot.core.api.localAccess]: `POST /add_treatments` and
+ * `/api/v1/events` both require the per-installation token
+ * ([WatchApiToken]), presented as
+ * `X-DiaPilot-Token`, as `Authorization: Bearer …` or as a `token` parameter.
+ * The user reads the token off the Settings screen and configures the client
+ * with it.
  */
 class WatchServer(private val context: Context) {
 
@@ -37,6 +59,10 @@ class WatchServer(private val context: Context) {
         private const val TAG = "WatchServer"
         const val PORT = 29863
         private const val MGDL_PER_MMOL = 18.0182
+
+        /** Ceiling on a request body. The parameters fit in a few dozen
+         *  characters; anything longer is not a client of ours. */
+        private const val MAX_BODY_CHARS = 4096
     }
 
     // Both loopback stacks: the Zepp side-service resolves "localhost", which
@@ -102,19 +128,123 @@ class WatchServer(private val context: Context) {
         client.soTimeout = 5_000
         val reader = client.getInputStream().bufferedReader()
         val requestLine = reader.readLine() ?: return
+        val headers = HashMap<String, String>()
         while (true) {
             val line = reader.readLine() ?: break
-            if (line.isBlank()) break  // headers done; GET only, no body
+            if (line.isBlank()) break  // headers done
+            val colon = line.indexOf(':')
+            if (colon > 0) {
+                headers[line.substring(0, colon).trim().lowercase(Locale.ENGLISH)] =
+                    line.substring(colon + 1).trim()
+            }
         }
-        val target = requestLine.split(" ").getOrNull(1) ?: "/"
+        val words = requestLine.split(" ")
+        val method = words.getOrNull(0)?.uppercase(Locale.ENGLISH) ?: "GET"
+        val target = words.getOrNull(1) ?: "/"
+        val r = respond(method, target, headers, readBody(reader, headers), client.inetAddress?.toString())
+        val bytes = r.body.toByteArray()
+        client.getOutputStream().apply {
+            write(
+                ("HTTP/1.1 ${r.status}\r\n" +
+                    "Content-Type: ${r.contentType}\r\n" +
+                    "Content-Length: ${bytes.size}\r\n" +
+                    r.extraHeaders +
+                    "Connection: close\r\n\r\n").toByteArray(),
+            )
+            write(bytes)
+            flush()
+        }
+    }
+
+    /**
+     * The announced body, bounded and read as text.
+     *
+     * Bounded because an unbounded read on a socket any app can connect to is a
+     * memory hole, and read at all because a POST whose body is never drained
+     * can have the connection closed under a client that is still writing.
+     */
+    private fun readBody(reader: java.io.Reader, headers: Map<String, String>): String? {
+        val announced = headers["content-length"]?.toIntOrNull() ?: return null
+        if (announced <= 0) return null
+        val buf = CharArray(minOf(announced, MAX_BODY_CHARS))
+        var read = 0
+        while (read < buf.size) {
+            val n = reader.read(buf, read, buf.size - read)
+            if (n < 0) break
+            read += n
+        }
+        return String(buf, 0, read)
+    }
+
+    /** One response, ready to be written to the socket. */
+    internal class Response(
+        val status: String,
+        val body: String,
+        // text/plain mirrors WatchDrip's NanoHTTPD: the Zepp fetch must NOT
+        // auto-parse the body — the watch app expects a string and does its
+        // own str2json. The journal endpoint has no such constraint and says
+        // what it actually serves.
+        val contentType: String = "text/plain",
+        // Extra headers go ONLY to the new route: the watch response stays
+        // byte-for-byte what it has always been, headers included.
+        val extraHeaders: String = "",
+    )
+
+    /**
+     * The whole request → response decision, with no socket in it: the tests
+     * drive this directly, so routing, the fuse and the response codes are
+     * checked without binding a port or racing an accept loop.
+     */
+    internal fun respond(
+        method: String,
+        target: String,
+        headers: Map<String, String> = emptyMap(),
+        body: String? = null,
+        peer: String? = null,
+    ): Response {
         val parsed = com.diapilot.core.api.parseRequestTarget(target)
         val path = parsed.path
-        val params = parsed.params
+        // A form-encoded body carries the same parameters as the query string,
+        // so a client may POST either way; the query wins on a collision.
+        val params = if (body.isNullOrEmpty() ||
+            headers["content-type"]?.startsWith("application/x-www-form-urlencoded") != true
+        ) {
+            parsed.params
+        } else {
+            com.diapilot.core.api.parseFormEncoded(body) + parsed.params
+        }
         val route = com.diapilot.core.api.routeFor(path)
         // Path only. The query string is where the medical payload lives —
         // /add_treatments?insulin=4.5&carbs=30 was going into the production
         // log verbatim.
-        Log.i(TAG, "request from ${client.inetAddress}: $path")
+        Log.i(TAG, "request from $peer: $method $path")
+
+        // The gate. `/info.json` passes untouched (see localAccess); the two
+        // endpoints that write a dose or publish history need the
+        // per-installation token, and `/add_treatments` needs a POST first.
+        val access = com.diapilot.core.api.localAccess(
+            route,
+            method,
+            com.diapilot.core.api.presentedToken(headers, params),
+            // Minted here rather than at start(): the token then exists as soon
+            // as anything asks for it, without the server having to run first.
+            WatchApiToken.getOrCreate(context),
+        )
+        when (access) {
+            com.diapilot.core.api.LocalAccess.METHOD_NOT_ALLOWED -> {
+                Log.w(TAG, "$path: $method not allowed")
+                return Response(
+                    "405 Method Not Allowed",
+                    "Method Not Allowed",
+                    extraHeaders = "Allow: POST\r\n",
+                )
+            }
+            com.diapilot.core.api.LocalAccess.UNAUTHORIZED -> {
+                Log.w(TAG, "$path: refused, no valid token")
+                return Response("401 Unauthorized", "Unauthorized")
+            }
+            com.diapilot.core.api.LocalAccess.OK -> Unit
+        }
 
         // Long-poll: hold the response until a reading NEWER than newer_than
         // arrives (or the wait budget runs out). The xDrip broadcast lands in
@@ -132,7 +262,7 @@ class WatchServer(private val context: Context) {
                 val ts = store.lastSensorReading()?.tsMs ?: 0
                 // The calibrated minute stream releases the poll too — the
                 // wrist updates every minute, not on the 5-minute grid.
-                val mts = if (io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context) != null) {
+                val mts = if (MinuteCalCache.get(store, context) != null) {
                     store.lastMinuteReading()?.tsMs ?: 0
                 } else 0
                 if (maxOf(ts, mts) > since) break
@@ -142,41 +272,25 @@ class WatchServer(private val context: Context) {
             }
         }
 
-        // text/plain mirrors WatchDrip's NanoHTTPD: the Zepp fetch must NOT
-        // auto-parse the body — the watch app expects a string and does its
-        // own str2json. The journal endpoint has no such constraint and says
-        // what it actually serves.
-        var contentType = "text/plain"
-        // Extra headers go ONLY to the new route: the watch response stays
-        // byte-for-byte what it has always been, headers included.
-        var extraHeaders = ""
-        val (status, body) = when (route) {
+        return when (route) {
             com.diapilot.core.api.LocalRoute.INFO_JSON ->
-                "200 OK" to infoJson(params["graph"] == "1")
-            com.diapilot.core.api.LocalRoute.ADD_TREATMENTS -> addTreatments(params)
+                Response("200 OK", infoJson(params["graph"] == "1"))
+            com.diapilot.core.api.LocalRoute.ADD_TREATMENTS ->
+                addTreatments(params).let { (status, body) -> Response(status, body) }
             com.diapilot.core.api.LocalRoute.EVENTS -> {
-                contentType = "application/json; charset=utf-8"
-                // The journal is a moving target — an intermediary caching a
-                // page would strand a consumer on a stale next_after.
-                extraHeaders = "Cache-Control: no-store\r\n"
-                val r = io.github.obdosok.diapilot.api.DiaForApi.handle(context, params)
+                val r = DiaForApi.handle(context, params)
                 // Status only. The body is medical payload and never logged.
                 Log.i(TAG, "events -> ${r.status}")
-                "${r.status} ${r.reason}" to r.body
+                Response(
+                    "${r.status} ${r.reason}",
+                    r.body,
+                    contentType = "application/json; charset=utf-8",
+                    // The journal is a moving target — an intermediary caching
+                    // a page would strand a consumer on a stale next_after.
+                    extraHeaders = "Cache-Control: no-store\r\n",
+                )
             }
-            com.diapilot.core.api.LocalRoute.NOT_FOUND -> "404 Not Found" to "Not Found"
-        }
-        val bytes = body.toByteArray()
-        client.getOutputStream().apply {
-            write(
-                ("HTTP/1.1 $status\r\n" +
-                    "Content-Type: $contentType\r\n" +
-                    "Content-Length: ${bytes.size}\r\n" +
-                    extraHeaders +
-                    "Connection: close\r\n\r\n").toByteArray(),
-            )
-            write(bytes)
-            flush()
+            com.diapilot.core.api.LocalRoute.NOT_FOUND -> Response("404 Not Found", "Not Found")
         }
     }
 
@@ -185,12 +299,12 @@ class WatchServer(private val context: Context) {
     private fun infoJson(includeGraph: Boolean = false): String {
         val store = Stores.get(context)
         val now = System.currentTimeMillis()
-        val sharedAnchor = io.github.obdosok.diapilot.data.forecastAnchor(
+        val sharedAnchor = forecastAnchor(
             store, context, now,
         ) ?: return "{}"
         val last = sharedAnchor.reading
-        val minuteCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
-        val meterCal = io.github.obdosok.diapilot.data.MeterCalCache.get(store, context)
+        val minuteCal = MinuteCalCache.get(store, context)
+        val meterCal = MeterCalCache.get(store, context)
 
         // Trend off the meter-calibrated 5-min MAIN grid — the same source the
         // phone header now uses, so all surfaces agree. The grid is the FROZEN
@@ -216,15 +330,15 @@ class WatchServer(private val context: Context) {
         }
 
         // 24h time-in-range, integer percents that sum to 100.
-        val rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
-        val rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
-        val tir = io.github.obdosok.diapilot.data.tir24h(store, context, now, rangeLo, rangeHi)
+        val rangeLo = Settings.rangeLoMmol(context)
+        val rangeHi = Settings.rangeHiMmol(context)
+        val tir = tir24h(store, context, now, rangeLo, rangeHi)
         val lowPct = tir?.low ?: 0
         val highPct = tir?.high ?: 0
         val inPct = tir?.inRange ?: 0
 
         // Local IOB — the store sees pen/watch/manual doses xDrip never will.
-        val iob = io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+        val iob = HybridRuntimeMetrics
             .surfaceIobUnits(store, context, now) ?: 0.0
         // Only a dose that still matters reaches the wrist (150 min);
         // older shots are history, findable on the chart.
@@ -237,7 +351,7 @@ class WatchServer(private val context: Context) {
 
         // The face interprets values via status.isMgdl — follow the app's
         // display-unit setting so phone and wrist always agree.
-        val mgdlPref = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+        val mgdlPref = Units.isMgdl(context)
         val bg = JSONObject()
             .put("tir", inPct.toString())
             .put("tirLow", lowPct.toString())
@@ -263,7 +377,7 @@ class WatchServer(private val context: Context) {
             .put("isLow", last.mmol < rangeLo || HypoAlertNotifier.watchSignalActive())
             .put("hypoAlert", HypoAlertNotifier.watchSignalActive())
             // Night-dim flag for the face (manual toggle or schedule on phone).
-            .put("dim", io.github.obdosok.diapilot.data.Settings.watchNightDimActive(context))
+            .put("dim", Settings.watchNightDimActive(context))
             .put("time", last.tsMs)
             .put("isStale", now - last.tsMs > 13 * 60_000)
 
@@ -301,20 +415,20 @@ class WatchServer(private val context: Context) {
                         predLoIn60 = hourLo,
                         iobUnits = iob,
                         carbSensMmolPerGram =
-                            io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+                            HybridRuntimeMetrics
                                 .carbSensitivityMmolPerGram()
                                 .takeIf {
                                     true
                                 }
-                                ?: io.github.obdosok.diapilot.data.TwinCache
+                                ?: TwinCache
                                     .getForForecast(store, context)?.carbSens?.mmolPerGram,
                         loMmol = rangeLo,
                         hiMmol = rangeHi,
-                        targetMmol = io.github.obdosok.diapilot.data.Settings.targetMmol(context),
+                        targetMmol = Settings.targetMmol(context),
                         mgdl = mgdlPref,
-                        hypoProtocol = io.github.obdosok.diapilot.data.Settings.hypoProtocol(context),
+                        hypoProtocol = Settings.hypoProtocol(context),
                     ),
-                )?.let { treatment.put("predictBWP", io.github.obdosok.diapilot.i18n.StatusText.watchHint(context, it)) }
+                )?.let { treatment.put("predictBWP", StatusText.watchHint(context, it)) }
             }
 
         val root = JSONObject()
@@ -337,10 +451,10 @@ class WatchServer(private val context: Context) {
     private fun predictionPoints(now: Long): List<com.diapilot.core.twin.PredictedPoint> {
         val store = Stores.get(context)
         return try {
-            val model = io.github.obdosok.diapilot.data.TwinCache.getForForecast(store, context)
-            val anchor = io.github.obdosok.diapilot.data.forecastAnchor(store, context, now)
+            val model = TwinCache.getForForecast(store, context)
+            val anchor = forecastAnchor(store, context, now)
             if (model != null && anchor != null) {
-                io.github.obdosok.diapilot.data.Forecaster.forecast(
+                Forecaster.forecast(
                     store, model, now,
                     anchorTsMs = anchor.reading.tsMs,
                     anchorMmol = anchor.reading.mmol,
@@ -374,12 +488,12 @@ class WatchServer(private val context: Context) {
     ): JSONObject {
         val store = Stores.get(context)
         val from = now - 3L * 3_600_000
-        val readings = io.github.obdosok.diapilot.data.displayHistory(store, context, from, now)
+        val readings = displayHistory(store, context, from, now)
         // Red/green/yellow by the USER's range, not a hardcoded 3.9/10.
-        val rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
-        val rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
+        val rangeLo = Settings.rangeLoMmol(context)
+        val rangeHi = Settings.rangeHiMmol(context)
 
-        val mgdlPref = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+        val mgdlPref = Units.isMgdl(context)
 
         fun line(name: String, color: String, pts: List<Pair<Long, Number>>): JSONObject =
             JSONObject().put("name", name).put("color", color).put(
@@ -446,12 +560,40 @@ class WatchServer(private val context: Context) {
      * Entry FROM the watch: insulin units and/or carb grams. Insulin goes in
      * as a manual event; carbs become a food note (feeds the twin like any
      * other grams). Source-tagged so a future sync never clobbers them.
+     *
+     * POST with the token, checked before this is reached. The parameters ride
+     * in the query string or in a form-encoded body, whichever the client finds
+     * easier.
+     *
+     * ONE FUSE FOR EVERY INSULIN INPUT. The values arrive over a socket and are
+     * written into IOB, the forecast and the hypo alert, so they pass the same
+     * [com.diapilot.core.analysis.validateCommandValues] the LLM path passes —
+     * `insulin > 0` was not a fuse, it merely excluded one of the two absurd
+     * directions. Nothing is written unless every value clears the guard: a
+     * request carrying a valid dose and implausible carbs stores neither, so a
+     * client is never left guessing which half landed.
      */
     private fun addTreatments(params: Map<String, String>): Pair<String, String> {
-        val insulin = params["insulin"]?.toDoubleOrNull()?.takeIf { it > 0 }
-        val carbs = params["carbs"]?.toDoubleOrNull()?.takeIf { it > 0 }
+        // Deliberately NOT filtered by `> 0` first: a non-positive or
+        // non-finite number must be REFUSED by the guard, not silently read as
+        // "parameter absent".
+        val insulin = params["insulin"]?.toDoubleOrNull()
+        val carbs = params["carbs"]?.toDoubleOrNull()
         if (insulin == null && carbs == null) {
             return "400 Bad Request" to "Parameters not specified"
+        }
+        val foodNote = context.localized().getString(R.string.watch_server_food_from_watch)
+        val block = listOfNotNull(
+            insulin?.let { com.diapilot.core.analysis.validateCommandValues("bolus", units = it) },
+            carbs?.let {
+                com.diapilot.core.analysis.validateCommandValues("food", food = foodNote, grams = it)
+            },
+        ).firstOrNull()
+        if (block != null) {
+            // The reason's CLASS only: the rejected value is medical payload
+            // and never reaches the log (same rule as the request target).
+            Log.w(TAG, "add_treatments refused: ${block.javaClass.simpleName}")
+            return "400 Bad Request" to "Refused by the dose guard"
         }
         val store = Stores.get(context)
         val now = System.currentTimeMillis()
@@ -463,7 +605,7 @@ class WatchServer(private val context: Context) {
         carbs?.let {
             store.addAnnotation(
                 com.diapilot.core.collector.Annotation(
-                    now, "food", context.localized().getString(R.string.watch_server_food_from_watch), estCarbs = it,
+                    now, "food", foodNote, estCarbs = it,
                 ),
             )
         }

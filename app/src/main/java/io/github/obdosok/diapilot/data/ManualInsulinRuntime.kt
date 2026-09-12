@@ -7,6 +7,7 @@ import com.diapilot.core.physio.InsulinParameterResolverV1
 import com.diapilot.core.physio.InsulinShapeLandmarksV1
 import com.diapilot.core.physio.ManualInsulinParamsV1
 import com.diapilot.core.physio.PersonalInsulinCurveV1
+import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 
 /**
  * P1 — the insulin shape and ISF the user set by hand.
@@ -36,7 +37,7 @@ object ManualInsulinRuntime {
     private const val KEY_SET_AT = "manual_insulin_set_at_ms"
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences(io.github.obdosok.diapilot.collect.TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE)
+        context.getSharedPreferences(TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE)
 
     private const val KEY_ISF_MIGRATED = "manual_insulin_isf_migrated_v1"
 

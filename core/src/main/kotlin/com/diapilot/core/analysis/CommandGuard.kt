@@ -104,3 +104,20 @@ fun validateCommandValues(
         else -> CommandBlock.UnknownAction(action)
     }
 }
+
+/**
+ * The same fuse for insulin that arrives from a SOCKET instead of from the LLM
+ * — the xDrip web service on loopback, whose port any app on the phone can bind
+ * while xDrip is stopped. Returns the events that clear [validateCommandValues];
+ * anything above the personal ceiling, non-finite or non-positive is dropped
+ * rather than repaired, because there is no way to know what an absurd number
+ * was meant to be.
+ *
+ * The caller is expected to report HOW MANY events were dropped and never the
+ * values: a refused dose is medical payload.
+ */
+fun acceptedInsulinEvents(
+    events: List<com.diapilot.core.collector.InsulinEvent>,
+    p: com.diapilot.core.PersonalParams = com.diapilot.core.PersonalParams.DEFAULT,
+): List<com.diapilot.core.collector.InsulinEvent> =
+    events.filter { validateCommandValues("bolus", units = it.units, p = p) == null }

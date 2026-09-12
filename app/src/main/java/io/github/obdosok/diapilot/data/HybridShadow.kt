@@ -25,6 +25,8 @@ import com.diapilot.core.twin.PredictedPoint
 import java.io.InputStream
 import kotlin.math.exp
 import kotlin.math.min
+import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.i18n.UiText
 
 // shadow-9: robust state/bridge plus full causal insulin on displayed curves.
 //
@@ -663,9 +665,9 @@ object HybridShadow {
                         it.physicalForm.name,"%.0f".format(it.confidence*100),it.provenance,
                     )
                     if(timing.tailEndMin>timing.plateauMin+30)
-                        io.github.obdosok.diapilot.i18n.UiText.res(io.github.obdosok.diapilot.R.string.hybrid_shadow_kinetics_tail,*args,"%.0f".format(timing.tailEndMin))
-                    else io.github.obdosok.diapilot.i18n.UiText.res(io.github.obdosok.diapilot.R.string.hybrid_shadow_kinetics,*args)
-                }?:io.github.obdosok.diapilot.i18n.UiText.res(io.github.obdosok.diapilot.R.string.hybrid_shadow_kinetics_none)
+                        UiText.res(R.string.hybrid_shadow_kinetics_tail,*args,"%.0f".format(timing.tailEndMin))
+                    else UiText.res(R.string.hybrid_shadow_kinetics,*args)
+                }?:UiText.res(R.string.hybrid_shadow_kinetics_none)
                 note.id to FoodCalculationV1(
                     annotationId=note.id,eventTsMs=note.tsMs,dish=note.content,
                     model="PHYSIO_V1:${physioArtifact.artifactId}",carbsG=event.carbsG,

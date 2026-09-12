@@ -59,10 +59,38 @@ import com.diapilot.core.collector.Reading
 import com.diapilot.core.collector.relabelMeal
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
+import io.github.obdosok.diapilot.data.AdaptiveIsfRuntime
+import io.github.obdosok.diapilot.data.CalibratedGlucose
+import io.github.obdosok.diapilot.data.DailyDiscrepancyRuntime
+import io.github.obdosok.diapilot.data.FoodCalculationRegistry
+import io.github.obdosok.diapilot.data.FoodEraSettings
+import io.github.obdosok.diapilot.data.ForecastLedger
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.HealthConnectSync
+import io.github.obdosok.diapilot.data.HistoryFoodProjectionCache
+import io.github.obdosok.diapilot.data.HybridFoodReadout
+import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+import io.github.obdosok.diapilot.data.HybridShadowRegistry
+import io.github.obdosok.diapilot.data.HybridWhatIfProfile
+import io.github.obdosok.diapilot.data.LedgerRetention
+import io.github.obdosok.diapilot.data.ManualInsulinRuntime
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.PhysioRuntime
+import io.github.obdosok.diapilot.data.PhysioTuning
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.data.displayHistory
+import io.github.obdosok.diapilot.data.tir24h
+import io.github.obdosok.diapilot.data.trustedHistory
+import io.github.obdosok.diapilot.i18n.StatusText
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.ui.AnalysisScreen
 import io.github.obdosok.diapilot.ui.GlucoseChart
+import io.github.obdosok.diapilot.ui.parseMealParts
 import io.github.obdosok.diapilot.ui.theme.DiaPilotTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -203,12 +231,12 @@ internal data class UiState(
     val counterfactualLandmarks:Map<Long,Triple<Double,Double,Double>> = emptyMap(),
     val carbSensMmolPerGram: Double? = null,
     val forecastKernelScale: Double = 1.0,
-    val hybridWhatIfProfile: io.github.obdosok.diapilot.data.HybridWhatIfProfile? = null,
-    val comparisonWhatIfProfile: io.github.obdosok.diapilot.data.HybridWhatIfProfile? = null,
+    val hybridWhatIfProfile: HybridWhatIfProfile? = null,
+    val comparisonWhatIfProfile: HybridWhatIfProfile? = null,
     val selectedArmWhatIf: Boolean = false,
     /** Per-note food response from the installed v11 artifact. This replaces
      * detector rise/time numbers in history cards. */
-    val hybridFoodReadouts: Map<Long, io.github.obdosok.diapilot.data.HybridFoodReadout> = emptyMap(),
+    val hybridFoodReadouts: Map<Long, HybridFoodReadout> = emptyMap(),
     /** Prospective one-hour v11 misses, not detector-selected meal dossiers. */
     // Lab toggle state: the main-screen forecast is showing the fingerprint
     // food model (Phase 1) instead of the live one.
@@ -320,7 +348,7 @@ internal fun loadLivePreview(
     context: android.content.Context,
     now: Long = System.currentTimeMillis(),
 ): UiState {
-    val last = io.github.obdosok.diapilot.data.CalibratedGlucose.lastReading(store, context)
+    val last = CalibratedGlucose.lastReading(store, context)
         ?: store.lastSensorReading() ?: return previous
     // THE WINDOW TRAVELS WITH THE POINTS. Publishing readings without
     // `chartFrom`/`chartTo` left them at their zero defaults on a cold start,
@@ -330,7 +358,7 @@ internal fun loadLivePreview(
     // screen at least showed the PREVIOUS window; a partial state that is
     // internally inconsistent is worse than a stale one that is whole.
     val from = now - 72L * 3_600_000L
-    val chart = io.github.obdosok.diapilot.data.displayHistory(store, context, from, now)
+    val chart = displayHistory(store, context, from, now)
     if (chart.isEmpty()) return previous
     // Nothing newer than what is already shown: leave the instance alone rather
     // than publish an identical state and invalidate every reader (A-35).
@@ -356,9 +384,9 @@ internal fun loadLivePreview(
     // resumed process holds the real thing, and the stored run can only be
     // older than it.
     val stored = previous.prediction.ifEmpty {
-        (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let { sqlite ->
+        (store as? SqliteCollectorStore)?.let { sqlite ->
             runCatching {
-                io.github.obdosok.diapilot.data.ForecastLedger.lastShownPrediction(
+                ForecastLedger.lastShownPrediction(
                     sqlite.readableDatabase, "main", last.tsMs,
                 )
             }.getOrNull()
@@ -539,9 +567,9 @@ internal suspend fun loadState(
     // Stage-10 History receipts are retrospective and expensive. Restore the
     // disk snapshot before Compose asks for History. A changed source key keeps
     // stable receipts and causes only the 72-hour hot tail to be recomputed.
-    (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let { sqlite ->
-        val key=io.github.obdosok.diapilot.data.FoodCalculationRegistry.sourceKey(sqlite,context,now)
-        io.github.obdosok.diapilot.data.FoodCalculationRegistry.restore(context,key)
+    (store as? SqliteCollectorStore)?.let { sqlite ->
+        val key=FoodCalculationRegistry.sourceKey(sqlite,context,now)
+        FoodCalculationRegistry.restore(context,key)
     }
     // Meal detection belongs to TreatmentsPollWorker. Running it from every
     // screen refresh duplicated the same scan while the app was foregrounded.
@@ -567,7 +595,7 @@ internal suspend fun loadState(
     // reading" — the header, the hypo button and the prediction anchor gain
     // up to 4 minutes of freshness. The 5-minute stream stays the truth for
     // analytics and the twin's training.
-    val minuteCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, context)
+    val minuteCal = MinuteCalCache.get(store, context)
     val lastPromoted = run {
         val lm = store.lastMinuteReading()
         if (minuteCal != null && lm != null && lastMain != null &&
@@ -588,8 +616,8 @@ internal suspend fun loadState(
     // storage stays untouched.
     // Window bounded by the sensor's life when the NFC scan told us it:
     // checks against the previous sensor must not calibrate this one.
-    val meterCal = io.github.obdosok.diapilot.data.MeterCalCache.get(store, context)
-    val meterCalTimeline = io.github.obdosok.diapilot.data.MeterCalCache.timeline(store, meterCal)
+    val meterCal = MeterCalCache.get(store, context)
+    val meterCalTimeline = MeterCalCache.timeline(store, meterCal)
     fun meterCalAt(tsMs: Long) = meterCalTimeline.lastOrNull {
         tsMs in it.validFromMs..it.validUntilMs
     }
@@ -624,13 +652,13 @@ internal suspend fun loadState(
     // Inferring a cost by subtracting two laps is exactly the reasoning
     // discipline #1 says to replace with a printed number.
     val model = if (allowBuild) timed("twin build (allowBuild)") {
-        io.github.obdosok.diapilot.data.TwinCache.get(store, context)
+        TwinCache.get(store, context)
     } else timed("twin forecast-only") {
-        io.github.obdosok.diapilot.data.TwinCache.getForForecast(store, context)
+        TwinCache.getForForecast(store, context)
     }
     // Reuse the already-built production deconvolution for per-episode History
     // receipts. This is an O(n) projection, not a second expensive rebuild.
-    io.github.obdosok.diapilot.data.HybridRuntimeMetrics.installLiveFoodObservations(
+    HybridRuntimeMetrics.installLiveFoodObservations(
         model?.fingerprintCorpus ?: emptyList(),
     )
     lap("anchors+calibration+model")
@@ -654,7 +682,7 @@ internal suspend fun loadState(
     // The current IOB is reused in three UI sections.  Calculate it once;
     // previously each section repeated the same database read and curve sum.
     val currentIob = timed("  iob surface") {
-        io.github.obdosok.diapilot.data.HybridRuntimeMetrics.surfaceIobUnits(store, context, now)
+        HybridRuntimeMetrics.surfaceIobUnits(store, context, now)
     }
     // FIRST `activeFoods` CALL REMOVED.
     //
@@ -684,7 +712,7 @@ internal suspend fun loadState(
     } ?: emptyList()
     // ONE engine for every consumer — diverge here and validation lies.
     val forecastResult = if (last != null && now - last.tsMs <= 36L * 3_600_000 && model != null) {
-        timed("  Forecaster.forecast") { io.github.obdosok.diapilot.data.Forecaster.forecast(
+        timed("  Forecaster.forecast") { Forecaster.forecast(
             store, model, now,
             anchorTsMs = last.tsMs, anchorMmol = last.mmol,
             minutePoints = if (minuteCal != null && last.source != "meter") {
@@ -705,9 +733,9 @@ internal suspend fun loadState(
     ) {
         maxOf(
             prediction.lastOrNull()?.tsMs ?: now,
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+            HybridRuntimeMetrics
                 .activeInsulinEndMs(store, now, context) ?: now,
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.activeFoodEndMs(store, now) ?: now,
+            HybridRuntimeMetrics.activeFoodEndMs(store, now) ?: now,
         )
     } else chartToBound
     lap("live forecast")
@@ -761,7 +789,7 @@ internal suspend fun loadState(
     val annAll = if(includeHistory) store.annotations(0, now)
         else store.annotations(now-72L*3_600_000L,now)
     val labeledAll500 = store.labeledMeals(limit = 500)
-        .filter { it.event.onsetMs >= io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs }
+        .filter { it.event.onsetMs >= FoodEraSettings.current().startMs }
     // Auto-label: a detected rise with a confident food note (grams, tight
     // window) is almost certainly THAT meal — apply it instead of nagging the
     // user to confirm. Only touches still-unlabeled meals, reversible via
@@ -803,7 +831,7 @@ internal suspend fun loadState(
     )
     // Unlogged-meal suggestions; user-declined ones stay declined (prefs).
     val foodSuggestions = run {
-        val dismissed = io.github.obdosok.diapilot.data.Settings.foodSuggestDismissed(context)
+        val dismissed = Settings.foodSuggestDismissed(context)
         com.diapilot.core.analysis.suggestFood(
             nowMs = now,
             notes = annAll,
@@ -866,14 +894,14 @@ internal suspend fun loadState(
     lap("receipts+deviation+suggestions+activity")
     val whatIfAnchor = forecastResult?.points?.firstOrNull()?.tsMs
     val selectedWhatIfProfile = whatIfAnchor
-        ?.let(io.github.obdosok.diapilot.data.HybridShadowRegistry::physioWhatIf)
+        ?.let(HybridShadowRegistry::physioWhatIf)
     val chartBolusRows=store.bolusesAll(chartWindow,chartToBound)
-    val physioForCounterfactual=io.github.obdosok.diapilot.data.PhysioRuntime.artifact(store,now)
+    val physioForCounterfactual=PhysioRuntime.artifact(store,now)
     val counterfactualPeople=chartBolusRows.filter{it.units>0&&!com.diapilot.core.analysis.isPrimePurpose(it.purpose)}.mapNotNull{b->
         val cal=java.util.Calendar.getInstance().apply{timeInMillis=b.tsMs}
         val hour=cal.get(java.util.Calendar.HOUR_OF_DAY)+cal.get(java.util.Calendar.MINUTE)/60.0
         val person=physioForCounterfactual?.personModelAt(hour)
-            ?:io.github.obdosok.diapilot.data.HybridRuntimeMetrics.model()
+            ?:HybridRuntimeMetrics.model()
         person?.let{b.tsMs to (b to it)}
     }.toMap()
     val counterfactualKernels=counterfactualPeople.mapValues{(_,pair)->
@@ -900,7 +928,7 @@ internal suspend fun loadState(
         chartTo = if (navAnchor != null) chartToBound else chartEffectsTo,
         chartNavActive = navAnchor != null,
         chartReadings = timed("chartReadings") {
-            val pts = io.github.obdosok.diapilot.data.displayHistory(
+            val pts = displayHistory(
                 store, context, chartWindow, chartToBound,
             )
             // Bridge NFC 15-min backfill spans into a line (cosmetic only).
@@ -913,7 +941,7 @@ internal suspend fun loadState(
         // the textbook curve (DIA 5h, peak 75) is a population guess, and this
         // body's own half-effect lands nearer 65 min.
         iobSeries = timed("iobSeries") {
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.surfaceIobSeries(
+            HybridRuntimeMetrics.surfaceIobSeries(
                 store, context, chartWindow, chartEffectsTo,
             )
         },
@@ -940,7 +968,7 @@ internal suspend fun loadState(
         // a different model (same principle as "a model failure should no
         // longer look like knowledge").
         cobSeries = timed("cobSeries") {
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.physioCobSeries(store, chartWindow, chartEffectsTo)
+            HybridRuntimeMetrics.physioCobSeries(store, chartWindow, chartEffectsTo)
         },
         chartBoluses = chartBolusRows,
         chartMeals = store.meals(chartWindow, chartToBound),
@@ -989,7 +1017,7 @@ internal suspend fun loadState(
             // A composite dish without explicit grams contributes its LIVE
             // recipe sum: fix "bread" once, every dish containing it follows.
             val derived = latest.mapValues { it.value.second }
-            val library = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+            val library = (store as? SqliteCollectorStore)
                 ?.foodLibrary().orEmpty()
                 .mapNotNull { e ->
                     val g = e.grams ?: e.components.takeIf { it.isNotEmpty() }?.let { comps ->
@@ -1060,7 +1088,7 @@ internal suspend fun loadState(
             // Library recipes are the CURATED source of a dish's split — they
             // override the history-derived guess, so picking a saved recipe
             // in the composer offers exactly its real composition.
-            val fromLibrary = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+            val fromLibrary = (store as? SqliteCollectorStore)
                 ?.foodLibrary().orEmpty()
                 .filter { it.components.isNotEmpty() }
                 .mapNotNull { e ->
@@ -1077,7 +1105,7 @@ internal suspend fun loadState(
         // decomposition reads) with editable per-instance portions — so the
         // label never fragments into a comma-list, but 1 vs 2 slices of bread still
         // adjusts the recorded grams.
-        compositeParts = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+        compositeParts = (store as? SqliteCollectorStore)
             ?.foodLibrary().orEmpty()
             .filter { it.components.isNotEmpty() }
             .mapNotNull { e ->
@@ -1091,10 +1119,10 @@ internal suspend fun loadState(
             .filter { it.mediaRef != null && it.content.isNotBlank() }
             .groupBy { it.content }
             .mapValues { (_, ns) -> ns.maxBy { it.tsMs }.mediaRef!! },
-        hcGranted = if (io.github.obdosok.diapilot.data.HealthConnectSync.clientOrNull(context) == null) null
-        else io.github.obdosok.diapilot.data.HealthConnectSync.hasPermissions(context),
-        stepsGranted = if (io.github.obdosok.diapilot.data.HealthConnectSync.clientOrNull(context) == null) null
-        else io.github.obdosok.diapilot.data.HealthConnectSync.hasStepsPermission(context),
+        hcGranted = if (HealthConnectSync.clientOrNull(context) == null) null
+        else HealthConnectSync.hasPermissions(context),
+        stepsGranted = if (HealthConnectSync.clientOrNull(context) == null) null
+        else HealthConnectSync.hasStepsPermission(context),
         // Delta over the LAST 5 MINUTES of the calibrated minute stream,
         // recomputed every refresh — the old mixed-source 5-min pair could
         // flip the sign when the scales disagreed.
@@ -1142,8 +1170,8 @@ internal suspend fun loadState(
                 minSinceLastBolus = lastBolusMs?.let { (now - it) / 60_000.0 },
                 isfEffectiveEpisodes = model.effectiveEpisodes,
                 hasCarbRatio = model.carbSens != null,
-                rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context),
-                rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context),
+                rangeLo = Settings.rangeLoMmol(context),
+                rangeHi = Settings.rangeHiMmol(context),
             )
         },
         historyNotes = if (includeHistory) store.annotations(historyFrom, historyTo) else emptyList(),
@@ -1159,7 +1187,7 @@ internal suspend fun loadState(
         historyReadings = if (includeHistory) timed("historyReadings") {
             val meterTs = store.meterReadings(historyFrom, historyTo)
                 .mapTo(HashSet()) { it.tsMs }
-            io.github.obdosok.diapilot.data.displayHistory(store, context, historyFrom, historyTo)
+            displayHistory(store, context, historyFrom, historyTo)
                 .filter { it.tsMs !in meterTs }
         } else emptyList(),
         // Already built for the food model — the history just reads it. Empty
@@ -1204,8 +1232,8 @@ internal suspend fun loadState(
         // composer still opens with data and the write path stops paying for it.
         foodMemory = if (!includeHistory) emptyMap() else timed("foodMemory") {
             val labeledAll = labeledAll500
-            val allBoluses = store.boluses(io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs, now)
-            val allNotes = annAll.filter { it.tsMs >= io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs }
+            val allBoluses = store.boluses(FoodEraSettings.current().startMs, now)
+            val allNotes = annAll.filter { it.tsMs >= FoodEraSettings.current().startMs }
             val stats = com.diapilot.core.analysis.labelStats(labeledAll)
             val memKernel = model?.kernel ?: emptyList()
             stats.mapNotNull {
@@ -1219,7 +1247,7 @@ internal suspend fun loadState(
             // Two bridges, unioned: response shape (rise/ttp — needs the
             // dish's own history) and shared recipe components (works for a
             // dish NEVER eaten: a new beer inherits prior beer experience).
-            val lib = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+            val lib = (store as? SqliteCollectorStore)
                 ?.foodLibrary().orEmpty()
             fun norm(s: String) = com.diapilot.core.analysis.normalizeFoodName(s)
             val recipeByName = lib.filter { it.components.isNotEmpty() }
@@ -1229,7 +1257,7 @@ internal suspend fun loadState(
             val dishNames = (stats.map { it.name } + lib.map { it.name }).distinct()
             val componentsByDish = dishNames.associateWith { n ->
                 recipeByName[n]
-                    ?: io.github.obdosok.diapilot.ui.parseMealParts(n)
+                    ?: parseMealParts(n)
                         .takeIf { it.size > 1 }?.keys
                         ?.map { norm(it) }?.filter { it.isNotEmpty() }?.toSet()
                     ?: setOfNotNull(norm(n).takeIf { it.isNotEmpty() })
@@ -1291,7 +1319,7 @@ internal suspend fun loadState(
             }.toMap()
         } else emptyMap(),
         // (Periodic observations moved to the Analysis screen.)
-        labeled = store.labeledMeals(limit = 20).filter { it.event.onsetMs >= io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs },
+        labeled = store.labeledMeals(limit = 20).filter { it.event.onsetMs >= FoodEraSettings.current().startMs },
         lastReading = last,
         lastBolus = store.boluses(now - 7L * 24 * 3_600_000, now).lastOrNull(),
         // Local IOB: xDrip's number went stale the day doses moved to the
@@ -1299,14 +1327,14 @@ internal suspend fun loadState(
         // THIS BODY's curve, same as the chart lane (see iobAt).
         iobUnits = currentIob,
         iobTsMs = now,
-        mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context),
-        rangeLo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context),
-        targetMmol = io.github.obdosok.diapilot.data.Settings.targetMmol(context),
-        rangeHi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context),
+        mgdl = Units.isMgdl(context),
+        rangeLo = Settings.rangeLoMmol(context),
+        targetMmol = Settings.targetMmol(context),
+        rangeHi = Settings.rangeHiMmol(context),
         forecastCheck = forecastCheck,
         correctionCandidate = correctionCandidate,
         meterCalLine = meterCal?.takeIf { it.isActive(now) }?.let { c ->
-            val mgdlPref = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+            val mgdlPref = Units.isMgdl(context)
             val text = context.localized()
             val parts = mutableListOf<String>()
             if (c.nChecks >= 2) {
@@ -1336,7 +1364,7 @@ internal suspend fun loadState(
         counterfactualLandmarks=counterfactualLandmarks,
         carbSensMmolPerGram =
             if (true) {
-                io.github.obdosok.diapilot.data.HybridRuntimeMetrics.carbSensitivityMmolPerGram()
+                HybridRuntimeMetrics.carbSensitivityMmolPerGram()
             } else {
                 model?.carbSens?.mmolPerGram
             },
@@ -1353,9 +1381,9 @@ internal suspend fun loadState(
         hybridFoodReadouts = if (includeHistory) timed("hybridFoodReadouts") {
             val notes=store.annotations(historyFrom,historyTo).filter{com.diapilot.core.analysis.isFoodNote(it)}
             run{
-                val artifact=io.github.obdosok.diapilot.data.PhysioRuntime.artifact(store,now)
+                val artifact=PhysioRuntime.artifact(store,now)
                 if(artifact==null)emptyMap() else {
-                    (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let { sqlite ->
+                    (store as? SqliteCollectorStore)?.let { sqlite ->
                         // THE CODE IS PART OF THE MODEL, and it was missing here.
                         // This identity held only the ARTIFACT, so a card stayed
                         // cached across app updates that changed how it is
@@ -1375,7 +1403,7 @@ internal suspend fun loadState(
                             artifact.baseMechanics.food.defaultShape,
                             artifact.macroTiming,
                             com.diapilot.core.twin.FORECAST_ALGO_VERSION_FP_SHADOW,
-                            io.github.obdosok.diapilot.BuildConfig.VERSION_NAME,
+                            BuildConfig.VERSION_NAME,
                             // THE TUNING IS PART OF THE MODEL TOO (A-31).
                             //
                             // The settings screen can now move ISF, the insulin
@@ -1388,14 +1416,14 @@ internal suspend fun loadState(
                             // dish. The comment above says "version a stored
                             // answer by the model that made it"; a tuning IS
                             // the model that made it.
-                            io.github.obdosok.diapilot.data.PhysioTuning.identity(
-                                io.github.obdosok.diapilot.data.PhysioTuning.read(context),
+                            PhysioTuning.identity(
+                                PhysioTuning.read(context),
                             ),
                         ).joinToString("|")
-                        io.github.obdosok.diapilot.data.HistoryFoodProjectionCache.getOrCompute(
+                        HistoryFoodProjectionCache.getOrCompute(
                             sqlite, projectionIdentity, notes,
                         ) { missing ->
-                            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.foodReadoutsForModel(
+                            HybridRuntimeMetrics.foodReadoutsForModel(
                                 // Food amplitude/timing does not depend on the
                                 // insulin time-of-day ISF; one engine is valid
                                 // for every cache miss in this batch.
@@ -1403,7 +1431,7 @@ internal suspend fun loadState(
                                 macroTiming=artifact.macroTiming,physioArtifact=artifact,
                             )
                         }
-                    } ?: io.github.obdosok.diapilot.data.HybridRuntimeMetrics.foodReadoutsForModel(
+                    } ?: HybridRuntimeMetrics.foodReadoutsForModel(
                         artifact.personModelAt(12.0,emptySet()),notes,
                         macroTiming=artifact.macroTiming,physioArtifact=artifact,
                     )
@@ -1411,11 +1439,11 @@ internal suspend fun loadState(
             }
         } else emptyMap(),
         insulinDiaMin =
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.physioInsulinLandmarks(store,now)?.effectEndMin
-                ?: io.github.obdosok.diapilot.data.Settings.insulinDiaMin(context),
+            HybridRuntimeMetrics.physioInsulinLandmarks(store,now)?.effectEndMin
+                ?: Settings.insulinDiaMin(context),
         insulinPeakMin =
-            io.github.obdosok.diapilot.data.HybridRuntimeMetrics.physioInsulinLandmarks(store,now)?.ratePeakMin
-                ?: io.github.obdosok.diapilot.data.Settings.insulinPeakMin(context),
+            HybridRuntimeMetrics.physioInsulinLandmarks(store,now)?.ratePeakMin
+                ?: Settings.insulinPeakMin(context),
         // Basal reminder: learned from the logging habit itself — the median
         // time-of-day of past basal entries. Due when >20h since the last
         // shot and the usual hour is near (or up to 3h overdue).
@@ -1447,12 +1475,12 @@ internal suspend fun loadState(
             units to "%02d:%02d".format(usual / 60, usual % 60)
         },
         dayStats = timed("dayStats") {
-            val day = io.github.obdosok.diapilot.data.trustedHistory(
+            val day = trustedHistory(
                 store, context, now - 24L * 3_600_000, now,
             )
             if (day.isEmpty()) null else {
-                val lo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
-                val hi = io.github.obdosok.diapilot.data.Settings.rangeHiMmol(context)
+                val lo = Settings.rangeLoMmol(context)
+                val hi = Settings.rangeHiMmol(context)
                 val mean = day.sumOf { it.mmol } / day.size
                 val dayNotes = store.annotations(now - 24L * 3_600_000, now)
                 val nutritionNotes = dayNotes.mapNotNull { note ->
@@ -1462,7 +1490,7 @@ internal suspend fun loadState(
                 val nutrition = nutritionNotes.fold(com.diapilot.core.analysis.FoodNutrition()) {
                     total, n -> total + n
                 }
-                val tir = io.github.obdosok.diapilot.data.tir24h(store, context, now, lo, hi)
+                val tir = tir24h(store, context, now, lo, hi)
                 DayStats(
                     tirPct = tir?.inRange ?: 0,
                     insulinUnits = store.boluses(now - 24L * 3_600_000, now).sumOf { it.units },
@@ -1479,7 +1507,7 @@ internal suspend fun loadState(
             last?.takeIf { now - it.tsMs < 15 * 60_000 }?.let { current ->
                 val delta = store.readings(now - 25 * 60_000, now).takeLast(2)
                     .takeIf { it.size == 2 }?.let { it[1].mmol - it[0].mmol }
-                val lo = io.github.obdosok.diapilot.data.Settings.rangeLoMmol(context)
+                val lo = Settings.rangeLoMmol(context)
                 current.mmol < lo + 0.1 ||
                     (current.mmol < lo + 1.6 && (delta ?: 0.0) <= -0.25)
             } ?: false
@@ -1497,11 +1525,11 @@ internal suspend fun loadState(
                     it.get(java.util.Calendar.MINUTE) / 60.0
             }
             val text = context.localized()
-            io.github.obdosok.diapilot.data.PhysioRuntime.artifact(store, now)
+            PhysioRuntime.artifact(store, now)
                 ?.personModelAt(hour, emptySet())
                 ?.let { it.insulin.isf to text.getString(R.string.main_state_isf_source_hour, hour.toInt()) }
                 ?.let { (isf, src) ->
-                val tuned = io.github.obdosok.diapilot.data.ManualInsulinRuntime.params(context).isfMmolPerU
+                val tuned = ManualInsulinRuntime.params(context).isfMmolPerU
                 if (tuned != null) tuned to text.getString(R.string.main_state_isf_source_manual, src) else isf to src
             }
         },
@@ -1518,7 +1546,7 @@ internal suspend fun loadState(
                 }
                 .maxByOrNull { it.tsMs }
             val labelByOnset4h = store.labeledMeals(limit = 100)
-                .filter { it.event.onsetMs >= io.github.obdosok.diapilot.data.FoodEraSettings.current().startMs }
+                .filter { it.event.onsetMs >= FoodEraSettings.current().startMs }
                 .associate { it.event.onsetMs to it.labelName }
             val foodMeal = store.meals(now - 4L * 3_600_000, now)
                 .filter { labelByOnset4h[it.onsetMs] !in com.diapilot.core.analysis.SysLabels.ALL }
@@ -1530,7 +1558,7 @@ internal suspend fun loadState(
             val future = prediction.filter { it.tsMs > now }
             val settleIdx = com.diapilot.core.analysis.settleIndex(future.map { it.mmol })
             val predPt = settleIdx?.let { future[it] }
-            io.github.obdosok.diapilot.i18n.StatusText.lines(context, com.diapilot.core.analysis.statusSummary(
+            StatusText.lines(context, com.diapilot.core.analysis.statusSummary(
                 com.diapilot.core.analysis.StatusInput(
                     iobUnits = localIob,
                     lastBolusUnits = lastBolus?.units,
@@ -1543,7 +1571,7 @@ internal suspend fun loadState(
                     // curves the forecast draws — the two must agree on screen.
                     // Sums ALL active meals, not just the headline one, so a
                     // dessert on top of dinner shows up.
-                    cobGrams = io.github.obdosok.diapilot.data.HybridRuntimeMetrics
+                    cobGrams = HybridRuntimeMetrics
                         .cobGrams(store, now)?.takeIf { it > 0.0 },
                     predMmolIn60 = predPt?.mmol,
                     // The header quotes the INNER (≈50%) band — "half the
@@ -1554,7 +1582,7 @@ internal suspend fun loadState(
                     predHiIn60 = predPt?.hiMid,
                     predSettleMin = predPt?.let { (it.tsMs - now) / 60_000 },
                     predSettled = settleIdx != null && settleIdx < future.size - 1,
-                    mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context),
+                    mgdl = Units.isMgdl(context),
                 ),
             ))
         },
@@ -1579,7 +1607,7 @@ internal suspend fun loadState(
         // that produced it. Observability only — nothing here changes a number,
         // and it never suggests a dose.
         appliedIsfLine = forecastResult?.appliedIsf?.let { isf ->
-            val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+            val mgdl = Units.isMgdl(context)
             val text = context.localized()
             fun isfText(v: Double) =
                 if (mgdl) text.getString(R.string.main_state_isf_unit_mgdl, v * 18.0)
@@ -1611,7 +1639,7 @@ internal suspend fun loadState(
     // Nothing below is required to render the graph or History. Keep the whole
     // maintenance bundle off the foreground path and serialize it with Closed
     // Episodes so their SQLite writes cannot contend with each other.
-    if(allowBuild) (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let { sqlite ->
+    if(allowBuild) (store as? SqliteCollectorStore)?.let { sqlite ->
         UiMaintenanceQueue.schedule {
             val db=sqlite.writableDatabase
             // THROTTLED, AND THE TIMER IS WHY. This bundle was left running on
@@ -1644,18 +1672,18 @@ internal suspend fun loadState(
                     if(ms>=200)android.util.Log.i("MainStatePerf","  maintenance $label in $ms ms")
                 }
             }
-            stage("dropRetiredLedgers"){io.github.obdosok.diapilot.data.LedgerRetention.dropRetiredLedgers(context,sqlite)}
+            stage("dropRetiredLedgers"){LedgerRetention.dropRetiredLedgers(context,sqlite)}
             // The sweep is also wired into `TreatmentsPollWorker`, and in the
             // whole recorded history of this device it never emitted a single
             // log line — so «growth is capped» rested on a worker nobody had
             // seen fire. It is self-throttled to once a day and fails open;
             // calling it from here as well costs nothing and makes the cap a
             // fact rather than an intention.
-            stage("ledgerRetention"){io.github.obdosok.diapilot.data.LedgerRetention.runIfDue(context,sqlite)}
-            stage("ledgerReclaim"){io.github.obdosok.diapilot.data.LedgerRetention.reclaimOnce(context,sqlite)}
-            stage("dailyDiscrepancy"){io.github.obdosok.diapilot.data.DailyDiscrepancyRuntime.update(store,db,now)}
+            stage("ledgerRetention"){LedgerRetention.runIfDue(context,sqlite)}
+            stage("ledgerReclaim"){LedgerRetention.reclaimOnce(context,sqlite)}
+            stage("dailyDiscrepancy"){DailyDiscrepancyRuntime.update(store,db,now)}
             stage("adaptiveIsf"){
-                io.github.obdosok.diapilot.data.AdaptiveIsfRuntime.refreshIfDue(context,store,now)
+                AdaptiveIsfRuntime.refreshIfDue(context,store,now)
             }
             val tScoring=android.os.SystemClock.elapsedRealtime()-tBundle
             // THROTTLED, AND ONLY THIS ONE. A live check showed the

@@ -18,9 +18,18 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.diapilot.core.collector.ACTION_BG
 import com.diapilot.core.collector.Reading
+import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.CalibratedGlucose
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.Settings
+import io.github.obdosok.diapilot.data.SqliteCollectorStore
+import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.widget.BgWidget
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,7 +106,7 @@ class CollectorService : Service() {
         // restart to take over. Opt-in (Settings -> Watch): off by default, so
         // a second copy never competes for the port. DiagState.watchServerUp is
         // set by WatchServer itself once a socket is actually bound.
-        if (io.github.obdosok.diapilot.data.Settings.watchServerEnabled(applicationContext)) {
+        if (Settings.watchServerEnabled(applicationContext)) {
             watchServer = WatchServer(applicationContext).also { it.start() }
         }
 
@@ -118,7 +127,7 @@ class CollectorService : Service() {
                     val obj = org.json.JSONObject(json)
                     // Stage-4 pair log: the decrypted buffer joins its
                     // encrypted twin (matched by capture timestamp).
-                    if (io.github.obdosok.diapilot.data.Settings.ownBleEnabled(this@CollectorService)) {
+                    if (Settings.ownBleEnabled(this@CollectorService)) {
                         obj.optString("DecodedBuffer").takeIf { it.isNotEmpty() }?.let { dec ->
                             Libre2PairLog.logDecoded(
                                 this@CollectorService,
@@ -135,17 +144,17 @@ class CollectorService : Service() {
                     }
                     val readings = com.diapilot.core.collector.parseOop2Trend(fields)
                     if (readings.isNotEmpty()) {
-                        val store = io.github.obdosok.diapilot.data.Stores.get(this@CollectorService)
+                        val store = Stores.get(this@CollectorService)
                         readings.forEach(store::upsertMinuteReading)
                         Log.d(OOP2_TAG, "minute stream: ${readings.size} pts, newest %.1f mmol".format(readings.first().mmol))
 
                         // Own-BLE mode: DiaPilot is the primary source now —
                         // promote the newest minute value onto the 5-minute
                         // main grid via the (frozen) minute→main calibration.
-                        if (io.github.obdosok.diapilot.data.Settings.ownBleEnabled(this@CollectorService)) {
+                        if (Settings.ownBleEnabled(this@CollectorService)) {
                             val nowP = System.currentTimeMillis()
                             val lastMain = store.lastSensorReading()
-                            val cal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, this@CollectorService)
+                            val cal = MinuteCalCache.get(store, this@CollectorService)
                             val newest = readings.maxByOrNull { it.tsMs }
                             if (newest != null && cal != null &&
                                 (lastMain == null || newest.tsMs - lastMain.tsMs >= 270_000)
@@ -184,11 +193,11 @@ class CollectorService : Service() {
                         // (up to 1.9 in the range where this alarm fires), so the
                         // notification both triggered early and printed a number
                         // the app's own screen disagreed with.
-                        val calibrated = io.github.obdosok.diapilot.data.CalibratedGlucose
+                        val calibrated = CalibratedGlucose
                             .lastReading(store, this@CollectorService)
                             ?.takeIf { now - it.tsMs < 10 * 60_000 }?.mmol
                         com.diapilot.core.analysis.detectRapidFall(
-                            minuteReadings = io.github.obdosok.diapilot.data.CalibratedGlucose
+                            minuteReadings = CalibratedGlucose
                                 .minutePoints(store, this@CollectorService, now - 15 * 60_000, now),
                             calibratedMmol = calibrated,
                             nowMs = now,
@@ -202,7 +211,7 @@ class CollectorService : Service() {
                         HypoAlertNotifier.maybeNotify(this@CollectorService, store)
 
                         // Home-screen widget follows the same heartbeat.
-                        io.github.obdosok.diapilot.widget.BgWidget.updateAll(this@CollectorService)
+                        BgWidget.updateAll(this@CollectorService)
                         // …and so does the companion dashboard (throttled inside).
                         CompanionSync.pushIfDue(this@CollectorService)
                         // Release any watch long-poll waiting on fresh data.
@@ -233,7 +242,7 @@ class CollectorService : Service() {
         }
 
         // Experimental own BLE link to the sensor (opt-in in Settings).
-        if (io.github.obdosok.diapilot.data.Settings.ownBleEnabled(this)) {
+        if (Settings.ownBleEnabled(this)) {
             libreBle = LibreBleClient(this).also { it.start() }
             startBleWakeup()
         }
@@ -311,15 +320,15 @@ class CollectorService : Service() {
     private fun onReading(r: Reading) {
         if (r.source != "libre_ble") DiagState.lastXdripBroadcastMs = System.currentTimeMillis()
         val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(this)
+        val mgdl = Units.isMgdl(this)
         // OUR arrow + delta from the FROZEN grid (same as the header), and OUR
         // meter-calibrated value — this ongoing notification is the on-device
         // BG glance, meant to stand in for xDrip's on the lock screen.
         val now = System.currentTimeMillis()
-        val store = io.github.obdosok.diapilot.data.Stores.get(this)
-        val meterCal = try { io.github.obdosok.diapilot.data.MeterCalCache.get(store, this) } catch (_: Exception) { null }
+        val store = Stores.get(this)
+        val meterCal = try { MeterCalCache.get(store, this) } catch (_: Exception) { null }
         val shownMmol = meterCal?.correctedAt(r.tsMs, r.mmol) ?: r.mmol
-        (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+        (store as? SqliteCollectorStore)
             ?.rememberPresentedGlucose(r.tsMs, shownMmol, r.source, now)
         val trend = try {
             val gridPts = store.sensorReadings(now - 16L * 60_000, now).map {
@@ -390,7 +399,7 @@ class CollectorService : Service() {
         private const val NOTIF_ID = 1001
         const val ACTION_OOP2_BLE = "com.eveningoutpost.dexdrip.OOP2_DECODE_BLE_RESULT"
         const val ACTION_OOP2_FARM = "com.eveningoutpost.dexdrip.OOP2_DECODE_FARM_RESULT"
-        private const val ACTION_BLE_WAKEUP = io.github.obdosok.diapilot.AppIdentity.ACTION_BLE_WAKEUP
+        private const val ACTION_BLE_WAKEUP = AppIdentity.ACTION_BLE_WAKEUP
         /** Doze-proof BLE stall check cadence. Cheap: a no-op while the stream
          *  is healthy, so a tight interval costs nothing but bounds a night
          *  stall to ~this instead of a Doze maintenance window (~37 min). */

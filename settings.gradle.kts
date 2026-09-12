@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "DiaPilot"
 include(":app")
 include(":core")
+include(":tools:accuracy")

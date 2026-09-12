@@ -3,6 +3,8 @@ package io.github.obdosok.diapilot.collect
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Libre2State
 import io.github.obdosok.diapilot.i18n.localized
 import org.json.JSONObject
 import java.io.File
@@ -37,7 +39,7 @@ object Libre2PairLog {
     }
 
     fun logEncrypted(context: Context, tsMs: Long, packet: ByteArray) {
-        val state = io.github.obdosok.diapilot.data.Libre2State.load(context)
+        val state = Libre2State.load(context)
         append(
             context,
             JSONObject()
@@ -57,9 +59,9 @@ object Libre2PairLog {
         val f = file(context)
         val text = context.localized()
         return if (f.exists()) {
-            text.getString(io.github.obdosok.diapilot.R.string.libre2_pair_log_stats_kb, f.length() / 1024.0)
+            text.getString(R.string.libre2_pair_log_stats_kb, f.length() / 1024.0)
         } else {
-            text.getString(io.github.obdosok.diapilot.R.string.libre2_pair_log_stats_empty)
+            text.getString(R.string.libre2_pair_log_stats_empty)
         }
     }
 }

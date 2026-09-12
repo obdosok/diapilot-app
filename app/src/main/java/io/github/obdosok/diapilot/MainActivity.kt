@@ -34,6 +34,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,10 +67,34 @@ import com.diapilot.core.collector.relabelMeal
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
+import io.github.obdosok.diapilot.data.AskClaude
+import io.github.obdosok.diapilot.data.BackupRestore
+import io.github.obdosok.diapilot.data.ForecastLedger
+import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.HYBRID_V11_SHADOW_ALGO_VERSION
+import io.github.obdosok.diapilot.data.HealthConnectSync
+import io.github.obdosok.diapilot.data.Libre2State
+import io.github.obdosok.diapilot.data.MeterCalCache
+import io.github.obdosok.diapilot.data.MinuteCalCache
+import io.github.obdosok.diapilot.data.PhysioRuntime
+import io.github.obdosok.diapilot.data.PhysioTuning
+import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
-import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TwinCache
+import io.github.obdosok.diapilot.i18n.AppLocaleFormats
+import io.github.obdosok.diapilot.i18n.FoodText
+import io.github.obdosok.diapilot.i18n.LibreText
+import io.github.obdosok.diapilot.nfc.LibreNfcScanner
+import io.github.obdosok.diapilot.nfc.LibreOop2Bridge
+import io.github.obdosok.diapilot.nfc.PenDoseSaver
+import io.github.obdosok.diapilot.nfc.PenNfcScanner
 import io.github.obdosok.diapilot.ui.AnalysisScreen
+import io.github.obdosok.diapilot.ui.AnnotationComposer
+import io.github.obdosok.diapilot.ui.AskScreen
+import io.github.obdosok.diapilot.ui.ForecastAtPointStrip
 import io.github.obdosok.diapilot.ui.GlucoseChart
+import io.github.obdosok.diapilot.ui.SettingsScreen
+import io.github.obdosok.diapilot.ui.photosDir
 import io.github.obdosok.diapilot.ui.theme.DiaPilotTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,7 +112,15 @@ class MainActivity : AppCompatActivity() {
     /** Set by the UI so a pen scan can refresh the screens immediately. */
     var onPenScanned: (() -> Unit)? = null
 
-    private val penScanner = io.github.obdosok.diapilot.nfc.PenNfcScanner()
+    /**
+     * The composition root of this activity: one graph, published to the
+     * screens through [LocalAppGraph] in [onCreate]. The activity's own
+     * background threads read the store from it too, so this file has a single
+     * answer to where a screen gets its store.
+     */
+    private val graph = AppGraph(this)
+
+    private val penScanner = PenNfcScanner()
     private var scanning = false
 
     private val notifPermission =
@@ -97,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(
             androidx.health.connect.client.PermissionController.createRequestPermissionResultContract(),
         ) { granted ->
-            if (granted.containsAll(io.github.obdosok.diapilot.data.HealthConnectSync.PERMISSIONS)) {
+            if (granted.containsAll(HealthConnectSync.PERMISSIONS)) {
                 TreatmentsPollWorker.pollNow(this)
             }
         }
@@ -106,7 +139,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // Opening the app acknowledges a pending gentle hypo alert — it won't
         // escalate to the full alarm while the user is already looking.
-        io.github.obdosok.diapilot.data.Settings.markAppOpened(this)
+        Settings.markAppOpened(this)
         // NFC reader mode while the app is visible. Two tag families:
         //  - NovoPen (IsoDep / NFC-A): dose log import
         //  - Libre 2 (NfcV / ISO-15693): sensor FRAM read
@@ -116,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                 if (tag.techList.contains("android.nfc.tech.NfcV")) {
                     // Opt-in: a Libre scan talks to the sensor and to OOP2,
                     // whose reply every listening app receives.
-                    if (io.github.obdosok.diapilot.data.Settings.libreNfcEnabled(this)) handleLibreTag(tag)
+                    if (Settings.libreNfcEnabled(this)) handleLibreTag(tag)
                     else toast(getString(R.string.main_activity_libre_nfc_off))
                 } else handlePenTag(tag)
             },
@@ -133,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    private val libreScanner = io.github.obdosok.diapilot.nfc.LibreNfcScanner()
+    private val libreScanner = LibreNfcScanner()
 
     private fun handleLibreTag(tag: android.nfc.Tag) {
         if (scanning) return
@@ -147,7 +180,7 @@ class MainActivity : AppCompatActivity() {
                     return@Thread
                 }
                 val serial = com.diapilot.core.libre.decodeLibreSerial(raw.uid)
-                val decoded = io.github.obdosok.diapilot.nfc.LibreOop2Bridge.decode(this, raw, serial, now)
+                val decoded = LibreOop2Bridge.decode(this, raw, serial, now)
                 if (decoded == null) {
                     toast(getString(R.string.main_activity_libre_oop2_no_response, serial))
                     return@Thread
@@ -166,7 +199,7 @@ class MainActivity : AppCompatActivity() {
 
                 // The raw OOP2 points land in minute_readings (display stream,
                 // 12h window) — freshness for the header and the grey trace.
-                val store = Stores.get(this)
+                val store = graph.store
                 val nfcPts = (history + trend).filter { it.bgMgdl != null && it.bgMgdl!! > 20 }
                 var saved = 0
                 nfcPts.forEach { s ->
@@ -187,7 +220,7 @@ class MainActivity : AppCompatActivity() {
                 // Never overwrites an existing point (real 5-min data wins).
                 var mainFilled = 0
                 var mainSkipped = 0
-                val minCal = io.github.obdosok.diapilot.data.MinuteCalCache.get(store, this)
+                val minCal = MinuteCalCache.get(store, this)
                 if (minCal != null) {
                     nfcPts.forEach { s ->
                         val mmol = minCal.apply(s.bgMgdl!! / com.diapilot.core.analysis.MGDL_PER_MMOL_F)
@@ -210,17 +243,17 @@ class MainActivity : AppCompatActivity() {
                 )
                 // New history landed in the main trace — rebuild the twin
                 // instead of riding the cached kernel/corridor for up to 6h.
-                if (mainFilled > 0) io.github.obdosok.diapilot.data.TwinCache.invalidate()
+                if (mainFilled > 0) TwinCache.invalidate()
 
                 // Sensor registry: a serial change starts a new calibration
                 // era (meter checks from the old sensor stop applying).
-                val prevSerial = io.github.obdosok.diapilot.data.Settings.libreSensorSerial(this)
+                val prevSerial = Settings.libreSensorSerial(this)
                 val isNew = prevSerial != null && prevSerial != serial
-                io.github.obdosok.diapilot.data.Settings.setLibreSensor(this, serial, parse.sensorStartMs)
+                Settings.setLibreSensor(this, serial, parse.sensorStartMs)
                 // The cached lens belongs to the previous physical sensor.
                 // The old coefficients remain persisted for historical charts;
                 // the new sensor starts its own calibration era.
-                io.github.obdosok.diapilot.data.MeterCalCache.invalidate()
+                MeterCalCache.invalidate()
                 if (isNew) {
                     store.addAnnotation(
                         com.diapilot.core.collector.Annotation(
@@ -233,12 +266,12 @@ class MainActivity : AppCompatActivity() {
                 // the sensor's MAC. NOTE: this takes the BLE link away from
                 // xDrip — reverting = re-scanning the sensor in xDrip.
                 var bleNote = ""
-                if (io.github.obdosok.diapilot.data.Settings.ownBleEnabled(this)) {
+                if (Settings.ownBleEnabled(this)) {
                     // The NFC enable command RESETS the sensor's nonce — every
                     // (re)scan starts the ladder at 1, exactly like xDrip's
                     // setLibre2SensorData does.
                     val nextIndex = 1
-                    val unlock = io.github.obdosok.diapilot.nfc.LibreOop2Bridge.enableStreaming(
+                    val unlock = LibreOop2Bridge.enableStreaming(
                         this, raw.uid, raw.patchInfo, nextIndex,
                     )
                     bleNote = if (unlock == null) {
@@ -248,9 +281,9 @@ class MainActivity : AppCompatActivity() {
                         if (mac == null) {
                             " · " + getString(R.string.main_activity_ble_rejected)
                         } else {
-                            io.github.obdosok.diapilot.data.Libre2State.save(
+                            Libre2State.save(
                                 this,
-                                io.github.obdosok.diapilot.data.Libre2State.State(
+                                Libre2State.State(
                                     uid = raw.uid,
                                     patchInfo = raw.patchInfo,
                                     serial = serial,
@@ -265,10 +298,10 @@ class MainActivity : AppCompatActivity() {
                             // up the fresh credentials.
                             stopService(
                                 android.content.Intent(
-                                    this, io.github.obdosok.diapilot.collect.CollectorService::class.java,
+                                    this, CollectorService::class.java,
                                 ),
                             )
-                            io.github.obdosok.diapilot.collect.CollectorService.start(this)
+                            CollectorService.start(this)
                             " · " + getString(R.string.main_activity_ble_streaming, mac)
                         }
                     }
@@ -280,7 +313,7 @@ class MainActivity : AppCompatActivity() {
                         (cur?.let { getString(R.string.main_activity_libre_mgdl, it) + " · " } ?: "") +
                         getString(
                             R.string.main_activity_libre_status_day,
-                            io.github.obdosok.diapilot.i18n.LibreText.status(this@MainActivity, parse.status),
+                            LibreText.status(this@MainActivity, parse.status),
                             parse.sensorTimeMin / 1440.0,
                         ) +
                         " · " + getString(R.string.main_activity_libre_stream, saved) +
@@ -317,8 +350,8 @@ class MainActivity : AppCompatActivity() {
                 val text = if (result == null || (result.doses.isEmpty() && !result.completed)) {
                     getString(R.string.main_activity_pen_scan_failed)
                 } else {
-                    val saved = io.github.obdosok.diapilot.nfc.PenDoseSaver.save(
-                        io.github.obdosok.diapilot.data.Stores.get(this), result,
+                    val saved = PenDoseSaver.save(
+                        graph.store, result,
                     )
                     val suffix = if (!result.completed) {
                         " · " + getString(R.string.main_activity_pen_scan_incomplete)
@@ -353,7 +386,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // A language switch recreates this activity; number formatting in
         // :core follows the language from here on.
-        io.github.obdosok.diapilot.i18n.AppLocaleFormats.sync(this)
+        AppLocaleFormats.sync(this)
         // WHAT THIS PHONE IS ACTUALLY DRAWING WITH, printed once per launch.
         //
         // The settings screen can import a triangle set that overrides the
@@ -376,9 +409,9 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             android.util.Log.i(
                 "PhysioTuning",
-                "configured: ${io.github.obdosok.diapilot.data.PhysioTuning.identity(
-                    io.github.obdosok.diapilot.data.PhysioTuning.read(this),
-                )} · triangles ${io.github.obdosok.diapilot.data.PhysioTuning
+                "configured: ${PhysioTuning.identity(
+                    PhysioTuning.read(this),
+                )} · triangles ${PhysioTuning
                     .effectiveTriangles(this)
                     .joinToString(" ") { "%.2f".format(java.util.Locale.ROOT, it) }}" +
                     " · generation ${com.diapilot.core.hybrid.CarbTrianglesV1.GENERATION}",
@@ -386,8 +419,8 @@ class MainActivity : AppCompatActivity() {
         }
         Thread {
             runCatching {
-                val store = io.github.obdosok.diapilot.data.Stores.get(this)
-                val artifact = io.github.obdosok.diapilot.data.PhysioRuntime.artifact(
+                val store = graph.store
+                val artifact = PhysioRuntime.artifact(
                     store, System.currentTimeMillis(),
                 ) ?: return@runCatching
                 val ins = artifact.personModelAt(12.0, emptySet()).insulin
@@ -420,7 +453,7 @@ class MainActivity : AppCompatActivity() {
                 // at startup makes the next such divergence visible without a
                 // database pull, which the release build does not allow.
                 runCatching {
-                    (store as io.github.obdosok.diapilot.data.SqliteCollectorStore).readableDatabase.rawQuery(
+                    (store as SqliteCollectorStore).readableDatabase.rawQuery(
                         "SELECT algo_version, anchor_ts_ms FROM forecast_runs " +
                             "WHERE consumer='main' ORDER BY created_at_ms DESC LIMIT 1",
                         null,
@@ -430,7 +463,7 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             val tag = c.getString(0)
                             val ageMin = (System.currentTimeMillis() - c.getLong(1)) / 60_000
-                            val live = io.github.obdosok.diapilot.data.HYBRID_V11_SHADOW_ALGO_VERSION
+                            val live = HYBRID_V11_SHADOW_ALGO_VERSION
                             android.util.Log.i(
                                 "PhysioTuning",
                                 "ledger: last screen run $tag, anchor $ageMin min ago" +
@@ -450,7 +483,7 @@ class MainActivity : AppCompatActivity() {
         // Load user concept-alias overrides into the fingerprint model before
         // history renders, so hand-assigned mappings take effect immediately.
         Thread {
-            (Stores.get(this) as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let {
+            (graph.store as? SqliteCollectorStore)?.let {
                 com.diapilot.core.analysis.setUserConceptAliases(it.conceptAliases())
                 // …and the user's edits to the dictionary itself (v24). Both must
                 // land BEFORE anything prices a portion or builds a fingerprint,
@@ -461,13 +494,15 @@ class MainActivity : AppCompatActivity() {
         }.start()
         // Daily silent DB copy into Downloads — a dead phone must not mean
         // a dead model. No-op when today's copy already exists.
-        Thread { io.github.obdosok.diapilot.data.BackupRestore.autoBackupIfDue(this) }.start()
+        Thread { BackupRestore.autoBackupIfDue(this) }.start()
         enableEdgeToEdge()
         setContent {
-            DiaPilotTheme {
-                MainApp(onConnectHc = {
-                    hcPermissions.launch(io.github.obdosok.diapilot.data.HealthConnectSync.PERMISSIONS)
-                })
+            CompositionLocalProvider(LocalAppGraph provides graph) {
+                DiaPilotTheme {
+                    MainApp(onConnectHc = {
+                        hcPermissions.launch(HealthConnectSync.PERMISSIONS)
+                    })
+                }
             }
         }
         // WorkManager's first initialization and starting the collector can
@@ -588,6 +623,7 @@ private fun AddNavIcon() {
 @Composable
 private fun MainApp(onConnectHc: () -> Unit = {}) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(0) }
     var state by remember { mutableStateOf(UiState()) }
@@ -613,7 +649,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         val tResume = android.os.SystemClock.elapsedRealtime()
         android.util.Log.i("MainStatePerf", "STARTED: block restarted")
         runCatching {
-            withContext(Dispatchers.IO) { loadLivePreview(state, Stores.get(context), context) }
+            withContext(Dispatchers.IO) { loadLivePreview(state, graph.store, context) }
         }.onSuccess {
             state = it
             android.util.Log.i(
@@ -626,7 +662,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         runCatching {
             withContext(Dispatchers.IO) {
                 loadState(
-                    Stores.get(context), context,
+                    graph.store, context,
                     allowBuild = false, includeHistory = false,
                 )
             }
@@ -694,12 +730,12 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                 continue
             }
             val stamps = withContext(Dispatchers.IO) {
-                val s = Stores.get(context)
+                val s = graph.store
                 val main = s.lastSensorReading()?.tsMs ?: 0
                 main to (s.lastMinuteReading()?.tsMs ?: 0)
             }
             val historyStamp = if (activeTab != Tab.LABEL) null else withContext(Dispatchers.IO) {
-                val s = Stores.get(context) as? SqliteCollectorStore
+                val s = graph.store as? SqliteCollectorStore
                 // The window the user is looking at is part of the identity: paging in
                 // another week must rebuild even though no fact changed.
                 s?.let { "${it.historyFactsStamp()}|${HistoryNav.days}|${HistoryNav.anchorMs ?: 0L}" }
@@ -721,7 +757,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     // continue below, but an interrupted/slow projection can
                     // no longer leave History as a blank screen.
                     val preview=withContext(Dispatchers.IO){
-                        loadHistoryPreview(state,Stores.get(context))
+                        loadHistoryPreview(state,graph.store)
                     }
                     state=preview
                 }
@@ -733,7 +769,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                 val loaded=runCatching {
                     withContext(Dispatchers.IO) {
                         loadState(
-                            Stores.get(context),context,
+                            graph.store,context,
                             allowBuild=activeTab==Tab.TODAY,
                             includeHistory=includeHistory,
                         )
@@ -761,7 +797,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                 // trained model and omit History-only projections instead of
                 // rebuilding the whole analytical screen every minute.
                 runCatching {
-                    withContext(Dispatchers.IO){loadState(Stores.get(context),context,allowBuild=false,includeHistory=false)}
+                    withContext(Dispatchers.IO){loadState(graph.store,context,allowBuild=false,includeHistory=false)}
                 }.onSuccess { state = it.withHistoryFrom(state).stabiliseHistoryAgainst(state) }
                     .onFailure { android.util.Log.e("MainRefresh", "minute state load failed; retrying", it) }
             }
@@ -782,7 +818,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         scope.launch(Dispatchers.IO) {
             // Give the one-shot poll a moment to land before re-reading.
             delay(1_800)
-            val store = Stores.get(context)
+            val store = graph.store
             val immediate = loadState(store, context, allowBuild = false, includeHistory = false)
             val preserved = immediate.withHistoryFrom(state)
             state = if (Tab.entries[tab] == Tab.LABEL) loadHistoryPreview(preserved, store) else preserved
@@ -841,7 +877,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         )
         if (relearn) {
             val tRe0 = android.os.SystemClock.elapsedRealtime()
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             val rebuilt = loadState(store, context, includeHistory = false)
             withContext(Dispatchers.Main.immediate) { state = rebuilt.withHistoryFrom(visible) }
             android.util.Log.i(
@@ -855,32 +891,32 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     androidx.compose.runtime.SideEffect {
         (context as? MainActivity)?.onPenScanned = {
             scope.launch(Dispatchers.IO) {
-                reloadAfterEvent(Stores.get(context))
+                reloadAfterEvent(graph.store)
             }
         }
     }
 
     fun label(meal: MealEvent, name: String) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.setMealLabel(meal.onsetMs, store.getOrCreateLabel(name.trim()))
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun relabel(item: LabeledMeal, name: String) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.relabelMeal(item.event.onsetMs, item.labelId, name)
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun addFoodWithAnalysis(tsMs: Long, text: String, mediaRef: String?, estCarbs: Double?, analysis: String) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val recordedAtMs = System.currentTimeMillis()
             // ONE history item per meal; the per-component split lives in the
             // cached analysis (composition-marker lines) and feeds the dish dictionary.
@@ -914,7 +950,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun addNote(tsMs: Long, text: String, mediaRef: String?, kind: String, estCarbs: Double? = null) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val recordedAtMs = System.currentTimeMillis()
             val id=store.addAnnotation(
                 com.diapilot.core.collector.Annotation(tsMs, kind, text, mediaRef, estCarbs = estCarbs,
@@ -958,7 +994,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun quickDextrose() {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val nowMs = System.currentTimeMillis()
             val existing = store.annotations(nowMs - 30 * 60_000, nowMs)
                 .firstOrNull { com.diapilot.core.analysis.isRescueNote(it.content) }
@@ -984,7 +1020,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun tagBolus(tsMs: Long, purpose: String?) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.setBolusPurpose(tsMs, purpose)
             reloadAfterEvent(store, relearn = tsMs < System.currentTimeMillis() - 6L * 3_600_000)
         }
@@ -992,7 +1028,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun deleteNoteById(id: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.deleteAnnotation(id)
             reloadAfterEvent(store, relearn = true)
         }
@@ -1000,7 +1036,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun addBasal(tsMs: Long, units: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             timedWrite("basal") { store.upsertBasal(tsMs, units) }
             reloadAfterEvent(store)
         }
@@ -1008,7 +1044,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun addManualBolus(tsMs: Long, units: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             timedWrite("bolus") {
                 store.upsertInsulin(
                     com.diapilot.core.collector.InsulinEvent(tsMs, units, "bolus", source = "manual"),
@@ -1023,7 +1059,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // and silently drop the purpose.
     fun addBolusWithPurpose(tsMs: Long, units: Double, purpose: String?) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             timedWrite("bolus+purpose") { store.addBolusWithPurpose(tsMs, units, purpose) }
             reloadAfterEvent(store)
         }
@@ -1031,7 +1067,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun editBolusUnits(tsMs: Long, units: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.setBolusUnits(tsMs, units)
             reloadAfterEvent(store, relearn = tsMs < System.currentTimeMillis() - 6L * 3_600_000)
         }
@@ -1039,7 +1075,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun deleteBolus(tsMs: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             timedWrite("delete bolus") { store.deleteInsulinForever(tsMs) }
             reloadAfterEvent(store, relearn = tsMs < System.currentTimeMillis() - 6L * 3_600_000)
         }
@@ -1047,25 +1083,25 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun addMeter(tsMs: Long, mmol: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.upsertReading(
                 com.diapilot.core.collector.Reading(
                     tsMs, mmol * com.diapilot.core.analysis.MGDL_PER_MMOL_F, mmol,
                     trend = null, source = "meter",
                 ),
             )
-            io.github.obdosok.diapilot.data.MeterCalCache.invalidate()
+            MeterCalCache.invalidate()
             // The calibration is baked into the model (corridor, food scale) —
             // a new check must rebuild it, or the header shifts to the new
             // lens while the model keeps the old one for up to 6h.
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun updateMeter(oldTsMs: Long, tsMs: Long, mmol: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.deleteReading(oldTsMs)
             store.upsertReading(
                 com.diapilot.core.collector.Reading(
@@ -1073,25 +1109,25 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     trend = null, source = "meter",
                 ),
             )
-            io.github.obdosok.diapilot.data.MeterCalCache.invalidate()
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            MeterCalCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun deleteMeter(tsMs: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.deleteReading(tsMs)
-            io.github.obdosok.diapilot.data.MeterCalCache.invalidate()
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            MeterCalCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun deleteBasal(tsMs: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.deleteBasal(tsMs)
             reloadAfterEvent(store, relearn = true)
         }
@@ -1099,7 +1135,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun updateBasal(oldTs: Long, newTs: Long, units: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             if (oldTs != newTs) store.deleteBasal(oldTs)
             store.upsertBasal(newTs, units)
             reloadAfterEvent(store, relearn = true)
@@ -1108,13 +1144,13 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun dismissMeal(onsetMs: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.dismissMeal(onsetMs)
             // Dismissing is the ONLY way to stop the forecast projecting a
             // phantom rise as absorption, so it must reach the twin at once —
             // label/relabel invalidate, this one never did, and the dismissed
             // meal kept feeding the forecast until the cache expired.
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
@@ -1140,7 +1176,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
      */
     fun markMeal(onsetMs: Long, kind: com.diapilot.core.analysis.MarkKind, comment: String?) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.addMealMark(
                 com.diapilot.core.analysis.MealMark(
                     onsetMs = onsetMs,
@@ -1150,7 +1186,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     createdAtMs = System.currentTimeMillis(),
                 ),
             )
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
@@ -1159,18 +1195,18 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
      *  to the triage list with its full case file. */
     fun unmarkMeal(onsetMs: Long) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             store.revokeMealMark(onsetMs, System.currentTimeMillis())
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
 
     fun deleteNote(note: com.diapilot.core.collector.Annotation) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             timedWrite("delete note") { store.deleteAnnotation(note.id) }
-            note.mediaRef?.let { java.io.File(io.github.obdosok.diapilot.ui.photosDir(context), it).delete() }
+            note.mediaRef?.let { java.io.File(photosDir(context), it).delete() }
             if (note.kind == "food") reloadAfterEvent(store, relearn = true)
             else state = loadState(store, context)
         }
@@ -1181,7 +1217,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // hand-editing every history row.
     suspend fun reconcilePlan(): List<com.diapilot.core.analysis.LabelFix> =
         withContext(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val now = System.currentTimeMillis()
             com.diapilot.core.analysis.reconcileLabels(
                 store.annotations(0, now), store.labeledMeals(limit = 2000),
@@ -1192,8 +1228,8 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // name), review, apply. Enriches the component substrate without touching
     // the human name.
     suspend fun decomposePlan(): List<DishDecomp> = withContext(Dispatchers.IO) {
-        val store = Stores.get(context)
-        val gramsByNorm = (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)
+        val store = graph.store
+        val gramsByNorm = (store as? SqliteCollectorStore)
             ?.foodLibrary().orEmpty()
             .mapNotNull { e ->
                 e.grams?.takeIf { it > 0 }
@@ -1208,12 +1244,12 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // One API call per composite meal without a split; reuses the same review
     // dialog + apply as the lexical 🧩.
     suspend fun llmDecomposePlan(): List<DishDecomp> = withContext(Dispatchers.IO) {
-        val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context)
+        val key = AskClaude.apiKey(context)
         if (key == null) {
             android.util.Log.w("Decompose", "no API key")
             return@withContext emptyList()
         }
-        val store = Stores.get(context)
+        val store = graph.store
         val notes = store.annotations(0, System.currentTimeMillis()).filter {
             it.kind == "food" && it.content.isNotBlank() &&
                 !com.diapilot.core.analysis.isContextNote(it.content) &&
@@ -1226,7 +1262,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         var single = 0
         val out = notes.mapNotNull { note ->
             try {
-                val analysis = io.github.obdosok.diapilot.data.AskClaude.estimateCarbs(key, note.content, context = context)
+                val analysis = AskClaude.estimateCarbs(key, note.content, context = context)
                 val comps = com.diapilot.core.analysis.parseComponents(analysis)
                 if (comps.size < 2) {
                     single++
@@ -1256,9 +1292,9 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
      * matching annotation ids. Photos are deliberately not resent.
      */
     suspend fun nutritionPlan(): List<NutritionFill> = withContext(Dispatchers.IO) {
-        val key = io.github.obdosok.diapilot.data.AskClaude.apiKey(context)
+        val key = AskClaude.apiKey(context)
             ?: return@withContext emptyList()
-        val store = Stores.get(context)
+        val store = graph.store
         val notes = store.annotations(0, System.currentTimeMillis()).filter { note ->
             note.kind == "food" && note.content.isNotBlank() &&
                 !com.diapilot.core.analysis.isContextNote(note.content) &&
@@ -1294,7 +1330,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         }
         val selected = groups.values.take(60)
         val inputs = selected.mapIndexed { i, g ->
-            io.github.obdosok.diapilot.data.AskClaude.NutritionBatchInput(
+            AskClaude.NutritionBatchInput(
                 id = "n$i",
                 dish = g.dish,
                 carbsG = g.carbs,
@@ -1306,7 +1342,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                 },
             )
         }
-        val result = io.github.obdosok.diapilot.data.AskClaude
+        val result = AskClaude
             .estimateNutritionBatch(key, inputs)
             .associateBy { it.id }
         selected.mapIndexedNotNull { i, g ->
@@ -1335,7 +1371,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         evidence: com.diapilot.core.collector.CarbEvidenceInputV1,
     ) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val now = System.currentTimeMillis()
             store.addFoodWithCarbEvidence(
                 com.diapilot.core.collector.Annotation(
@@ -1355,7 +1391,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     fun applyNutrition(plans: List<NutritionFill>) {
         if (plans.isEmpty()) return
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val byId = store.annotations(0, System.currentTimeMillis()).associateBy { it.id }
             plans.forEach { plan ->
                 plan.annotationIds.forEach { id ->
@@ -1379,14 +1415,14 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     fun applyDecompose(plans: List<DishDecomp>) {
         if (plans.isEmpty()) return
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             plans.forEach { d ->
                 val merged = listOfNotNull(
                     d.existingAnalysis?.takeIf { it.isNotBlank() }, decompSostav(d),
                 ).joinToString("\n")
                 store.setAnnotationAnalysis(d.annotationId, merged)
             }
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
@@ -1394,9 +1430,9 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     fun applyReconcile(fixes: List<com.diapilot.core.analysis.LabelFix>) {
         if (fixes.isEmpty()) return
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             fixes.forEach { store.relabelMeal(it.onsetMs, it.labelId, it.to) }
-            io.github.obdosok.diapilot.data.TwinCache.invalidate()
+            TwinCache.invalidate()
             state = loadState(store, context)
         }
     }
@@ -1411,10 +1447,10 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
      */
     fun scaleFoodPortion(note: com.diapilot.core.collector.Annotation, factor: Double) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val scaled = com.diapilot.core.analysis.FoodPortionScalingV1.scale(
                 note.content, note.estCarbs, note.analysis, factor,
-                portionWord = io.github.obdosok.diapilot.i18n.FoodText.portionWord(context),
+                portionWord = FoodText.portionWord(context),
             )
             store.updateAnnotation(note.id, note.tsMs, scaled.text, note.mediaRef)
             store.setAnnotationCarbs(note.id, scaled.estCarbsG, source = "portion-scaled")
@@ -1425,12 +1461,12 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
 
     fun updateNote(note: com.diapilot.core.collector.Annotation, tsMs: Long, text: String, mediaRef: String?) {
         scope.launch(Dispatchers.IO) {
-            val store = Stores.get(context)
+            val store = graph.store
             val oldContent = note.content
             store.updateAnnotation(note.id, tsMs, text, mediaRef)
             // Photo replaced — remove the orphaned old file.
             if (note.mediaRef != null && note.mediaRef != mediaRef) {
-                java.io.File(io.github.obdosok.diapilot.ui.photosDir(context), note.mediaRef!!).delete()
+                java.io.File(photosDir(context), note.mediaRef!!).delete()
             }
             // Renaming a food note must follow through to the LABELED EPISODE it
             // owns — otherwise the detected rise keeps the old name, the library
@@ -1461,10 +1497,10 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // History → chart jump: the Today chart centers on this moment once.
     var chartFocus by remember { mutableStateOf<Long?>(null) }
     // Long-press on the chart: what the app forecast at that minute. See
-    // [io.github.obdosok.diapilot.ui.ForecastAtPointDialog].
+    // [ForecastAtPointDialog].
     var inspectAtMs by remember { mutableStateOf<Long?>(null) }
     var inspectedRun by remember {
-        mutableStateOf<io.github.obdosok.diapilot.data.ForecastLedger.InspectedRun?>(null)
+        mutableStateOf<ForecastLedger.InspectedRun?>(null)
     }
     var inspectReplayPoints by remember {
         mutableStateOf<List<com.diapilot.core.twin.PredictedPoint>>(emptyList())
@@ -1543,15 +1579,15 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     onInspectForecast = { ts ->
                         inspectAtMs = ts
                         scope.launch(Dispatchers.IO) {
-                            val store = Stores.get(context)
+                            val store = graph.store
                             val run = runCatching {
-                                (store as? io.github.obdosok.diapilot.data.SqliteCollectorStore)?.let {
-                                    io.github.obdosok.diapilot.data.ForecastLedger.inspectAt(
+                                (store as? SqliteCollectorStore)?.let {
+                                    ForecastLedger.inspectAt(
                                         it.readableDatabase, ts,
                                         // Same lens the forecast lived on —
                                         // comparing it against a RAW fact is
                                         // the corridor mistake found before.
-                                        cal = io.github.obdosok.diapilot.data.MeterCalCache.get(it, context),
+                                        cal = MeterCalCache.get(it, context),
                                     )
                                 }
                             }.getOrNull()
@@ -1569,10 +1605,10 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                             // overwrite what the screen is showing.
                             val replay = run?.let { r ->
                                 runCatching {
-                                    io.github.obdosok.diapilot.data.TwinCache
+                                    TwinCache
                                         .getForForecast(store, context)
                                         ?.let { m ->
-                                            io.github.obdosok.diapilot.data.Forecaster.forecast(
+                                            Forecaster.forecast(
                                                 store, m,
                                                 nowMs = r.anchorTsMs,
                                                 anchorTsMs = r.anchorTsMs,
@@ -1590,9 +1626,9 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     },
                     onRefresh = { refresh() },
                     onHistoryNav = { date ->
-                        io.github.obdosok.diapilot.ChartNav.anchorMs = date
+                        ChartNav.anchorMs = date
                         scope.launch(Dispatchers.IO) {
-                            state = loadState(Stores.get(context), context)
+                            state = loadState(graph.store, context)
                         }
                     },
                 )
@@ -1604,7 +1640,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                         Modifier.fillMaxSize(),
                         contentAlignment = androidx.compose.ui.Alignment.BottomCenter,
                     ) {
-                        io.github.obdosok.diapilot.ui.ForecastAtPointStrip(
+                        ForecastAtPointStrip(
                             run = inspectedRun,
                             requestedTsMs = ts,
                             mgdl = state.mgdl,
@@ -1637,11 +1673,11 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                         // loads only the live 72-hour chart window. Move the data
                         // window first; focusing an unloaded timestamp only
                         // changed tabs and left the user on today's graph.
-                        io.github.obdosok.diapilot.ChartNav.anchorMs = ts
+                        ChartNav.anchorMs = ts
                         tab = Tab.TODAY.ordinal
                         scope.launch {
                             state = withContext(Dispatchers.IO) {
-                                loadState(Stores.get(context), context, allowBuild = false)
+                                loadState(graph.store, context, allowBuild = false)
                             }
                             chartFocus = ts
                         }
@@ -1659,37 +1695,37 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     onNutritionPlan = ::nutritionPlan,
                     onApplyNutrition = ::applyNutrition,
                     onSearchStart = {
-                        if (io.github.obdosok.diapilot.HistoryNav.days < 60) {
-                            io.github.obdosok.diapilot.HistoryNav.days = 60
+                        if (HistoryNav.days < 60) {
+                            HistoryNav.days = 60
                             scope.launch(Dispatchers.IO) {
-                                state = loadState(Stores.get(context), context, allowBuild = false)
+                                state = loadState(graph.store, context, allowBuild = false)
                             }
                         }
                     },
                     onMarkMeal = ::markMeal,
                     onUnmarkMeal = ::unmarkMeal,
                     onLoadMoreHistory = {
-                        if (io.github.obdosok.diapilot.HistoryNav.days < 60) {
-                            io.github.obdosok.diapilot.HistoryNav.days += 7
+                        if (HistoryNav.days < 60) {
+                            HistoryNav.days += 7
                             scope.launch(Dispatchers.IO) {
-                                state = loadState(Stores.get(context), context)
+                                state = loadState(graph.store, context)
                             }
                         }
                     },
                     onHistoryJump = { date ->
                         // -1 = return to the live edge; a real date anchors a
                         // fresh 7-day window ending just after it.
-                        io.github.obdosok.diapilot.HistoryNav.anchorMs = date.takeIf { it > 0 }
-                        io.github.obdosok.diapilot.HistoryNav.days = 7
+                        HistoryNav.anchorMs = date.takeIf { it > 0 }
+                        HistoryNav.days = 7
                         scope.launch(Dispatchers.IO) {
-                            state = loadState(Stores.get(context), context)
+                            state = loadState(graph.store, context)
                         }
                     },
                 )
             }
             Tab.ANALYSIS -> AnalysisScreen(modifier = mod)
-            Tab.ASK -> io.github.obdosok.diapilot.ui.AskScreen(modifier = mod)
-            Tab.SETTINGS -> io.github.obdosok.diapilot.ui.SettingsScreen(
+            Tab.ASK -> AskScreen(modifier = mod)
+            Tab.SETTINGS -> SettingsScreen(
                 modifier = mod,
                 // The auto-fit lists the episodes it used; each is tappable and
                 // lands on the chart at that moment. Same path History already
@@ -1697,11 +1733,11 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                 // outside Today's live window, so the DATA window has to move
                 // before the focus does, or the tap only changes tabs.
                 onShowOnChart = { ts ->
-                    io.github.obdosok.diapilot.ChartNav.anchorMs = ts
+                    ChartNav.anchorMs = ts
                     tab = Tab.TODAY.ordinal
                     scope.launch {
                         state = withContext(Dispatchers.IO) {
-                            loadState(Stores.get(context), context, allowBuild = false)
+                            loadState(graph.store, context, allowBuild = false)
                         }
                         chartFocus = ts
                     }
@@ -1762,7 +1798,7 @@ private fun ComposerSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            io.github.obdosok.diapilot.ui.AnnotationComposer(
+            AnnotationComposer(
                 frequentTexts = state.frequentNotes,
                 recentBoluses = state.chartBoluses.filter { it.tsMs > now - 6L * 3_600_000 },
                 foodLabels = state.foodLabels,

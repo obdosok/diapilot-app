@@ -43,8 +43,15 @@ object Settings {
      * Action curves: label + (peak min, DIA min) for the exponential model.
      * Fiasp's DIA is deliberately shorter than the book value: a measured
      * curve showed no visible action past ~2.5-3 h.
-     * DIA is user-overridable below; the long game is deriving it from the
-     * personal insulin kernel once enough clean episodes accumulate.
+     *
+     * NEITHER THE PROFILE NOR THE DIA CAN BE SET FROM THIS BUILD. Both
+     * [insulinProfile] and [insulinDiaMin] read a preference that nothing here
+     * writes — no screen, no setter — so on an install that never ran an older
+     * build the profile is NovoRapid and the DIA is its 300 min. Kept as
+     * preferences rather than folded into constants because an older build
+     * could have written both, and that value must keep being honoured. The
+     * long game is deriving the DIA from the personal insulin kernel once
+     * enough clean episodes accumulate.
      */
     enum class InsulinProfile(val label: String, val peakMin: Double, val diaMin: Double) {
         NOVORAPID("NovoRapid", 75.0, 300.0),
@@ -142,6 +149,16 @@ object Settings {
         return canonical
     }
 
+    // NO CALLER (audit, WP-A6). Nothing in the app writes the bolus product:
+    // there is no screen for it, and this is the only writer of
+    // `insulin_product_bolus` apart from the canonicalisation above. The getter
+    // is NOT therefore a constant — an older build could have stored a name,
+    // which is exactly what the Russian-placeholder rewrite in `product()`
+    // exists for — so the pair stays a preference instead of becoming one.
+    // This setter is also the only caller of
+    // `PhysioContextIngestionRuntime.syncSettings`: deleting it deletes the
+    // path that records a product change into the physio context, which is a
+    // decision about the feature, not a cleanup.
     fun setBolusProduct(context:Context,value:String,knownAtMs:Long=System.currentTimeMillis(),storeOverride:SqliteCollectorStore?=null) {
         prefs(context).edit().putString(KEY_BOLUS_PRODUCT,InsulinProductDefault.canonical(value.trim())).commit()
         (storeOverride?:Stores.get(context) as? SqliteCollectorStore)?.let{store->
@@ -250,6 +267,18 @@ object Settings {
     fun setCompanionToken(context: Context, v: String?): Boolean =
         Secrets.store(context).set(SecretStore.Secret.COMPANION_TOKEN, v)
 
+    /**
+     * The `api-secret` the user's xDrip web service is configured with, if any.
+     * Encrypted at rest; sent hashed, never in plaintext — see
+     * [com.diapilot.core.collector.xdripApiSecretHeader].
+     */
+    fun xdripApiSecret(context: Context): String? =
+        Secrets.store(context).get(SecretStore.Secret.XDRIP_API_SECRET)
+
+    /** False when the secret could not be stored securely; nothing is saved then. */
+    fun setXdripApiSecret(context: Context, v: String?): Boolean =
+        Secrets.store(context).set(SecretStore.Secret.XDRIP_API_SECRET, v)
+
     /** The user's own pre-agreed hypo first step ("10 g soka") - reminded
      *  verbatim on predicted lows; the app never computes rescue carbs. */
     fun hypoProtocol(context: Context): String? =
@@ -342,11 +371,27 @@ object Settings {
     fun setNightCorridorLow(context: Context, v: Boolean) =
         prefs(context).edit().putBoolean("night_corridor_low", v).apply()
 
-    /** Gate the forecast anchor for sensor plausibility (compression lows,
-     *  EOL noise) before trusting it. Default off — shadow-safe until
-     *  measured. Screen: Settings -> "Experimental". */
+    /**
+     * Gate the forecast anchor for sensor plausibility (compression lows, EOL
+     * noise) before trusting it. Screen: Settings -> "Experimental".
+     *
+     * DEFAULT ON. It was off to stay shadow-safe until measured, which is the
+     * right default for a knob that changes the number; this one decides
+     * whether an ANCHOR is a measurement at all, and off means the forecast and
+     * the alert take an artifact at face value on a stranger's phone. The
+     * thresholds themselves are untouched — see
+     * `com.diapilot.core.analysis.plausibilityGate`.
+     *
+     * What it changes for the alert is deliberate and lives in
+     * `decideHypoAlert` branch (a0): a de-trusted anchor produces a gentle
+     * SENSOR_CHECK ("verify with a meter") that PRECEDES every alarm branch and
+     * re-fires on its own cadence, instead of a factual SEVERE on a value
+     * glucose cannot have. Not silence — a real mild low can hide under the
+     * artifact — but it does mean a LOW_ALARM is replaced by the advisory for
+     * as long as the gate distrusts the anchor.
+     */
     fun plausibilityGate(context: Context): Boolean =
-        prefs(context).getBoolean("plausibility_gate", false)
+        prefs(context).getBoolean("plausibility_gate", true)
 
     fun setPlausibilityGate(context: Context, v: Boolean) =
         prefs(context).edit().putBoolean("plausibility_gate", v).apply()

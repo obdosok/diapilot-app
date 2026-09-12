@@ -64,4 +64,22 @@ class OpenFoodFactsTest {
             OpenFoodFacts.parse("123", json)?.servingG,
         )
     }
+
+    @Test
+    fun `only a barcode reaches the URL`() {
+        // EAN-8 through GTIN-14 — what the scanner's formats can produce.
+        listOf("12345678", "0123456789012", "01234567890123").forEach {
+            assertTrue(it, OpenFoodFacts.BARCODE.matches(it))
+        }
+        listOf(
+            "1234567", "012345678901234", "", "  ", "12345678 ", "1234-5678",
+            "12345678?fields=x", "../../etc/passwd", "12345678#x", "abcdefgh",
+            "1234567890123456789012345",
+        ).forEach {
+            assertFalse(it, OpenFoodFacts.BARCODE.matches(it))
+            // And the lookup refuses before it builds a URL, so nothing that is
+            // not a barcode is ever interpolated into one.
+            assertNull(it, OpenFoodFacts.lookup(it))
+        }
+    }
 }

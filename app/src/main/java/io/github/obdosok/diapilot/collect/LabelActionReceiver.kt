@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.RemoteInput
+import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.data.Stores
 import java.util.concurrent.Executors
 
@@ -37,7 +38,7 @@ class LabelActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_LABEL = io.github.obdosok.diapilot.AppIdentity.ACTION_LABEL
+        const val ACTION_LABEL = AppIdentity.ACTION_LABEL
         private const val TAG = "LabelActionReceiver"
         private val EXECUTOR = Executors.newSingleThreadExecutor()
     }

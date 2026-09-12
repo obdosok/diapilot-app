@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings for the security work: the loopback server's client token. -->
+<resources>
+    <!-- SettingsScreen: the per-installation token for the loopback server. -->
+    <string name="settings_screen_watch_token_title">Client token</string>
+    <string name="settings_screen_watch_token_hint">Needed by a client that sends doses (POST /add_treatments) or reads the history (/api/v1/events): header X-DiaPilot-Token, Authorization: Bearer, or ?token=. The watch face feed /info.json is unchanged and needs nothing. The token belongs to this installation and is stored encrypted.</string>
+    <string name="settings_screen_watch_token_copy">Copy token</string>
+    <string name="settings_screen_watch_token_copied">Token copied to the clipboard</string>
+    <string name="settings_screen_watch_token_unavailable">The token could not be created on this phone, so those two endpoints stay closed.</string>
+
+    <!-- SettingsScreen: the optional credential for xDrip's local web service. -->
+    <string name="settings_screen_xdrip_title">xDrip web service</string>
+    <string name="settings_screen_xdrip_secret_label">api-secret (optional)</string>
+    <string name="settings_screen_xdrip_secret_hint">Fill this in if your xDrip has an api-secret configured (Settings → Inter-app settings). It is sent hashed, as xDrip expects, and is stored encrypted. Leave it empty if you did not set one.</string>
+</resources>

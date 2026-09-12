@@ -14,7 +14,8 @@ class BroadcastParserTest {
     @Test
     fun `parse bg broadcast ok`() {
         val r = parseBgBroadcast(
-            mapOf(EXTRA_BG to 180.0, EXTRA_TIME to BASE, EXTRA_SLOPE_NAME to "Flat")
+            mapOf(EXTRA_BG to 180.0, EXTRA_TIME to BASE, EXTRA_SLOPE_NAME to "Flat"),
+            nowMs = BASE,
         )
         assertNotNull(r)
         r!!
@@ -26,11 +27,43 @@ class BroadcastParserTest {
 
     @Test
     fun `parse bg broadcast garbled returns null`() {
-        assertNull(parseBgBroadcast(emptyMap()))
-        assertNull(parseBgBroadcast(null))
-        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to 0, EXTRA_TIME to BASE)))
-        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to "abc", EXTRA_TIME to BASE)))
-        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to 120, EXTRA_TIME to null)))
+        assertNull(parseBgBroadcast(emptyMap(), BASE))
+        assertNull(parseBgBroadcast(null, BASE))
+        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to 0, EXTRA_TIME to BASE), BASE))
+        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to "abc", EXTRA_TIME to BASE), BASE))
+        assertNull(parseBgBroadcast(mapOf(EXTRA_BG to 120, EXTRA_TIME to null), BASE))
+    }
+
+    @Test
+    fun `a broadcast value outside the CGM range is refused`() {
+        fun at(mgdl: Any) = parseBgBroadcast(mapOf(EXTRA_BG to mgdl, EXTRA_TIME to BASE), BASE)
+        // The bounds themselves are accepted; anything past them is not.
+        assertNotNull(at(20.0))
+        assertNotNull(at(600.0))
+        assertNull(at(19.9))
+        assertNull(at(600.1))
+        assertNull(at(-100.0))
+        assertNull(at(Double.NaN))
+        assertNull(at(Double.POSITIVE_INFINITY))
+        // A forged "8.0 now" that would become the forecast anchor: the value
+        // is in range, so the range alone does not catch it — the window and
+        // the sender check do their own halves of the job.
+        assertNotNull(at(144.0))
+    }
+
+    @Test
+    fun `a broadcast timestamp outside the window around now is refused`() {
+        fun at(tsMs: Long) = parseBgBroadcast(mapOf(EXTRA_BG to 120, EXTRA_TIME to tsMs), BASE)
+        assertNotNull(at(BASE))
+        assertNotNull(at(BASE - BG_BROADCAST_MAX_AGE_MS))
+        assertNotNull(at(BASE + BG_BROADCAST_MAX_AHEAD_MS))
+        assertNull(at(BASE - BG_BROADCAST_MAX_AGE_MS - 1))
+        assertNull(at(BASE + BG_BROADCAST_MAX_AHEAD_MS + 1))
+        // Rewriting last week, and parking a value in next year.
+        assertNull(at(BASE - 7L * 24 * 3_600_000))
+        assertNull(at(BASE + 365L * 24 * 3_600_000))
+        assertNull(at(0L))
+        assertNull(at(-BASE))
     }
 
     @Test

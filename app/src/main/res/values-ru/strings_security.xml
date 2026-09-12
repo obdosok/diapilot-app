@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_screen_watch_token_title">Токен клиента</string>
+    <string name="settings_screen_watch_token_hint">Нужен клиенту, который отправляет дозы (POST /add_treatments) или читает историю (/api/v1/events): заголовок X-DiaPilot-Token, Authorization: Bearer или ?token=. Лента циферблата /info.json не изменилась и токена не требует. Токен принадлежит этой установке и хранится в зашифрованном виде.</string>
+    <string name="settings_screen_watch_token_copy">Скопировать токен</string>
+    <string name="settings_screen_watch_token_copied">Токен скопирован в буфер обмена</string>
+    <string name="settings_screen_watch_token_unavailable">Токен не удалось создать на этом телефоне — эти две точки доступа остаются закрытыми.</string>
+
+    <string name="settings_screen_xdrip_title">Веб-сервис xDrip</string>
+    <string name="settings_screen_xdrip_secret_label">api-secret (необязательно)</string>
+    <string name="settings_screen_xdrip_secret_hint">Заполните, если в вашем xDrip задан api-secret (Настройки → Межпрограммные настройки). Отправляется в виде хеша, как и ожидает xDrip, и хранится в зашифрованном виде. Если секрет не задан, оставьте поле пустым.</string>
+</resources>

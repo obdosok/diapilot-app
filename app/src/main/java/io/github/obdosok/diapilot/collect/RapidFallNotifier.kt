@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.diapilot.core.analysis.RapidFall
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.i18n.unitLabel
 
@@ -57,7 +58,7 @@ object RapidFallNotifier {
         } else {
             localizedText.getString(R.string.rapid_fall_notifier_title)
         }
-        val mgdl = io.github.obdosok.diapilot.data.Units.isMgdl(context)
+        val mgdl = Units.isMgdl(context)
         val slope = if (mgdl) {
             "%.0f %s".format(fall.slopePerMin * com.diapilot.core.analysis.MGDL_PER_MMOL_F, unitLabel(true))
         } else {

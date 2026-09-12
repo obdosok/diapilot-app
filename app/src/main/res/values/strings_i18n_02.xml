@@ -181,7 +181,7 @@
     <!-- Experimental card -->
     <string name="settings_screen_experimental_title">Experimental</string>
     <string name="settings_screen_plausibility_label">Distrust an implausible anchor</string>
-    <string name="settings_screen_plausibility_hint">A reading below the 2.0 floor, one that surfaced from a gap, or one inside an artifact spike stops counting as a reliable anchor: the forecast loses TRUSTED status and names the reason. Plausible anchors are untouched. It feeds the hypo-alert path — turn it on while watching.</string>
+    <string name="settings_screen_plausibility_hint">A reading below the 2.0 floor, one that surfaced from a gap, or one inside an artifact spike stops counting as a reliable anchor: the forecast loses TRUSTED status and names the reason, and the hypo alert asks for a meter check instead of alarming on a value glucose cannot take. Plausible anchors are untouched. On by default.</string>
     <string name="settings_screen_night_low_label">At night, judge by the band’s lower edge</string>
     <string name="settings_screen_night_low_hint">The night hypo alert fires on the LOWER edge of the forecast, not the center line — earlier and more often. On checked history this gave many alerts without a real night low, so it is off by default. Turn it on once a real low shows up that lets you judge it fully.</string>
     <string name="settings_screen_marks_teach_label">Meal marks teach the model</string>

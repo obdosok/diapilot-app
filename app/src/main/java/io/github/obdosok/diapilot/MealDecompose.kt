@@ -6,6 +6,7 @@ import com.diapilot.core.analysis.isContextNote
 import com.diapilot.core.analysis.lookupFoodGrams
 import com.diapilot.core.analysis.parseComponents
 import com.diapilot.core.collector.Annotation
+import io.github.obdosok.diapilot.ui.parseMealParts
 
 /**
  * Batch decomposition of already-logged meals: a meal whose NAME is an explicit
@@ -37,7 +38,7 @@ fun computeDecompPlan(
     .mapNotNull { note ->
         // Already has a split → nothing to do.
         if (parseComponents(note.analysis ?: "").isNotEmpty()) return@mapNotNull null
-        val parts = io.github.obdosok.diapilot.ui.parseMealParts(note.content)
+        val parts = parseMealParts(note.content)
         if (parts.size < 2) return@mapNotNull null
         DishDecomp(
             annotationId = note.id,

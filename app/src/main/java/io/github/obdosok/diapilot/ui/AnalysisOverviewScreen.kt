@@ -32,11 +32,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.GlycemicStats
 import com.diapilot.core.analysis.glycemicStats
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.AdaptiveIsfRuntime
+import io.github.obdosok.diapilot.data.DailyDiscrepancyRuntime
 import io.github.obdosok.diapilot.data.HybridModelStore
+import io.github.obdosok.diapilot.data.PhysioRuntime
 import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
-import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.data.TodayDiscrepancyView
 import io.github.obdosok.diapilot.i18n.localized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,6 +56,7 @@ import kotlin.math.max
 @Composable
 fun AnalysisScreen(modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val graph = LocalAppGraph.current
     var data by remember { mutableStateOf<AnalysisOverview?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     // `ClosedEpisodeRuntime.updates` was retired along with the pipeline it
@@ -60,7 +65,7 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         runCatching {
             withContext(Dispatchers.IO) {
-                val store = Stores.get(context)
+                val store = graph.store
                 val now = System.currentTimeMillis()
                 val from30 = now - 30L * 24 * 60 * 60_000
                 val from7 = now - 7L * 24 * 60 * 60_000
@@ -70,19 +75,19 @@ fun AnalysisScreen(modifier: Modifier = Modifier) {
                 val db = (store as? SqliteCollectorStore)?.readableDatabase
                 // Analysis is a read-only projection. Learning/promotion is
                 // maintained by the normal causal runtime, never by rendering.
-                val artifact=io.github.obdosok.diapilot.data.PhysioRuntime.artifact(store,now)
+                val artifact=PhysioRuntime.artifact(store,now)
                 val rescueEvents=com.diapilot.core.analysis.rescueEvents(store.annotations(from30,now),from30,now)
                 val rescueSafety=com.diapilot.core.analysis.rescueSafetyEpisodesV1(rescueEvents,readings,store.boluses(from30,now))
                 // Same computation the model applies: the card calls
                 // AdaptiveIsfRuntime.balance instead of computing its own balance.
-                val balance=io.github.obdosok.diapilot.data.AdaptiveIsfRuntime.balance(store,now,windowDays=14)
-                val balanceCarbSens=io.github.obdosok.diapilot.data.AdaptiveIsfRuntime.carbSens(store,now)
+                val balance=AdaptiveIsfRuntime.balance(store,now,windowDays=14)
+                val balanceCarbSens=AdaptiveIsfRuntime.carbSens(store,now)
                 AnalysisOverview(
                     week = glycemicStats(readings.filter { it.tsMs >= from7 }, lo, hi),
                     month = glycemicStats(readings, lo, hi),
                     model = HybridModelStore.status(context),
                     hybridEnabled = true,
-                    today = db?.let { io.github.obdosok.diapilot.data.DailyDiscrepancyRuntime.view(it, now, store = store, context = context) },
+                    today = db?.let { DailyDiscrepancyRuntime.view(it, now, store = store, context = context) },
                     rescueSafety=rescueSafety,
                     balance=balance,
                     balanceCarbSens=balanceCarbSens,
@@ -157,7 +162,7 @@ private data class AnalysisOverview(
     val month: GlycemicStats?,
     val model: HybridModelStore.Status?,
     val hybridEnabled: Boolean,
-    val today: io.github.obdosok.diapilot.data.TodayDiscrepancyView?,
+    val today: TodayDiscrepancyView?,
     val rescueSafety:List<com.diapilot.core.analysis.RescueSafetyEpisodeV1>,
     val balance: com.diapilot.core.physio.DailyBalanceIsfV1.Result?,
     val balanceCarbSens: Double?,
@@ -299,7 +304,7 @@ private fun humanEpisodeStatus(s:String)=when(s){
 
 
 @Composable
-private fun TodayChangeCard(today: io.github.obdosok.diapilot.data.TodayDiscrepancyView?) {
+private fun TodayChangeCard(today: TodayDiscrepancyView?) {
     OverviewCard(stringResource(R.string.analysis_overview_screen_today_card_title)) {
         if (today == null) {
             Text(stringResource(R.string.analysis_overview_screen_today_no_checkpoints))

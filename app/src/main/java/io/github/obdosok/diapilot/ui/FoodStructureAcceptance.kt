@@ -22,11 +22,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.data.FoodStructureProposalRuntime
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
-import io.github.obdosok.diapilot.data.Stores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +44,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val graph = LocalAppGraph.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var rows by remember { mutableStateOf<List<FoodStructureProposalRuntime.Row>>(emptyList()) }
     var expanded by remember { mutableStateOf(false) }
@@ -53,7 +54,7 @@ fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
     suspend fun reload() {
         rows = withContext(Dispatchers.IO) {
             runCatching {
-                FoodStructureProposalRuntime.rows(context, Stores.get(context) as SqliteCollectorStore)
+                FoodStructureProposalRuntime.rows(context, graph.store as SqliteCollectorStore)
             }.getOrDefault(emptyList())
         }
     }
@@ -136,7 +137,7 @@ fun FoodStructureAcceptanceSection(modifier: Modifier = Modifier) {
                                 val n = withContext(Dispatchers.IO) {
                                     runCatching {
                                         FoodStructureProposalRuntime.accept(
-                                            context, Stores.get(context) as SqliteCollectorStore,
+                                            context, graph.store as SqliteCollectorStore,
                                             row.proposed.id,
                                         )
                                     }.getOrDefault(0)

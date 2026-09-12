@@ -74,4 +74,22 @@ class CommandGuardTest {
         assertEquals(CommandBlock.ActivityEmpty, validateCommandValues("activity", activity = ""))
         assertEquals(CommandBlock.ActivityTooLong, validateCommandValues("activity", activity = "б".repeat(41)))
     }
+
+    @Test
+    fun socketInsulinPassesTheSameFuse() {
+        val fuse = com.diapilot.core.PersonalParams.DEFAULT.commandMaxBolusUnits
+        val events = listOf(
+            com.diapilot.core.collector.InsulinEvent(1_000L, 4.5, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(2_000L, fuse, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(3_000L, fuse + 0.1, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(4_000L, 0.0, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(5_000L, -2.0, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(6_000L, Double.NaN, "bolus"),
+            com.diapilot.core.collector.InsulinEvent(7_000L, Double.POSITIVE_INFINITY, "bolus"),
+        )
+        // The ceiling itself passes; everything above it, zero, negative and
+        // non-finite is dropped. Nothing is repaired or clamped.
+        assertEquals(listOf(1_000L, 2_000L), acceptedInsulinEvents(events).map { it.tsMs })
+        assertEquals(emptyList<Long>(), acceptedInsulinEvents(emptyList()).map { it.tsMs })
+    }
 }
