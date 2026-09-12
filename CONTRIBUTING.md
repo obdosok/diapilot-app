@@ -13,17 +13,22 @@ direction.
 
 ```bash
 export JAVA_HOME=<a JDK 21, e.g. the JetBrains Runtime bundled with Android Studio>
-./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug --console=plain
+./gradlew :core:test :app:test :app:assembleDebug --console=plain
 ```
+
+`:app:test` and `:app:assembleDebug` cover **both editions** (`oss` and
+`store` — see [docs/editions.md](docs/editions.md)); a single one is
+`:app:testOssDebugUnitTest` / `:app:assembleOssDebug`. Both must stay green:
+the edition boundary is asserted by a test that runs on each flavor.
 
 The Android SDK must be installed (Android Studio writes its path to
 `local.properties`, or set `ANDROID_HOME`); CI does not need `local.properties`
 at all. See the README's "Building" section for the phone-side setup needed
-to run the app itself, and `:app:connectedDebugAndroidTest` for instrumented
+to run the app itself, and `:app:connectedOssDebugAndroidTest` for instrumented
 tests, which need a device.
 
-CI runs `:core:test`, `:app:testDebugUnitTest` and `:app:assembleDebug` on
-every push and pull request; please keep these green.
+CI runs `:core:test`, `:app:test` and `:app:assembleDebug` on every push and
+pull request — both editions — please keep these green.
 
 ## Code style
 

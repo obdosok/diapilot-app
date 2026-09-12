@@ -2,7 +2,7 @@ package io.github.obdosok.diapilot.collect
 
 import android.content.Context
 import android.os.BatteryManager
-import android.util.Log
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.api.DiaForApi
 import io.github.obdosok.diapilot.data.Forecaster
@@ -17,6 +17,7 @@ import io.github.obdosok.diapilot.data.WatchApiToken
 import io.github.obdosok.diapilot.data.displayHistory
 import io.github.obdosok.diapilot.data.forecastAnchor
 import io.github.obdosok.diapilot.data.tir24h
+import io.github.obdosok.diapilot.diag.DiagLog
 import io.github.obdosok.diapilot.i18n.StatusText
 import io.github.obdosok.diapilot.i18n.localized
 import org.json.JSONObject
@@ -88,7 +89,7 @@ class WatchServer(private val context: Context) {
                     val ss = ServerSocket(PORT, 4, InetAddress.getByName(addr))
                     servers[addr] = ss
                     DiagState.watchServerUp = true
-                    Log.i(TAG, "listening on $addr:$PORT")
+                    DiagLog.i(TAG, "listening on $addr:$PORT")
                     while (!ss.isClosed) {
                         val client = ss.accept()
                         // Thread per connection: long-poll requests hold their
@@ -97,7 +98,7 @@ class WatchServer(private val context: Context) {
                             try {
                                 handle(client)
                             } catch (e: Exception) {
-                                Log.w(TAG, "request failed: ${e.message}")
+                                DiagLog.w(TAG, "request failed: ${e.message}")
                             } finally {
                                 runCatching { client.close() }
                             }
@@ -109,7 +110,7 @@ class WatchServer(private val context: Context) {
                         if (servers.isEmpty()) DiagState.watchServerUp = false
                         if (stopped) break
                     } else {
-                        Log.w(TAG, "$addr port busy, retry in 60s: ${e.message}")
+                        DiagLog.w(TAG, "$addr port busy, retry in 60s: ${e.message}")
                     }
                 }
                 if (!stopped) Thread.sleep(60_000)
@@ -217,7 +218,7 @@ class WatchServer(private val context: Context) {
         // Path only. The query string is where the medical payload lives —
         // /add_treatments?insulin=4.5&carbs=30 was going into the production
         // log verbatim.
-        Log.i(TAG, "request from $peer: $method $path")
+        DiagLog.i(TAG, "request from $peer: $method $path")
 
         // The gate. `/info.json` passes untouched (see localAccess); the two
         // endpoints that write a dose or publish history need the
@@ -232,7 +233,7 @@ class WatchServer(private val context: Context) {
         )
         when (access) {
             com.diapilot.core.api.LocalAccess.METHOD_NOT_ALLOWED -> {
-                Log.w(TAG, "$path: $method not allowed")
+                DiagLog.w(TAG, "$path: $method not allowed")
                 return Response(
                     "405 Method Not Allowed",
                     "Method Not Allowed",
@@ -240,7 +241,7 @@ class WatchServer(private val context: Context) {
                 )
             }
             com.diapilot.core.api.LocalAccess.UNAUTHORIZED -> {
-                Log.w(TAG, "$path: refused, no valid token")
+                DiagLog.w(TAG, "$path: refused, no valid token")
                 return Response("401 Unauthorized", "Unauthorized")
             }
             com.diapilot.core.api.LocalAccess.OK -> Unit
@@ -280,7 +281,7 @@ class WatchServer(private val context: Context) {
             com.diapilot.core.api.LocalRoute.EVENTS -> {
                 val r = DiaForApi.handle(context, params)
                 // Status only. The body is medical payload and never logged.
-                Log.i(TAG, "events -> ${r.status}")
+                DiagLog.i(TAG, "events -> ${r.status}")
                 Response(
                     "${r.status} ${r.reason}",
                     r.body,
@@ -338,8 +339,10 @@ class WatchServer(private val context: Context) {
         val inPct = tir?.inRange ?: 0
 
         // Local IOB — the store sees pen/watch/manual doses xDrip never will.
-        val iob = HybridRuntimeMetrics
-            .surfaceIobUnits(store, context, now) ?: 0.0
+        // Null in the store edition (IOB is prospective), and kept nullable
+        // here on purpose: `?: 0.0` would publish `predictIOB: "0.0u"`, which a
+        // watch face cannot tell from a real empty board.
+        val iob = HybridRuntimeMetrics.surfaceIobUnits(store, context, now)
         // Only a dose that still matters reaches the wrist (150 min);
         // older shots are history, findable on the chart.
         val doseCutoffMs = com.diapilot.core.PersonalParams.DEFAULT.lastDoseShowMin * 60_000
@@ -386,7 +389,10 @@ class WatchServer(private val context: Context) {
             treatment.put("insulin", it.units)
             treatment.put("time", it.tsMs)
         }
-        treatment.put("predictIOB", String.format(Locale.ENGLISH, "%.1fu", iob))
+        // ABSENT, NOT ZERO. The face prints whatever string it is handed, so an
+        // edition without IOB must not write the key at all — `predictIOB` is
+        // one of the `predict*` fields the store edition does not publish.
+        iob?.let { treatment.put("predictIOB", String.format(Locale.ENGLISH, "%.1fu", it)) }
         // Active food on the wrist: the freshest carb-carrying note within 3h.
         store.annotations(now - 3L * 3_600_000, now)
             .filter { it.estCarbs != null && it.kind != "tag" }
@@ -413,7 +419,9 @@ class WatchServer(private val context: Context) {
                     com.diapilot.core.analysis.WatchHintInput(
                         predMmolIn60 = pSettle.mmol,
                         predLoIn60 = hourLo,
-                        iobUnits = iob,
+                        // Reached only with a prediction in hand, which the
+                        // store edition never has — so IOB is non-null here.
+                        iobUnits = iob ?: 0.0,
                         carbSensMmolPerGram =
                             HybridRuntimeMetrics
                                 .carbSensitivityMmolPerGram()
@@ -447,8 +455,15 @@ class WatchServer(private val context: Context) {
         return root.toString()
     }
 
-    /** Twin prediction from the freshest reading; empty when data is stale. */
+    /**
+     * Twin prediction from the freshest reading; empty when data is stale — and
+     * empty for the whole store edition, which is what removes `predictBWP`,
+     * the `predict` / `predLo` / `predHi` graph lines and the background model
+     * build this call would otherwise trigger from the collector's heartbeat.
+     * Every reader below already handles the empty list.
+     */
     private fun predictionPoints(now: Long): List<com.diapilot.core.twin.PredictedPoint> {
+        if (!Edition.prospective) return emptyList()
         val store = Stores.get(context)
         return try {
             val model = TwinCache.getForForecast(store, context)
@@ -471,7 +486,7 @@ class WatchServer(private val context: Context) {
                 )?.points ?: emptyList()
             } else emptyList()
         } catch (e: Exception) {
-            Log.w(TAG, "prediction failed: ${e.message}")
+            DiagLog.w(TAG, "prediction failed: ${e.message}")
             emptyList()
         }
     }
@@ -592,7 +607,7 @@ class WatchServer(private val context: Context) {
         if (block != null) {
             // The reason's CLASS only: the rejected value is medical payload
             // and never reaches the log (same rule as the request target).
-            Log.w(TAG, "add_treatments refused: ${block.javaClass.simpleName}")
+            DiagLog.w(TAG, "add_treatments refused: ${block.javaClass.simpleName}")
             return "400 Bad Request" to "Refused by the dose guard"
         }
         val store = Stores.get(context)

@@ -65,6 +65,7 @@ import io.github.obdosok.diapilot.i18n.CommandText
 import io.github.obdosok.diapilot.i18n.FoodText
 import io.github.obdosok.diapilot.i18n.TokenText
 import io.github.obdosok.diapilot.i18n.localized
+import io.github.obdosok.diapilot.i18n.uiLanguage
 import io.github.obdosok.diapilot.i18n.unitLabel
 import kotlinx.coroutines.launch
 import java.io.File
@@ -555,7 +556,7 @@ fun AnnotationComposer(
                 scanBusy = true
                 scanStatus = context.localized().getString(R.string.annotation_composer_barcode_searching, ean)
                 aiScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    val product = OpenFoodFacts.lookup(ean)
+                    val product = OpenFoodFacts.lookup(ean, context.uiLanguage())
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         scanBusy = false
                         if (product == null || !product.usable) {

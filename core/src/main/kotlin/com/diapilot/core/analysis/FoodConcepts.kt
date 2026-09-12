@@ -88,13 +88,13 @@ data class FoodConcept(
  */
 val FOOD_CONCEPTS: List<FoodConcept> = listOf(
     // --- carbohydrate drivers (the early rise) ---
-    FoodConcept("bread", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("хлеб", "хлебушек", "багет", "булка", "тост")),
-    FoodConcept("buckwheat", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.MED, listOf("гречка", "гречневая", "греча")),
-    FoodConcept("rice", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("рис", "рисовая")),
-    FoodConcept("pasta", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("паста", "макароны", "спагетти", "лапша")),
-    FoodConcept("potato", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("картофель", "картошка", "картоф")),
-    FoodConcept("potato_mash", CarbSpeed.FAST, MacroLevel.MED, MacroLevel.LOW, MacroLevel.LOW, listOf("пюре", "картофельное пюре")),
-    FoodConcept("oats", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("овсянка", "овсяная", "геркулес")),
+    FoodConcept("bread", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("хлеб", "хлебушек", "багет", "булка", "тост", "bread", "toast", "baguette", "roll")),
+    FoodConcept("buckwheat", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.MED, listOf("гречка", "гречневая", "греча", "buckwheat")),
+    FoodConcept("rice", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("рис", "рисовая", "rice")),
+    FoodConcept("pasta", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("паста", "макароны", "спагетти", "лапша", "pasta", "spaghetti", "noodles", "macaroni")),
+    FoodConcept("potato", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("картофель", "картошка", "картоф", "potato", "potatoes")),
+    FoodConcept("potato_mash", CarbSpeed.FAST, MacroLevel.MED, MacroLevel.LOW, MacroLevel.LOW, listOf("пюре", "картофельное пюре", "mashed potato", "mashed potatoes", "potato mash")),
+    FoodConcept("oats", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("овсянка", "овсяная", "геркулес", "oats", "oatmeal", "porridge")),
     // Boiled whole-grain porridges the alias table simply did not cover. The gap
     // was not cosmetic: a spelt porridge note can carry the bulk of a meal's carbs,
     // and with no concept those grams are invisible to everything keyed on concepts —
@@ -110,11 +110,11 @@ val FOOD_CONCEPTS: List<FoodConcept> = listOf(
     // 21 g/100 g × 200 g = 42 g where bread wants 14. Zero occurrences of that word
     // in the corpus; the word for "spelt (grain)" is used instead. Re-add only
     // together with whole-word matching for it.
-    FoodConcept("spelt", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.MED, listOf("спельта", "булгур", "перловка", "перловая")),
-    FoodConcept("cereal_puff", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("хлопья", "мюсли", "сухарик", "сухарики", "кантуччи", "контучч")),
-    FoodConcept("pancake", CarbSpeed.FAST, MacroLevel.MED, MacroLevel.MED, MacroLevel.LOW, listOf("блин", "блины", "оладьи", "панкейк")),
-    FoodConcept("banana", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("банан")),
-    FoodConcept("berries", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("ягоды", "черника", "клубника", "малина", "голубика")),
+    FoodConcept("spelt", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.MED, listOf("спельта", "булгур", "перловка", "перловая", "spelt", "bulgur", "pearl barley", "barley")),
+    FoodConcept("cereal_puff", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("хлопья", "мюсли", "сухарик", "сухарики", "кантуччи", "контучч", "cereal", "muesli", "granola", "biscotti", "cracker", "crackers")),
+    FoodConcept("pancake", CarbSpeed.FAST, MacroLevel.MED, MacroLevel.MED, MacroLevel.LOW, listOf("блин", "блины", "оладьи", "панкейк", "pancake", "pancakes", "crepe", "crepes")),
+    FoodConcept("banana", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("банан", "banana")),
+    FoodConcept("berries", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("ягоды", "черника", "клубника", "малина", "голубика", "berries", "blueberries", "strawberries", "raspberries")),
     // Sweet baked dough (the flour/sugar drives it fast) — a berry bun is pastry,
     // NOT berries. The alias is a Polish blueberry bun; the dough dominates.
     FoodConcept("pastry", CarbSpeed.FAST, MacroLevel.MED, MacroLevel.LOW, MacroLevel.LOW, listOf("ягодянка", "булочка", "плюшка", "пирожок", "пирог", "круассан", "маффин", "кекс",
@@ -122,45 +122,51 @@ val FOOD_CONCEPTS: List<FoodConcept> = listOf(
         // note, which had been reaching `sugar` only because the word for "honey"
         // is a prefix of the word for "honeyed". Sponge layers + cream are
         // this archetype — flour-and-sugar dough, fat MED — not table sugar.
-        "торт", "коржи", "корж", "медовик")),
-    FoodConcept("smoothie", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("смузи", "фреш")),
-    FoodConcept("juice", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("сок", "апельсиновый сок")),
-    FoodConcept("chocolate", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("шоколад", "шоколадка", "милка")),
-    FoodConcept("nutella", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("нутелла")),
-    FoodConcept("ice_cream", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("мороженое", "магнум", "пломбир")),
-    FoodConcept("beer", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("пиво", "корона", "портер", "лагер", "эль")),
-    FoodConcept("dextrose", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("декстроза", "dextrose", "dextro", "dextrosa", "глюкоза")),
-    FoodConcept("sugar", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("сахар", "мёд", "мед", "варенье")),
-    FoodConcept("chips", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("чипсы")),
+        "торт", "коржи", "корж", "медовик",
+        "pastry", "sweet bun", "bun", "muffin", "croissant", "cake", "pie", "cupcake")),
+    FoodConcept("smoothie", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("смузи", "фреш", "smoothie")),
+    FoodConcept("juice", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("сок", "апельсиновый сок", "juice", "orange juice")),
+    FoodConcept("chocolate", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("шоколад", "шоколадка", "милка", "chocolate", "chocolate bar")),
+    FoodConcept("nutella", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("нутелла", "nutella")),
+    FoodConcept("ice_cream", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("мороженое", "магнум", "пломбир", "ice cream")),
+    FoodConcept("beer", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("пиво", "корона", "портер", "лагер", "эль", "beer", "lager", "ale", "porter")),
+    FoodConcept("dextrose", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("декстроза", "dextrose", "dextro", "dextrosa", "глюкоза", "glucose tablet", "glucose tablets")),
+    FoodConcept("sugar", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("сахар", "мёд", "мед", "варенье", "sugar", "honey")),
+    FoodConcept("chips", CarbSpeed.FAST, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("чипсы", "chips", "crisps")),
     // Nuts/seeds: few carbs, and what there is crawls behind the fat and fibre.
     // A block of unnamed carbs (pistachios, sunflower seeds) had nowhere to go without this.
-    FoodConcept("nuts", CarbSpeed.SLOW, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.HIGH, listOf("орехи", "фисташки", "миндаль", "арахис", "кешью", "фундук", "семечки", "грецкий")),
+    FoodConcept("nuts", CarbSpeed.SLOW, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.HIGH, listOf("орехи", "фисташки", "миндаль", "арахис", "кешью", "фундук", "семечки", "грецкий",
+        "nuts", "pistachios", "almonds", "peanuts", "cashews", "hazelnuts", "walnuts", "sunflower seeds")),
     // SWEET yogurt is sugar wearing a dairy coat — the added sugar drives it,
     // fast. Kefir is lactose only: little of it, and slow. One «dairy» concept
     // would average the two into a lie (the user's call).
-    FoodConcept("yogurt", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("йогурт", "йогуртный", "активиа", "данон")),
-    FoodConcept("kefir", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("кефир", "ряженка", "простокваша", "айран", "молоко")),
-    FoodConcept("pizza", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("пицца", "пиццы")),
-    FoodConcept("legume", CarbSpeed.SLOW, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("чечевица", "фасоль", "нут", "горох", "горошек")),
+    FoodConcept("yogurt", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("йогурт", "йогуртный", "активиа", "данон", "yogurt", "yoghurt")),
+    FoodConcept("kefir", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.LOW, listOf("кефир", "ряженка", "простокваша", "айран", "молоко", "kefir", "buttermilk", "milk")),
+    FoodConcept("pizza", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("пицца", "пиццы", "pizza")),
+    FoodConcept("legume", CarbSpeed.SLOW, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("чечевица", "фасоль", "нут", "горох", "горошек", "lentils", "beans", "chickpeas", "peas")),
     // Quinoa is a real carb driver (MED speed), not a zero-carb «vegetable».
-    FoodConcept("quinoa", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("киноа", "кинва")),
-    FoodConcept("soup", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("суп", "щи", "борщ", "том ям", "свекольный суп")),
+    FoodConcept("quinoa", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.MED, MacroLevel.HIGH, listOf("киноа", "кинва", "quinoa")),
+    FoodConcept("soup", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("суп", "щи", "борщ", "том ям", "свекольный суп", "soup", "borscht")),
     // --- moderate carb + fat (spreads) ---
-    FoodConcept("hummus", CarbSpeed.MED, MacroLevel.MED, MacroLevel.MED, MacroLevel.MED, listOf("хумус")),
+    FoodConcept("hummus", CarbSpeed.MED, MacroLevel.MED, MacroLevel.MED, MacroLevel.MED, listOf("хумус", "hummus")),
     // --- protein / fat (tail modifiers, ~0 fast carbs) ---
-    FoodConcept("egg", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("скрэмбл", "яйцо", "яйца", "омлет", "яичница")),
-    FoodConcept("chicken", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("курица", "куриная", "грудка")),
-    FoodConcept("meat_cutlet", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("котлета", "котлеты", "отбивная", "отбивные", "фрикадельки", "мясо", "тефтели")),
-    FoodConcept("fish", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("рыба", "тунец", "паста тунца", "лосось")),
-    FoodConcept("cheese", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("сыр", "творог")),
-    FoodConcept("butter", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("масло", "сливочное")),
-    FoodConcept("pate", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("паштет")),
+    FoodConcept("egg", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("скрэмбл", "яйцо", "яйца", "омлет", "яичница", "egg", "eggs", "omelet", "omelette", "scrambled eggs")),
+    FoodConcept("chicken", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("курица", "куриная", "грудка", "chicken", "chicken breast")),
+    FoodConcept("meat_cutlet", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("котлета", "котлеты", "отбивная", "отбивные", "фрикадельки", "мясо", "тефтели",
+        "cutlet", "cutlets", "meatball", "meatballs", "meat")),
+    FoodConcept("fish", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.HIGH, MacroLevel.LOW, listOf("рыба", "тунец", "паста тунца", "лосось", "fish", "tuna", "tuna paste", "salmon")),
+    FoodConcept("cheese", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("сыр", "творог", "cheese", "cottage cheese")),
+    FoodConcept("butter", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("масло", "сливочное", "butter")),
+    FoodConcept("pate", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("паштет", "pate", "pâté")),
     // --- fiber / negligible (slow the early phase, ~0 carbs) ---
-    FoodConcept("salad", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("салат", "зелень", "листья", "петрушка", "укроп", "базилик", "кинза")),
-    FoodConcept("vegetable", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("капуста", "огурец", "помидор", "томат", "перец", "кабачок", "брокколи")),
+    FoodConcept("salad", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("салат", "зелень", "листья", "петрушка", "укроп", "базилик", "кинза",
+        "salad", "greens", "parsley", "dill", "basil", "cilantro")),
+    FoodConcept("vegetable", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("капуста", "огурец", "помидор", "томат", "перец", "кабачок", "брокколи",
+        "cabbage", "cucumber", "tomato", "pepper", "zucchini", "broccoli")),
     // Root veg carries a modest SLOW carb load — not zero like leafy/watery veg.
-    FoodConcept("root_veg", CarbSpeed.SLOW, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("морковь", "свёкла", "свекла", "кольраби", "репа", "тыква", "пастернак")),
-    FoodConcept("tea", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("чай", "кофе", "вода")),
+    FoodConcept("root_veg", CarbSpeed.SLOW, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.HIGH, listOf("морковь", "свёкла", "свекла", "кольраби", "репа", "тыква", "пастернак",
+        "carrot", "beet", "beetroot", "kohlrabi", "turnip", "pumpkin", "parsnip")),
+    FoodConcept("tea", CarbSpeed.NONE, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("чай", "кофе", "вода", "tea", "coffee", "water")),
 
     // --- added after the CONCEPT AUDIT (`compose` §1a) ---------------------------
     // These eight carried CARBS AND NO CONCEPT — invisible to every pool: they
@@ -173,23 +179,23 @@ val FOOD_CONCEPTS: List<FoodConcept> = listOf(
 
     // Beetroot kefir soup, eaten cold. Beet + kefir, so root-veg-ish carbs in a
     // liquid — one of the largest orphaned carb sources the audit found.
-    FoodConcept("cold_soup", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("холодник", "холодный борщ", "окрошка")),
+    FoodConcept("cold_soup", CarbSpeed.MED, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.MED, listOf("холодник", "холодный борщ", "окрошка", "cold borscht", "cold beet soup", "okroshka")),
     // Berry jam/preserve: sugar in water, the fastest thing in this group. Kept
     // SEPARATE from `sugar` because the "preserve" alias already lives there — this is
     // the fruit-preserve form, and the audit found it orphaned.
-    FoodConcept("jam", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("джем", "конфитюр", "брусничный", "ягодный джем", "повидло")),
+    FoodConcept("jam", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("джем", "конфитюр", "брусничный", "ягодный джем", "повидло", "jam", "preserve", "marmalade")),
     // Soured-cream confectioner's cream: sugar carried in fat, so the fat slows it.
-    FoodConcept("cream_sweet", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("крем", "крем сметанный", "сливки взбитые")),
+    FoodConcept("cream_sweet", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.LOW, listOf("крем", "крем сметанный", "сливки взбитые", "whipped cream", "cream filling")),
     // Plain soured cream — a fat/protein tail modifier, milk sugar only.
-    FoodConcept("sour_cream", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("сметана", "йогурт греческий")),
+    FoodConcept("sour_cream", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.MED, MacroLevel.LOW, listOf("сметана", "йогурт греческий", "sour cream", "greek yogurt")),
     // Sausage: filler carbs only, and the fat dominates the response.
-    FoodConcept("sausage", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("сосиска", "сосиски", "колбаса", "шпикачки")),
+    FoodConcept("sausage", CarbSpeed.NONE, MacroLevel.HIGH, MacroLevel.HIGH, MacroLevel.LOW, listOf("сосиска", "сосиски", "колбаса", "шпикачки", "sausage", "sausages", "hot dog")),
     // Fried mushrooms: negligible carbs, mostly water and fat from the pan.
-    FoodConcept("mushroom", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.MED, MacroLevel.MED, listOf("грибы", "грибы жареные", "шампиньоны", "белые")),
+    FoodConcept("mushroom", CarbSpeed.NONE, MacroLevel.MED, MacroLevel.MED, MacroLevel.MED, listOf("грибы", "грибы жареные", "шампиньоны", "белые", "mushroom", "mushrooms", "champignons")),
     // Crisp fried onion topping — a little sugar, a lot of oil.
-    FoodConcept("fried_onion", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.MED, listOf("жареный лук", "лук жареный", "хрустящий лук")),
+    FoodConcept("fried_onion", CarbSpeed.MED, MacroLevel.HIGH, MacroLevel.LOW, MacroLevel.MED, listOf("жареный лук", "лук жареный", "хрустящий лук", "fried onion", "crispy onion")),
     // Gravy: thickened stock, starch is the carb.
-    FoodConcept("gravy", CarbSpeed.MED, MacroLevel.MED, MacroLevel.LOW, MacroLevel.LOW, listOf("соус", "подливка", "подлива", "гравy")),
+    FoodConcept("gravy", CarbSpeed.MED, MacroLevel.MED, MacroLevel.LOW, MacroLevel.LOW, listOf("соус", "подливка", "подлива", "гравy", "gravy", "sauce")),
 
     // NON-ALCOHOLIC BEER IS A DIFFERENT PRODUCT, not a variant of `beer`.
     // The user asked for them not to be mixed; the audit showed it was mixed with
@@ -199,7 +205,7 @@ val FOOD_CONCEPTS: List<FoodConcept> = listOf(
     // would have become alcohol are still there. Listed AFTER `beer` deliberately: `conceptFor`
     // resolves by stem, and the longer alias must not be shadowed, so it is checked in
     // its own right rather than as a beer alias.
-    FoodConcept("beer_nonalc", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("безалкогольное", "пиво безалкогольное", "безалкогольный")),
+    FoodConcept("beer_nonalc", CarbSpeed.FAST, MacroLevel.LOW, MacroLevel.LOW, MacroLevel.LOW, listOf("безалкогольное", "пиво безалкогольное", "безалкогольный", "non-alcoholic beer", "alcohol-free beer")),
 )
 
 /**
@@ -262,6 +268,42 @@ val TYPICAL_PORTION_G: Map<String, Double> = mapOf(
  *  «in pieces» fallback. Null when unknown. */
 fun typicalCarbs(conceptId: String?): Double? =
     conceptId?.let { TYPICAL_PORTION_G[it]?.let { p -> carbsForPortion(conceptId, p) } }
+
+/**
+ * Typical grams for ONE of a generic PORTION WORD — "2 slices of bread",
+ * "a cup of rice", "a handful of nuts" — for the case a concept's own
+ * [TYPICAL_PORTION_G] does not already stand for that unit (rice's typical
+ * portion is a plateful, not a cup, so "1 cup of rice" needs its own number).
+ * Deliberately generic (not per-concept): a rough estimate here is still
+ * better than none, and an explicit gram figure in the note always wins.
+ * Keyed on the normalized portion word, English and Russian side by side.
+ */
+val PORTION_WORD_GRAMS: Map<String, Double> = mapOf(
+    "slice" to 30.0, "slices" to 30.0,
+    "piece" to 30.0, "pieces" to 30.0,
+    "cup" to 240.0, "cups" to 240.0,
+    "glass" to 200.0, "glasses" to 200.0,
+    "bottle" to 500.0, "bottles" to 500.0,
+    "tbsp" to 15.0, "tablespoon" to 15.0, "tablespoons" to 15.0,
+    "tsp" to 5.0, "teaspoon" to 5.0, "teaspoons" to 5.0,
+    "handful" to 30.0, "handfuls" to 30.0,
+    // Russian equivalents — the same portion words a note already uses in
+    // that language, so the table serves both languages the parser reads.
+    "кусок" to 30.0, "куска" to 30.0, "кусочек" to 30.0, "ломтик" to 30.0,
+    "стакан" to 240.0, "чашка" to 240.0,
+    "бутылка" to 500.0,
+    "ст.л." to 15.0, "столовая ложка" to 15.0,
+    "ч.л." to 5.0, "чайная ложка" to 5.0,
+    "горсть" to 30.0,
+)
+
+/**
+ * [PORTION_WORD_GRAMS] with the user's edit applied — null when [word] names
+ * no known portion. Word is matched after the same normalization every other
+ * lookup here uses, so case and stray punctuation don't split one word into two.
+ */
+fun typicalPortionWordGrams(word: String): Double? =
+    PORTION_WORD_GRAMS[normalizeFoodName(word)]
 
 private val CONCEPT_BY_STEM: Map<String, FoodConcept> = buildMap {
     for (c in FOOD_CONCEPTS) for (a in c.aliasesRu) {

@@ -19,10 +19,19 @@ class ManualInsulinParamsV1Test {
     /** "Most active action from 30 to 70, after that it tails off." */
     private val phase = InsulinShapeLandmarksV1(27.0, 30.0, plateauEndMin = 70.0, tailMin = 145.0)
 
-    /** A measured curve shaped like the one a real correction produced. */
+    /**
+     * A measured curve shaped like the one a real correction produced.
+     *
+     * It ENDS AT 260, not at 130 as it used to. `insulinTailMinRange` now floors
+     * the end of action at 240 (audit M1), and every measured curve reaches this
+     * resolver through `InsulinShapeV1.coerceIntoDomain`, so a corpus curve that
+     * ends inside the third hour is no longer one the runtime can hand over. A
+     * fixture below the floor would test a path production cannot reach — and it
+     * would refuse a partial manual entry for a reason the user never caused.
+     */
     private val measured = listOf(
         0.0 to 0.0, 15.0 to 0.0, 20.0 to .02, 30.0 to .12, 40.0 to .28,
-        50.0 to .45, 60.0 to .60, 80.0 to .80, 100.0 to .92, 120.0 to .99, 130.0 to 1.0,
+        50.0 to .45, 60.0 to .60, 80.0 to .80, 100.0 to .92, 180.0 to .99, 260.0 to 1.0,
     ).map { (m, f) -> HybridCdfKnot(m, f) }
 
     private fun resolve(
@@ -37,7 +46,7 @@ class ManualInsulinParamsV1Test {
     @Test fun landmarksReadTheCurveTheRuntimeWouldHaveRead() {
         val lm = checkNotNull(InsulinShapeV1.landmarks(measured))
         assertEquals(20.0, lm.onsetMin, 1e-9)
-        assertEquals(130.0, lm.tailMin, 1e-9)
+        assertEquals(260.0, lm.tailMin, 1e-9)
         assertTrue("steepest segment is between 30 and 60: ${lm.peakMin}", lm.peakMin in 30.0..60.0)
     }
 
@@ -148,7 +157,7 @@ class ManualInsulinParamsV1Test {
 
     @Test fun anActivePhaseEndingAfterTheCurveIsRefused() {
         val r = resolve(
-            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 30.0, plateauEndMin = 200.0, tailMin = 145.0),
+            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 30.0, plateauEndMin = 320.0, tailMin = 300.0),
         )
         assertTrue(InsulinParameterResolverV1.SHAPE_OUT_OF_DOMAIN in r.rejected)
         assertEquals(measured, r.knots)
@@ -187,7 +196,7 @@ class ManualInsulinParamsV1Test {
     // ---- precedence ------------------------------------------------------
 
     @Test fun manualShapeWinsOverAMeasuredCurve() {
-        val r = resolve(ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 145.0))
+        val r = resolve(ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 300.0))
         assertEquals(InsulinParamTierV1.MANUAL, r.shapeTier)
         assertEquals(27.0, checkNotNull(r.landmarks).onsetMin, 1e-6)
         // ISF was not overridden, so it stays measured.
@@ -209,7 +218,7 @@ class ManualInsulinParamsV1Test {
      */
     @Test fun manualShapeWorksWithNothingMeasured() {
         val r = resolve(
-            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 145.0, isfMmolPerU = 2.5),
+            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 300.0, isfMmolPerU = 2.5),
             curve = null, isf = null,
         )
         assertEquals(InsulinParamTierV1.MANUAL, r.shapeTier)
@@ -245,12 +254,12 @@ class ManualInsulinParamsV1Test {
     }
 
     /**
-     * Each of 50 / 30 / 200 sits inside its OWN bound; together they are not a
+     * Each of 50 / 30 / 300 sits inside its OWN bound; together they are not a
      * curve. Checking the fields one at a time would let this through — the
      * order is a separate constraint and has to be asserted separately.
      */
     @Test fun landmarksInBoundsButOutOfOrderAreRefused() {
-        val r = resolve(ManualInsulinParamsV1(onsetMin = 50.0, peakMin = 30.0, tailMin = 200.0))
+        val r = resolve(ManualInsulinParamsV1(onsetMin = 50.0, peakMin = 30.0, tailMin = 300.0))
         assertTrue(
             "expected an out-of-domain refusal, got ${r.rejected}",
             InsulinParameterResolverV1.SHAPE_OUT_OF_DOMAIN in r.rejected,
@@ -265,7 +274,7 @@ class ManualInsulinParamsV1Test {
         assertEquals(InsulinParamTierV1.MANUAL, r.shapeTier)
         val lm = checkNotNull(r.landmarks)
         assertEquals(27.0, lm.onsetMin, 1e-6)
-        assertEquals("the untouched tail stays where it was measured", 130.0, lm.tailMin, 1e-6)
+        assertEquals("the untouched tail stays where it was measured", 260.0, lm.tailMin, 1e-6)
     }
 
     @Test fun anIsfOutsideThePhysiologicalDomainIsRefused() {
@@ -293,13 +302,13 @@ class ManualInsulinParamsV1Test {
 
     @Test fun divergenceIsReportedEvenThoughManualStillWins() {
         val r = resolve(
-            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 145.0, isfMmolPerU = 2.5),
+            ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 300.0, isfMmolPerU = 2.5),
             isf = 4.2,
         )
         assertEquals(InsulinParamTierV1.MANUAL, r.shapeTier)
         assertEquals(2.5, checkNotNull(r.isfMmolPerU), 1e-9)
         assertTrue(r.divergences.any { it.field == ManualInsulinParamsV1.ISF })
-        // 145 against a measured 130 is 10% — below the reporting floor, and
+        // 300 against a measured 260 is 13% — below the reporting floor, and
         // deliberately so: the tail is the landmark the user is least sure of.
         assertTrue(r.divergences.none { it.field == ManualInsulinParamsV1.TAIL })
     }

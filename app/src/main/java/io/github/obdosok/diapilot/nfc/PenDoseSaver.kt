@@ -1,9 +1,9 @@
 package io.github.obdosok.diapilot.nfc
 
-import android.util.Log
 import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.collector.InsulinEvent
 import com.diapilot.core.pen.InsulinDose
+import io.github.obdosok.diapilot.diag.DiagLog
 
 /**
  * Persists a pen scan with three dedup layers:
@@ -61,7 +61,7 @@ object PenDoseSaver {
             )
             new++
         }
-        Log.i(TAG, "saved: new=$new priming=$priming dup=$duplicates of ${valid.size} valid")
+        DiagLog.i(TAG, "saved: new=$new priming=$priming dup=$duplicates of ${valid.size} valid")
         return Result(new, priming, duplicates, scan.serial)
     }
 

@@ -43,6 +43,7 @@
     <string name="settings_screen_shape_prior">⏱ Форма — популяционный приор, это НЕ ваши данные</string>
     <string name="settings_screen_refusal_line">не дали ориентиров: %1$s — %2$d</string>
     <string name="settings_screen_curve_not_applied">кривая построена, но НЕ применена к прогнозу — см. расхождения артефакта</string>
+    <string name="settings_screen_measured_tail_below_floor">измеренный конец %1$.0f мин — короче нижней границы области %2$.0f мин: окно измерения дальше не видит</string>
     <string name="settings_screen_manual_set_title">Задать вручную</string>
     <string name="settings_screen_manual_set_hint">Минуты от укола: начало действия · активная фаза с и до · полный конец. Пустое поле — считаем сами. Заполненное имеет приоритет над измеренным, и мы сможем только сказать, что у нас вышло иначе.</string>
     <string name="settings_screen_onset_label">начало</string>

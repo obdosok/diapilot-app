@@ -31,6 +31,36 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // TWO EDITIONS OUT OF ONE TRUNK — see docs/editions.md.
+    //
+    // `oss` is the head: the research vehicle, everything on. `store` is the
+    // same code with the prospective and the sensor-direct halves closed, so
+    // what it collects and shows is the user's own data in the past tense. No
+    // feature is deleted for `store` — it is simply not reachable there, and
+    // the one place that decides is the `Edition` object, which reads the two
+    // booleans declared below.
+    //
+    // A SUFFIX, not a second applicationId: a suffixed id keeps every derived
+    // name (FileProvider authority, broadcast actions, backup file names — see
+    // AppIdentity) distinct, so both editions install side by side, each with
+    // its own database. Which edition eventually keeps the clean id is still
+    // open — `roadmap.md` lists it as a "before O-B" checkpoint.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("oss") {
+            dimension = "edition"
+            isDefault = true
+            buildConfigField("boolean", "EDITION_PROSPECTIVE", "true")
+            buildConfigField("boolean", "EDITION_SENSOR_DIRECT", "true")
+        }
+        create("store") {
+            dimension = "edition"
+            applicationIdSuffix = ".store"
+            buildConfigField("boolean", "EDITION_PROSPECTIVE", "false")
+            buildConfigField("boolean", "EDITION_SENSOR_DIRECT", "false")
+        }
+    }
+
     buildTypes {
         release {
             optimization {

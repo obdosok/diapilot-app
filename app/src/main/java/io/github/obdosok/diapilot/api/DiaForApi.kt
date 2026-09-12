@@ -1,7 +1,6 @@
 package io.github.obdosok.diapilot.api
 
 import android.content.Context
-import android.util.Log
 import com.diapilot.core.api.ApiResponse
 import com.diapilot.core.api.DiaForFacts
 import com.diapilot.core.api.EventJournal
@@ -12,6 +11,7 @@ import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.diag.DiagLog
 
 /**
  * The local read-only feed for a second app on the same phone (DiaFor).
@@ -108,7 +108,7 @@ object DiaForApi {
         val (js, journal) = try {
             open(context)
         } catch (e: Exception) {
-            Log.w(TAG, "journal unavailable: ${e.javaClass.simpleName}")
+            DiagLog.w(TAG, "journal unavailable: ${e.javaClass.simpleName}")
             return ApiResponse.unavailable("event journal is not available")
         }
         return try {
@@ -118,10 +118,10 @@ object DiaForApi {
         } catch (e: android.database.sqlite.SQLiteException) {
             // The source is there but momentarily unreadable (locked, disk
             // pressure) — a retry is the right advice, not a hard failure.
-            Log.w(TAG, "source unavailable: ${e.javaClass.simpleName}")
+            DiagLog.w(TAG, "source unavailable: ${e.javaClass.simpleName}")
             ApiResponse.unavailable("data source temporarily unavailable")
         } catch (e: Exception) {
-            Log.w(TAG, "request failed: ${e.javaClass.simpleName}")
+            DiagLog.w(TAG, "request failed: ${e.javaClass.simpleName}")
             ApiResponse.serverError("internal error")
         }
     }
@@ -227,13 +227,13 @@ object DiaForApi {
                 // never a value. `adb logcat -s DiaForApi` answers «how deep
                 // does the history go» without opening the database.
                 val s = js.stats()
-                Log.i(
+                DiagLog.i(
                     TAG,
                     "backfill complete: ${s.entries} entries / ${s.facts} facts, " +
                         "seq<=${s.maxSeq}, oldest=${s.oldestOccurredMs} newest=${s.newestOccurredMs}",
                 )
             } catch (e: Exception) {
-                Log.w(TAG, "backfill stopped: ${e.javaClass.simpleName}")
+                DiagLog.w(TAG, "backfill stopped: ${e.javaClass.simpleName}")
             } finally {
                 backfillRunning = false
             }

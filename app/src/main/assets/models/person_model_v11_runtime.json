@@ -19,8 +19,8 @@
     "isf_high": 2.35,
     "onset_min": 20,
     "peak_min": 75,
-    "short_duration_min": 140,
-    "tail_duration_min": 175,
+    "short_duration_min": 200,
+    "tail_duration_min": 300,
     "tail_weight": 0.7,
     "tail_weight_per_unit": 0.15,
     "tail_reference_units": 3.0

@@ -67,7 +67,7 @@ class PhysioAutoFitV1Test {
         onsetMin = 25.0,
         fullSpeedMin = pk,
         phaseMin = 30.0,
-        tailMin = 165.0,
+        tailMin = 300.0,
         emptyingKcalPerHour = 200.0,
         carbSieving = 0.80,
         carbSpread = 1.0,

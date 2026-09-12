@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="data_sources_title">Источники данных</string>
+    <string name="data_sources_intro">Всё, что нужно приложению, чтобы получать данные. Любая не зелёная строка — причина, по которой данные могут перестать приходить.</string>
+    <string name="data_sources_back">Назад</string>
+    <string name="data_sources_recheck">Проверить снова</string>
+
+    <string name="data_sources_settings_button">Источники данных</string>
+    <string name="data_sources_settings_hint">xDrip, его веб-сервис, сборщик, разрешения — что приходит, а что нет.</string>
+    <string name="data_sources_settings_open">Открыть</string>
+
+    <string name="data_sources_banner_stalled">Новой глюкозы нет %1$d мин.</string>
+    <string name="data_sources_banner_never">Данных о глюкозе пока нет.</string>
+    <string name="data_sources_banner_action">Проверить источники данных</string>
+
+    <string name="data_sources_row_xdrip_app_title">xDrip+ установлен</string>
+    <string name="data_sources_row_xdrip_broadcast_title">Broadcast с глюкозой</string>
+    <string name="data_sources_row_xdrip_web_title">Веб-сервис xDrip</string>
+    <string name="data_sources_row_nightscout_title">Nightscout</string>
+    <string name="data_sources_row_oop2_title">Поминутный поток OOPAlgorithm2</string>
+    <string name="data_sources_row_own_ble_title">Свой канал к сенсору (BLE)</string>
+    <string name="data_sources_row_battery_title">Оптимизация батареи</string>
+    <string name="data_sources_row_notifications_title">Уведомления</string>
+    <string name="data_sources_row_exact_alarms_title">Точные будильники</string>
+    <string name="data_sources_row_collector_service_title">Служба сборщика</string>
+    <string name="data_sources_row_health_connect_title">Health Connect</string>
+    <string name="data_sources_row_overlay_title">Плашка на экране блокировки</string>
+    <string name="data_sources_row_nfc_title">NFC</string>
+
+    <string name="data_sources_row_xdrip_app_why">Сенсором владеет xDrip+. Без него приложение не получает глюкозу вообще.</string>
+    <string name="data_sources_row_xdrip_broadcast_why">Основной канал глюкозы. Когда он останавливается, вместе с ним останавливаются график, статус и оповещения.</string>
+    <string name="data_sources_row_xdrip_web_why">Через этот сервис приходят дозы и пропущенные измерения. Без него нет инсулина, а пробелы на графике остаются пустыми.</string>
+    <string name="data_sources_row_nightscout_why">Второй источник глюкозы. Без него перерыв в xDrip оставляет приложение без данных.</string>
+    <string name="data_sources_row_oop2_why">Поминутный поток глюкозы. Без него не срабатывает ни одна тревога — гипо-тревога и детектор быстрого падения работают на этом такте; виджет обновляется только раз в 30 минут.</string>
+    <string name="data_sources_row_own_ble_why">Собственный канал приложения к сенсору. Пока он выключен, глюкоза идёт только из xDrip.</string>
+    <string name="data_sources_row_battery_why">При оптимизации батареи Android усыпляет приложение, а вместе с ним и сбор данных — обычно на ночь.</string>
+    <string name="data_sources_row_notifications_why">Если уведомления запрещены, предупреждение о низкой глюкозе до вас не дойдёт.</string>
+    <string name="data_sources_row_exact_alarms_why">Без точных будильников система откладывает ночные проверки, и предупреждение может прийти поздно.</string>
+    <string name="data_sources_row_collector_service_why">Служба, которая слушает измерения. Если она остановлена, при закрытом приложении ничего не собирается.</string>
+    <string name="data_sources_row_health_connect_why">Отсюда приходят пульс, сон и шаги. Без них модель не видит активность.</string>
+    <string name="data_sources_row_overlay_why">Показывает глюкозу поверх экрана блокировки. Если выключено, чтобы посмотреть, нужно открыть приложение.</string>
+    <string name="data_sources_row_nfc_why">По NFC читается журнал доз инсулиновой ручки.</string>
+    <string name="data_sources_row_nfc_why_sensor_direct">По NFC читается журнал доз инсулиновой ручки и сканируется сенсор.</string>
+
+    <string name="data_sources_status_fresh">%1$d мин назад</string>
+    <string name="data_sources_status_late">с опозданием — %1$d мин назад</string>
+    <string name="data_sources_status_stalled">остановлено — ничего %1$d мин</string>
+    <string name="data_sources_status_never">пока ничего</string>
+    <string name="data_sources_status_installed">установлен</string>
+    <string name="data_sources_status_missing">не установлен</string>
+    <string name="data_sources_status_reachable">ответил %1$d мин назад</string>
+    <string name="data_sources_status_unreachable">нет ответа</string>
+    <string name="data_sources_status_not_checked">пока не проверялось</string>
+    <string name="data_sources_status_configured">настроен</string>
+    <string name="data_sources_status_not_configured">не настроен</string>
+    <string name="data_sources_status_allowed">разрешено</string>
+    <string name="data_sources_status_restricted">ограничено</string>
+    <string name="data_sources_status_granted">разрешено</string>
+    <string name="data_sources_status_denied">не разрешено</string>
+    <string name="data_sources_status_steps_missing">разрешено, шагов нет</string>
+    <string name="data_sources_status_running">работает</string>
+    <string name="data_sources_status_not_running">не работает</string>
+    <string name="data_sources_status_on">включено</string>
+    <string name="data_sources_status_off">выключено</string>
+    <string name="data_sources_status_permission_missing">включено, нет разрешения</string>
+    <string name="data_sources_status_radio_off">выключен</string>
+    <string name="data_sources_status_no_hardware">в этом телефоне нет NFC</string>
+    <string name="data_sources_status_unavailable">нет на этом телефоне</string>
+
+    <string name="data_sources_fix_open_xdrip">Открыть xDrip+</string>
+    <string name="data_sources_fix_battery">Настройки батареи</string>
+    <string name="data_sources_fix_notifications">Настройки уведомлений</string>
+    <string name="data_sources_fix_exact_alarms">Настройки будильников</string>
+    <string name="data_sources_fix_start_collector">Запустить сборщик</string>
+    <string name="data_sources_fix_health_connect">Настройки Health Connect</string>
+    <string name="data_sources_fix_overlay">Дать разрешение</string>
+    <string name="data_sources_fix_nfc">Настройки NFC</string>
+    <string name="data_sources_fix_no_screen">В этом телефоне нет экрана для этой настройки.</string>
+
+    <string name="data_sources_advice_install_xdrip">Установите xDrip+ (его нет в Google Play) и включите Settings → Inter-app settings → Broadcast locally.</string>
+    <string name="data_sources_advice_needs_xdrip">Сначала установите xDrip+ — остальная цепочка читает из него.</string>
+    <string name="data_sources_advice_nightscout">В этой сборке источника Nightscout ещё нет; он запланирован на следующий выпуск.</string>
+    <string name="data_sources_advice_oop2">Установите OOPAlgorithm2 и дайте xDrip+ передавать ему пакет сенсора.</string>
+    <string name="data_sources_advice_own_ble">Поднесите телефон к сенсору, чтобы считать его по NFC, и проверьте, что Bluetooth включён.</string>
+    <string name="data_sources_advice_health_connect">Health Connect нет на этом телефоне. Установите его, чтобы читать пульс, сон и шаги.</string>
+</resources>

@@ -6,7 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.util.Base64
-import android.util.Log
+import io.github.obdosok.diapilot.diag.DiagLog
 import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -88,7 +88,7 @@ object LibreOop2Bridge {
                     )
                     latch.countDown()
                 } catch (e: Exception) {
-                    Log.w(TAG, "bad ENABLE result: ${e.message}")
+                    DiagLog.w(TAG, "bad ENABLE result: ${e.message}")
                 }
             }
         }
@@ -113,7 +113,7 @@ object LibreOop2Bridge {
             context.sendBroadcast(intent)
             latch.await(timeoutS, TimeUnit.SECONDS)
         } catch (e: Exception) {
-            Log.w(TAG, "enableStreaming roundtrip failed: ${e.message}")
+            DiagLog.w(TAG, "enableStreaming roundtrip failed: ${e.message}")
         } finally {
             runCatching { context.unregisterReceiver(receiver) }
         }
@@ -152,7 +152,7 @@ object LibreOop2Bridge {
                     )
                     latch.countDown()
                 } catch (e: Exception) {
-                    Log.w(TAG, "bad FARM result: ${e.message}")
+                    DiagLog.w(TAG, "bad FARM result: ${e.message}")
                 }
             }
         }
@@ -179,7 +179,7 @@ object LibreOop2Bridge {
             context.sendBroadcast(intent)
             latch.await(timeoutS, TimeUnit.SECONDS)
         } catch (e: Exception) {
-            Log.w(TAG, "decode roundtrip failed: ${e.message}")
+            DiagLog.w(TAG, "decode roundtrip failed: ${e.message}")
         } finally {
             runCatching { context.unregisterReceiver(receiver) }
         }

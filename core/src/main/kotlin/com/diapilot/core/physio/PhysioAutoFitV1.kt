@@ -320,7 +320,13 @@ object PhysioAutoFitV1 {
         "onset" to (0.0 to 45.0),
         "fullSpeed" to (20.0 to 140.0),
         "phase" to (0.0 to 90.0),
-        "tail" to (90.0 to 420.0),
+        // Inside the artifact's own domain floor (`insulinTailMinRange`), not
+        // below it: a corridor that started at 90 let the fit propose an end of
+        // action the model then had to clamp, so the proposal and the installed
+        // value disagreed with nobody told. The ceiling drops to 480 for the
+        // same reason the floor rose — above eight hours the measurement window
+        // has no say at all, and the fit would be reading the loss, not insulin.
+        "tail" to (240.0 to 480.0),
         // This axis was added together with the field: without a range `fitOne`
         // trips on NoSuchElement, because it iterates AXES and requires
         // bounds for each. The lower bound is not zero — a curve with no tail at

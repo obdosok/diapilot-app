@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import com.diapilot.core.collector.ACTION_BG
 import com.diapilot.core.collector.Reading
 import io.github.obdosok.diapilot.AppIdentity
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.CalibratedGlucose
@@ -28,6 +29,8 @@ import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
 import io.github.obdosok.diapilot.data.Units
+import io.github.obdosok.diapilot.diag.DiagLog
+import io.github.obdosok.diapilot.diag.Redact
 import io.github.obdosok.diapilot.i18n.localized
 import io.github.obdosok.diapilot.widget.BgWidget
 import java.text.SimpleDateFormat
@@ -76,7 +79,7 @@ class CollectorService : Service() {
                 this, it, IntentFilter(ACTION_BG), ContextCompat.RECEIVER_EXPORTED,
             )
         }
-        Log.i(TAG, "Collector service started; listening for $ACTION_BG")
+        DiagLog.i(TAG, "Collector service started; listening for $ACTION_BG")
         DiagState.serviceStartedMs = System.currentTimeMillis()
 
         // Lock-screen BG chip: show while the screen is on AND locked, hide
@@ -142,11 +145,40 @@ class CollectorService : Service() {
                             else -> v
                         }
                     }
-                    val readings = com.diapilot.core.collector.parseOop2Trend(fields)
-                    if (readings.isNotEmpty()) {
+                    // SENSOR-DIRECT: the decoded minute stream is OOP2's answer
+                    // about the sensor, and consuming it is what
+                    // [Edition.sensorDirect] names. The store edition parses
+                    // nothing out of the payload and writes no minute reading.
+                    //
+                    // WHAT IT STILL USES THE BROADCAST FOR, and this is a
+                    // finding rather than a design: the tail of this block —
+                    // the hypo alert, the widget, the companion push, the watch
+                    // long-poll release — is the app's ONLY collection
+                    // heartbeat. Nothing else drives it: the xDrip receiver
+                    // stores a reading and returns, and the periodic worker
+                    // polls but never alerts. Gating the receiver off would
+                    // therefore have taken the threshold hypo alarm and the
+                    // widget with it, in the edition whose whole job is
+                    // collection. Separating the heartbeat from this source is
+                    // its own work package; until then both editions register
+                    // the receiver and only the ingestion is gated.
+                    val readings = if (Edition.sensorDirect) {
+                        com.diapilot.core.collector.parseOop2Trend(fields)
+                    } else emptyList()
+                    if (readings.isNotEmpty() || !Edition.sensorDirect) {
                         val store = Stores.get(this@CollectorService)
                         readings.forEach(store::upsertMinuteReading)
-                        Log.d(OOP2_TAG, "minute stream: ${readings.size} pts, newest %.1f mmol".format(readings.first().mmol))
+                        if (readings.isNotEmpty()) {
+                            // Count, not values (docs/audit.md, S10): how many
+                            // points the stream delivered is the diagnosis; the
+                            // newest one was only ever a sanity check by eye.
+                            //
+                            // ON `Log`, NOT `DiagLog`: one line per decoded
+                            // minute is ~1440 a day, nearly twice the ring's
+                            // whole cap, so the diagnostics export would carry
+                            // this line and nothing else.
+                            Log.d(OOP2_TAG, "minute stream: ${readings.size} pts")
+                        }
 
                         // Own-BLE mode: DiaPilot is the primary source now —
                         // promote the newest minute value onto the 5-minute
@@ -166,7 +198,7 @@ class CollectorService : Service() {
                                         mmol, trend = null, source = "libre_ble",
                                     ),
                                 )
-                                Log.i(OOP2_TAG, "own-BLE main reading: %.1f mmol".format(mmol))
+                                DiagLog.i(OOP2_TAG, "own-BLE main reading promoted: ${Redact.glucose(mgdl = false)}")
                             }
                             // The status notification used to follow xDrip's
                             // broadcast — in own-BLE mode our stream drives it.
@@ -202,7 +234,13 @@ class CollectorService : Service() {
                             calibratedMmol = calibrated,
                             nowMs = now,
                         )?.let { fall ->
-                            Log.i(OOP2_TAG, "rapid fall: %.2f/min projected %.1f".format(fall.slopePerMin, fall.projected20Mmol))
+                            // The decision and its shape. The slope and the
+                            // projection are both glucose on the user's scale.
+                            DiagLog.i(
+                                OOP2_TAG,
+                                "rapid fall detected: slope ${Redact.perUnit("mmol/min")}, " +
+                                    "projected ${Redact.glucose(mgdl = false)}",
+                            )
                             RapidFallNotifier.maybeNotify(this@CollectorService, fall)
                         }
 
@@ -228,7 +266,7 @@ class CollectorService : Service() {
                         // executor and is throttled there.
                     }
                 } catch (e: Exception) {
-                    Log.w(OOP2_TAG, "Unparsed OOP2 payload: ${e.message}")
+                    DiagLog.w(OOP2_TAG, "Unparsed OOP2 payload: ${e.message}")
                 }
             }
         }.also {
@@ -241,7 +279,9 @@ class CollectorService : Service() {
             registerReceiver(it, filter, null, requireNotNull(oop2Handler), Context.RECEIVER_EXPORTED)
         }
 
-        // Experimental own BLE link to the sensor (opt-in in Settings).
+        // Experimental own BLE link to the sensor (opt-in in Settings, and
+        // sensor-direct — `Settings.ownBleEnabled` is false for the whole store
+        // edition, which also has no BLUETOOTH_CONNECT to connect with).
         if (Settings.ownBleEnabled(this)) {
             libreBle = LibreBleClient(this).also { it.start() }
             startBleWakeup()
@@ -295,6 +335,11 @@ class CollectorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
+        // Stamped BEFORE the teardown, so a screen that reads it while this
+        // runs already sees the service as gone. The service shares the UI's
+        // process, so without this stamp `serviceStartedMs` alone would keep
+        // reporting a collector that has stopped listening.
+        DiagState.serviceStoppedMs = System.currentTimeMillis()
         receiver?.let(::unregisterReceiver)
         receiver = null
         oop2Receiver?.let(::unregisterReceiver)
@@ -411,7 +456,7 @@ class CollectorService : Service() {
                     context, Intent(context, CollectorService::class.java),
                 )
             } catch (e: Exception) {
-                Log.w(TAG, "Could not start collector service: ${e.message}")
+                DiagLog.w(TAG, "Could not start collector service: ${e.message}")
             }
         }
     }

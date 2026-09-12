@@ -30,6 +30,15 @@ object PhysioRuntime {
          */
         val tuningIdentity: String,
         /**
+         * BODY WEIGHT AND THE HAND-SET CARB SENSITIVITY, and they were missing:
+         * carb sensitivity is now derived from the weight the user entered
+         * (audit M4), so the artifact underneath this cache changes when that
+         * field changes. Without it, typing a weight would leave the previous
+         * food amplitude serving for the rest of the process and the field
+         * would look inert.
+         */
+        val carbSensIdentity: String,
+        /**
          * The causal WATERMARK, not the raw cutoff: the newest known-at that is
          * at or before `asOfMs` across the ledgers this artifact reads. Exact
          * rather than bucketed, because a bucket lets a later revision answer an
@@ -59,19 +68,48 @@ object PhysioRuntime {
      * spread, and pretending otherwise would smuggle a second change in beside
      * the first. With no weight recorded the whole thing reproduces the old
      * constants to the digit.
+     *
+     * @param overrideMmolPerG a value the user stored by hand, which outranks
+     *   both — a prior loses to a measurement, and it loses silently nowhere.
+     *   Null means nobody ever chose one; see
+     *   [Settings.storedCarbSensOverrideMmolPerG] for why the applied override
+     *   cannot answer that question itself.
      */
-    internal fun foodDynamicsGlobalPriorV1(weightKg: Double? = null): PosteriorV1 {
-        // NO ROUND TRIP WHEN THERE IS NO WEIGHT. The first version reproduced
-        // the old constant by converting it to an implied weight and back, and
-        // floating point returned a value one ulp away from it — two integration tests
-        // that pin the bundled artifact's exact contract caught it. «Unchanged»
-        // has to mean bit-for-bit here, because those tests exist to notice a
-        // silent drift in what ships.
-        val median = if (weightKg == null) STAGE8_GLOBAL_CS_PRIOR
-        else com.diapilot.core.analysis.CarbSensitivityPriorV1.fromWeight(weightKg)
+    internal fun foodDynamicsGlobalPriorV1(
+        weightKg: Double? = null,
+        overrideMmolPerG: Double? = null,
+    ): PosteriorV1 {
+        // THE PRIORITY CHAIN, in one place: a number the user set by hand, then
+        // the prior their weight implies, then the shipped constant. Stated here
+        // rather than at the call site so "which door won" has one answer and one
+        // test, the way the ISF axis has exactly two doors.
+        val median = when {
+            overrideMmolPerG != null -> overrideMmolPerG
+            // NO ROUND TRIP WHEN THERE IS NO WEIGHT. The first version reproduced
+            // the old constant by converting it to an implied weight and back, and
+            // floating point returned a value one ulp away from it — two integration tests
+            // that pin the bundled artifact's exact contract caught it. «Unchanged»
+            // has to mean bit-for-bit here, because those tests exist to notice a
+            // silent drift in what ships.
+            weightKg == null -> STAGE8_GLOBAL_CS_PRIOR
+            else -> com.diapilot.core.analysis.CarbSensitivityPriorV1.fromWeight(weightKg)
+        }
         val scale = median / STAGE8_GLOBAL_CS_PRIOR
         return PosteriorV1(median, STAGE8_GLOBAL_CS_LOW * scale, STAGE8_GLOBAL_CS_HIGH * scale, 0, 0, null)
     }
+
+    /**
+     * The carb-sensitivity INPUTS as one string, so a cache key and an artifact
+     * id can carry the same thing. Read from the app's own settings rather than
+     * passed in, because [artifact] and [buildArtifact] ask the question
+     * independently — a cache that misses is slow, an id that collides averages
+     * two models.
+     */
+    private fun carbSensIdentity(context: android.content.Context?): String =
+        context?.let {
+            "${Settings.weightKg(it) ?: "-"}|${Settings.storedCarbSensOverrideMmolPerG(it) ?: "-"}"
+        } ?: ""
+
     private fun artifactId(stateIdentity: String): String {
         val base = HybridShadowRegistry.modelSha256()?.take(16) ?: "unhashed"
         val stateHash = MessageDigest.getInstance("SHA-256")
@@ -104,6 +142,7 @@ object PhysioRuntime {
             (store as? SqliteCollectorStore)?.appContext?.let {
                 PhysioTuning.identity(PhysioTuning.read(it))
             } ?: ""
+        val carbSensIdentity = carbSensIdentity((store as? SqliteCollectorStore)?.appContext)
         val key =
             sqlite?.let { db ->
                 val maintenance = "" // maintenance was removed; nothing left in the cache key to change
@@ -157,6 +196,7 @@ object PhysioRuntime {
                     promotion,
                     manualIdentity,
                     tuningIdentity,
+                    carbSensIdentity,
                     watermark
                 )
             }
@@ -170,6 +210,7 @@ object PhysioRuntime {
                     "",
                     manualIdentity,
                     tuningIdentity,
+                    carbSensIdentity,
                     asOfMs
                 )
         artifactCache
@@ -187,6 +228,7 @@ object PhysioRuntime {
                         "promotion".takeIf { old.promotionIdentity != key.promotionIdentity },
                         "manual".takeIf { old.manualIdentity != key.manualIdentity },
                         "tuning".takeIf { old.tuningIdentity != key.tuningIdentity },
+                        "carb sensitivity".takeIf { old.carbSensIdentity != key.carbSensIdentity },
                         "watermark".takeIf { old.causalWatermark != key.causalWatermark },
                         "model".takeIf { old.modelSha != key.modelSha },
                     )
@@ -491,12 +533,26 @@ object PhysioRuntime {
             val baseCsRaw = base.food.globalFactor
             val baseCsBounded =
                 baseCsRaw.coerceIn(bounds.globalCsMmolPerLGMin, bounds.globalCsMmolPerLGMax)
-            val stage8Prior =
-                STAGE8_GLOBAL_CS_PRIOR.coerceIn(
+            // WEIGHT REACHES CARB SENSITIVITY (audit M4). This used to be
+            // `STAGE8_GLOBAL_CS_PRIOR` coerced into bounds — one population
+            // number for every body — while `CarbSensitivityPriorV1.fromWeight`
+            // and the weight field both existed and neither reached the model.
+            // The prior's own scaled band comes with it, then both ends are held
+            // inside the artifact's bounds: `PhysioArtifactV1` requires the
+            // posterior to sit inside them, and a hand-set override may be any
+            // value the user once stored.
+            val csPrior =
+                foodDynamicsGlobalPriorV1(
+                    weightKg = manualContext?.let { Settings.weightKg(it) },
+                    overrideMmolPerG = manualContext?.let {
+                        Settings.storedCarbSensOverrideMmolPerG(it)
+                    },
+                )
+            val baseCs =
+                csPrior.median.coerceIn(
                     bounds.globalCsMmolPerLGMin,
                     bounds.globalCsMmolPerLGMax
                 )
-            val baseCs = stage8Prior
             val conflicts = buildList {
                 add("v11 global CS $baseCsRaw is not used as an independent PHYSIO anchor")
                 if (baseCsRaw != baseCsBounded)
@@ -656,8 +712,8 @@ object PhysioRuntime {
                 mechanics,
                 PosteriorV1(
                     baseCs,
-                    minOf(baseCs, STAGE8_GLOBAL_CS_LOW),
-                    maxOf(baseCs, STAGE8_GLOBAL_CS_HIGH),
+                    minOf(baseCs, csPrior.p10).coerceAtLeast(bounds.globalCsMmolPerLGMin),
+                    maxOf(baseCs, csPrior.p90).coerceAtMost(bounds.globalCsMmolPerLGMax),
                     0,
                     0,
                     null

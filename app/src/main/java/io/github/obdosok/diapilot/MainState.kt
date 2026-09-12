@@ -711,7 +711,21 @@ internal suspend fun loadState(
         )
     } ?: emptyList()
     // ONE engine for every consumer — diverge here and validation lies.
-    val forecastResult = if (last != null && now - last.tsMs <= 36L * 3_600_000 && model != null) {
+    //
+    // THE FORWARD LINE IS AN EDITION FEATURE, and this is where the store
+    // edition loses it. `forecastResult` null makes `prediction` empty, and an
+    // empty prediction is already the app's "nothing to draw" state: the chart
+    // draws no line and no band, the What-if panel is not composed, and
+    // `statusSummary` receives null horizons and writes no sentence about
+    // later. Nothing downstream substitutes a zero for the missing line —
+    // every consumer of `prediction` tests it for emptiness.
+    //
+    // The RETROSPECTIVE uses of the same engine are untouched: the stored
+    // forecast a long-press replays, the day decomposition and the measured
+    // insulin curve all still build and read `model` above.
+    val forecastResult = if (Edition.prospective &&
+        last != null && now - last.tsMs <= 36L * 3_600_000 && model != null
+    ) {
         timed("  Forecaster.forecast") { Forecaster.forecast(
             store, model, now,
             anchorTsMs = last.tsMs, anchorMmol = last.mmol,

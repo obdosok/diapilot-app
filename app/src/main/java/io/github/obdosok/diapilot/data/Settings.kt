@@ -3,6 +3,7 @@ package io.github.obdosok.diapilot.data
 import com.diapilot.core.analysis.InsulinProductDefault
 import android.content.Context
 import com.diapilot.core.analysis.CARB_SENS_OVERRIDE_DEFAULT
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 
 /**
@@ -113,9 +114,19 @@ object Settings {
      * with a broadcast that every app listening for it receives, including
      * another installed copy of DiaPilot. Pen scans are not gated: they only
      * read the pen and write to this app's own database.
+     *
+     * AND THE EDITION GATES IT BEFORE THE PREFERENCE DOES. Talking to the
+     * sensor ourselves is [Edition.sensorDirect]; the store edition has no
+     * switch for it on the Settings screen and no reader mode that would
+     * deliver an ISO-15693 tag, so reporting the capability off here — whatever
+     * a preference restored from an oss backup happens to say — is what keeps
+     * the two answers from disagreeing. The SETTER is deliberately untouched:
+     * the preference is the user's, and an export carried back to the oss
+     * edition must still remember it.
      */
     fun libreNfcEnabled(context: Context): Boolean =
-        prefs(context).getBoolean("libre_nfc_enabled", DEFAULT_LIBRE_NFC)
+        Edition.sensorDirect &&
+            prefs(context).getBoolean("libre_nfc_enabled", DEFAULT_LIBRE_NFC)
 
     fun setLibreNfcEnabled(context: Context, v: Boolean) =
         prefs(context).edit().putBoolean("libre_nfc_enabled", v).apply()
@@ -245,6 +256,26 @@ object Settings {
     fun carbSensOverrideMmolPerG(context: Context): Double? =
         prefs(context).getFloat(KEY_CARB_SENS_OVERRIDE, CARB_SENS_OVERRIDE_DEFAULT.toFloat())
             .toDouble().takeIf { it in 0.02..1.0 }
+
+    /**
+     * The same override, but ONLY when an install actually stored one.
+     *
+     * [carbSensOverrideMmolPerG] answers "what does the forecast apply", and it
+     * can never answer null, because its default IS the shipped constant. That
+     * makes it useless as the first tier of a priority chain: manual over
+     * weight-derived over the shipped default (audit M4) would collapse to
+     * "manual always", and the weight the user entered would never reach the
+     * model at all. `contains` is the only thing that can tell a value somebody
+     * chose from the constant every install reads.
+     *
+     * NOTHING IN THIS TREE WRITES THE KEY. So today this returns null on every
+     * install except one that stored a value under an older build — which is
+     * precisely the case that must keep winning: a number that a user's own
+     * measurement put there outranks a prior derived from their weight.
+     */
+    fun storedCarbSensOverrideMmolPerG(context: Context): Double? =
+        if (!prefs(context).contains(KEY_CARB_SENS_OVERRIDE)) null
+        else carbSensOverrideMmolPerG(context)
 
 
     fun carbSensPer10gMmol(context: Context): Double? =
@@ -537,9 +568,19 @@ object Settings {
         else -> false
     }
 
-    /** Experimental: DiaPilot holds the sensor's BLE link itself. */
+    /**
+     * Experimental: DiaPilot holds the sensor's BLE link itself.
+     *
+     * Sensor-direct, and gated the same way as [libreNfcEnabled] — and here the
+     * gate carries more weight than a hidden switch, because this flag also
+     * puts the whole collector into own-BLE MODE: it makes the app ignore
+     * xDrip's readings, promote its own minute stream onto the main grid and
+     * arm a stall watchdog. An edition with no BLE client must never enter that
+     * mode, so the answer is false there regardless of the stored preference.
+     */
     fun ownBleEnabled(context: Context): Boolean =
-        prefs(context).getBoolean("libre_own_ble", DEFAULT_OWN_BLE)
+        Edition.sensorDirect &&
+            prefs(context).getBoolean("libre_own_ble", DEFAULT_OWN_BLE)
 
     fun setOwnBleEnabled(context: Context, v: Boolean) =
         prefs(context).edit().putBoolean("libre_own_ble", v).apply()

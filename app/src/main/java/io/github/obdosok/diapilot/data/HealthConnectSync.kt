@@ -11,6 +11,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.collector.HrPoint
 import com.diapilot.core.collector.SleepSession
+import io.github.obdosok.diapilot.diag.DiagLog
 import java.time.Instant
 
 /**
@@ -68,7 +69,7 @@ object HealthConnectSync {
             client.permissionController.getGrantedPermissions()
                 .containsAll(REQUIRED_PERMISSIONS)
         } catch (e: Exception) {
-            Log.w(TAG, "Permission check failed: ${e.message}")
+            DiagLog.w(TAG, "Permission check failed: ${e.message}")
             false
         }
     }
@@ -171,7 +172,7 @@ object HealthConnectSync {
                 // row with a refusal source makes the hole COUNTABLE after
                 // the fact — the same argument as for the refusal row in the
                 // forecast ledger.
-                Log.w(TAG, "STEPS NOT SYNCING: Health Connect permission revoked")
+                DiagLog.w(TAG, "STEPS NOT SYNCING: Health Connect permission revoked")
                 (store as? SqliteCollectorStore)?.recordActivityCoverage(
                     to.toEpochMilli(), to.toEpochMilli(), to.toEpochMilli(),
                     source = "health_connect_steps_denied",
@@ -214,7 +215,7 @@ object HealthConnectSync {
             Log.d(TAG, "Synced $nHr HR samples, $nSleep sleep sessions, $nSteps step buckets")
             return true
         } catch (e: Exception) {
-            Log.w(TAG, "Health Connect sync failed: ${e.message}")
+            DiagLog.w(TAG, "Health Connect sync failed: ${e.message}")
             return false
         }
     }

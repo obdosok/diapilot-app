@@ -214,6 +214,31 @@ object InsulinProfileRuntime {
     }
 
     /**
+     * The measured end of action, when it came out BELOW the domain floor.
+     *
+     * Null means the measurement cleared the floor and there is nothing to mark.
+     *
+     * WHY THIS IS NOT A DEFECT IN THE USER'S BODY. The instrument cannot see
+     * past four hours: [CAP_MS] closes a dose's window at 240 minutes and the
+     * next injection closes it earlier, `TAIL_HORIZON_MIN` needs 200 clean
+     * minutes inside that, and "end" is the rate returning to the pre-dose
+     * slope, which a rising background meets early. So a measured end of, say,
+     * 180 is where the window ran out, not where the insulin did — and the
+     * screen has to say so, because the number it sits next to looks exactly
+     * like a measurement (audit M1).
+     *
+     * Read from the profile's own `tailEnd`, i.e. BEFORE `coerceIntoDomain`
+     * lifts it to the floor. The coerced value is what the model runs; this is
+     * what the doses actually showed, and the mark is about the difference.
+     */
+    fun measuredTailBelowFloorMin(state: State): Double? =
+        state.profile?.tailEnd?.minute?.takeIf { it < TAIL_DOMAIN_FLOOR_MIN }
+
+    /** The floor the mark above compares against — the artifact's own domain. */
+    val TAIL_DOMAIN_FLOOR_MIN: Double =
+        com.diapilot.core.physio.PhysioBoundsV1().insulinTailMinRange.start
+
+    /**
      * One line for the screen: what is in use, or precisely what is missing.
      * [context] renders the landmark messages in the UI language; without one
      * (the log line) they come out as their data form.

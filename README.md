@@ -98,10 +98,11 @@ its numbers by hand. Do not install this expecting a finished product.
 
 The things a reader should know up front, all of them from the audit:
 insulin sensitivity is hand-entered rather than learned (M8, and the section
-below); the measured insulin tail is short because the instrument's window is
-(M1); there is no first-run calibration screen (M2); the offline food-note
-parser reads Russian under an English UI (P1); and the release build is still
-signed with the debug keystore (S8).
+below); the measured insulin tail is short, because the instrument that
+measures it only looks four hours ahead — the domain now refuses anything under
+240 minutes and the settings card flags a measurement that lands short, but the
+measurement itself is unchanged (M1); there is no first-run calibration screen
+(M2); and the release build is still signed with the debug keystore (S8).
 
 ## Install
 
@@ -228,15 +229,21 @@ issue — see [SECURITY.md](SECURITY.md) for how, and what is in scope.
 
 ```bash
 export JAVA_HOME=<a JDK 21, e.g. the JetBrains Runtime bundled with Android Studio>
-./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug
-# APK: app/build/outputs/apk/debug/app-debug.apk
+./gradlew :core:test :app:testOssDebugUnitTest :app:assembleOssDebug
+# APK: app/build/outputs/apk/oss/debug/app-oss-debug.apk
 ```
+
+`:app` is built in two editions — `oss` (this one: the research vehicle,
+every feature on) and `store` (the same code with the forecast and the
+sensor-direct paths closed). Swap `Oss` for `Store` above to build the other,
+or use `:app:assembleDebug` / `:app:test` to do both. What the two carry, and
+why, is [docs/editions.md](docs/editions.md).
 
 The Android SDK must be installed (Android Studio writes its path to
 `local.properties`, or set `ANDROID_HOME`). Gradle 9.4 wrapper, AGP 9.2,
 Kotlin 2.2, minSdk 26, targetSdk 36; `:core` targets Java 11, and the foojay
 toolchain resolver can download that JDK. Instrumented tests in
-`app/src/androidTest` need a device: `./gradlew :app:connectedDebugAndroidTest`.
+`app/src/androidTest` need a device: `./gradlew :app:connectedOssDebugAndroidTest`.
 
 ### Setting up the phone
 
@@ -294,12 +301,12 @@ proposes a dose.
   System, English and Russian in Settings → Language; notifications and the
   widget follow the choice, and Claude answers (chat, dish and component names)
   come back in that language.
-- **The offline food-note parser reads Russian**: food words, number words,
-  the Russian abbreviations for grams, pieces and millilitres, and activity
-  durations in Russian minutes. Its English is limited to a few words ("beer",
-  "honey", "portion" in the half/double portion mark). English dish names are
-  understood when Claude estimates the meal with your API key. Note tags and
-  injection purposes are stored as Russian tokens and shown in the UI language.
+- **The offline food-note parser reads English and Russian**: food words,
+  number words, and the abbreviations for grams, pieces and millilitres, in
+  either language — a note never needs Claude to turn "2 slices of bread"
+  into grams. Activity durations are still read in Russian minutes only. Note
+  tags and injection purposes are stored as Russian tokens and shown in the UI
+  language.
 - **It is built around one user.** The defaults in `PersonalParams` were tuned
   on one person. A per-installation start date for regular meal logging
   (`FoodEra`, stored by `FoodEraSettings`) gates learning: it defaults to the

@@ -1,7 +1,6 @@
 package io.github.obdosok.diapilot.collect
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -20,6 +19,8 @@ import io.github.obdosok.diapilot.data.LedgerRetention
 import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.SqliteCollectorStore
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.diag.DiagLog
+import io.github.obdosok.diapilot.diag.Redact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -78,7 +79,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                 fetch("$BASE_URL/sgv.json?count=$sgvCount")?.let { json ->
                     val readings = parseSgvEntries(jsonToMaps(json))
                     readings.forEach(store::upsertReading)
-                    Log.d(TAG, "sgv.json: ${readings.size} readings backfilled (deep=$deep)")
+                    DiagLog.d(TAG, "sgv.json: ${readings.size} readings backfilled (deep=$deep)")
                     if (deep) prefsAll.edit().putBoolean(PREF_DEEP_DONE, true).apply()
                     anySuccess = true
                 }
@@ -86,7 +87,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                 anySuccess = true
             }
         } catch (e: Exception) {
-            Log.w(TAG, "sgv.json poll failed: ${e.message}")
+            DiagLog.w(TAG, "sgv.json poll failed: ${e.message}")
         }
 
         // 2. Pebble: the live display value (exactly what the xDrip screen shows) + IOB.
@@ -103,12 +104,20 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                             .putLong(PREF_IOB_TS, System.currentTimeMillis())
                             .apply()
                     }
-                    Log.d(TAG, "pebble: now=${now.reading?.mmol} iob=${now.iobUnits}")
+                    // Presence, not the pair of values (docs/audit.md, S10):
+                    // this line existed to prove the endpoint answered, and a
+                    // glucose reading plus insulin on board is the most
+                    // sensitive line the app ever wrote.
+                    DiagLog.d(
+                        TAG,
+                        "pebble: reading ${if (now.reading == null) "absent" else "present"}, " +
+                            "iob ${Redact.insulin()}",
+                    )
                     anySuccess = true
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "pebble poll failed: ${e.message}")
+            DiagLog.w(TAG, "pebble poll failed: ${e.message}")
         }
 
         // 3. Insulin from treatments (path differs across xDrip builds — probe candidates).
@@ -125,7 +134,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                 accepted.forEach(store::upsertInsulin)
                 if (accepted.size != events.size) {
                     // Count only — the refused dose is medical payload.
-                    Log.w(TAG, "dose guard refused ${events.size - accepted.size} treatments")
+                    DiagLog.w(TAG, "dose guard refused ${events.size - accepted.size} treatments")
                 }
                 // Deletion sync: within the span the response covers, anything we
                 // have locally that xDrip no longer returns was deleted there.
@@ -141,27 +150,27 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                     val stale = store.boluses(minTs, Long.MAX_VALUE)
                         .filter { it.tsMs !in fetched && it.tsMs !in protected }
                     stale.forEach { store.deleteInsulin(it.tsMs) }
-                    if (stale.isNotEmpty()) Log.i(TAG, "removed ${stale.size} deleted-in-xDrip boluses")
+                    if (stale.isNotEmpty()) DiagLog.i(TAG, "removed ${stale.size} deleted-in-xDrip boluses")
                 }
                 // The same shot may exist both ways (pen NFC here + the pen
                 // history scanned into xDrip) with clocks seconds apart —
                 // collapse to the non-sync copy.
                 val duped = store.dedupeSyncedBoluses()
-                if (duped > 0) Log.i(TAG, "dropped $duped synced boluses duplicating pen/manual doses")
-                Log.d(TAG, "treatments: ${events.size} insulin events")
+                if (duped > 0) DiagLog.i(TAG, "dropped $duped synced boluses duplicating pen/manual doses")
+                DiagLog.d(TAG, "treatments: ${events.size} insulin events")
                 anySuccess = true
             } else {
-                Log.w(TAG, "No treatments endpoint answered")
+                DiagLog.w(TAG, "No treatments endpoint answered")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "treatments poll failed: ${e.message}")
+            DiagLog.w(TAG, "treatments poll failed: ${e.message}")
         }
 
         // 4. Physiology from Health Connect (no-op until permissions granted).
         try {
             HealthConnectSync.sync(applicationContext, store)
         } catch (e: Exception) {
-            Log.w(TAG, "HC sync failed: ${e.message}")
+            DiagLog.w(TAG, "HC sync failed: ${e.message}")
         }
 
         if (anySuccess) {
@@ -179,7 +188,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
             val found = scanMeals(store, scanFrom, now)
             prefsAll.edit().putLong(PREF_MEAL_SCAN_WATERMARK, now).apply()
             val quiet = com.diapilot.core.collector.promoteQuietMeals(store, now)
-            Log.d(TAG, "meal scan: $found events, $quiet quiet successes promoted")
+            DiagLog.d(TAG, "meal scan: $found events, $quiet quiet successes promoted")
             notifyFreshMeals(now)
             // Second, independent driver for closed-episode receipts.
             //
@@ -221,7 +230,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
             MealNotifier.notifyMeal(applicationContext, m, labels)
         }
         prefs.edit().putLong(PREF_LAST_NOTIFIED, fresh.maxOf { it.onsetMs }).apply()
-        Log.d(TAG, "notified about ${fresh.size} fresh meals")
+        DiagLog.d(TAG, "notified about ${fresh.size} fresh meals")
     }
 
 
@@ -231,11 +240,11 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
             val body = try {
                 fetch(url)
             } catch (e: Exception) {
-                Log.d(TAG, "$url: ${e.message}")
+                DiagLog.d(TAG, "$url: ${e.message}")
                 null
             }
             if (body != null && body.trimStart().startsWith("[")) {
-                Log.d(TAG, "treatments endpoint: $url")
+                DiagLog.d(TAG, "treatments endpoint: $url")
                 return body
             }
         }
@@ -253,8 +262,16 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         )
     }
 
+    /**
+     * One request to the xDrip web service. Every attempt and every 200 is
+     * stamped into [DiagState], because the Data sources screen reports
+     * "xDrip web service reachable" from those two stamps and a probe that was
+     * never sent must not read as a service that never answered. Observation
+     * only: nothing in this worker reads the stamps back.
+     */
     private fun fetch(url: String): String? {
         val conn = URL(url).openConnection() as HttpURLConnection
+        DiagState.lastXdripWebProbeMs = System.currentTimeMillis()
         return try {
             conn.connectTimeout = 5_000
             conn.readTimeout = 10_000
@@ -263,9 +280,10 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
                 conn.setRequestProperty(com.diapilot.core.collector.XDRIP_API_SECRET_HEADER, it)
             }
             if (conn.responseCode != 200) {
-                Log.d(TAG, "$url -> HTTP ${conn.responseCode}")
+                DiagLog.d(TAG, "$url -> HTTP ${conn.responseCode}")
                 null
             } else {
+                DiagState.lastXdripWebOkMs = System.currentTimeMillis()
                 conn.inputStream.bufferedReader().readText()
             }
         } finally {

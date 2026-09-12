@@ -133,7 +133,7 @@ class FoodAmpAndTimeScaleTest {
         // The fitter and the applier must synthesize the SAME model, or a knob
         // found on the bench draws a different curve when applied (M-59).
         val k = PhysioAutoFitV1.Knobs(
-            isf = 2.5, onsetMin = 11.0, fullSpeedMin = 51.0, phaseMin = 18.0, tailMin = 130.0,
+            isf = 2.5, onsetMin = 11.0, fullSpeedMin = 51.0, phaseMin = 18.0, tailMin = 300.0,
             emptyingKcalPerHour = 150.0, carbSieving = 0.65, carbSpread = 1.0,
             trustRamp = 0.0, foodAmp = 1.7, carbTimeScale = 1.3,
         )

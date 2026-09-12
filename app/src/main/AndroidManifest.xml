@@ -4,8 +4,14 @@
 
     <!-- Loopback poll of the xDrip local web service (127.0.0.1:17580) only; no cloud. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- NovoPen dose-log import, present in both editions. The Libre FRAM read
+         over the same adapter is sensor-direct — Edition.sensorDirect decides
+         whether the reader even asks for ISO-15693 tags. -->
     <uses-permission android:name="android.permission.NFC" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- BLUETOOTH_CONNECT is declared by the OSS manifest ONLY: its sole caller
+         is the own-BLE sensor link (LibreBleClient and the switch that starts
+         it), which Edition.sensorDirect closes in the store edition. A runtime
+         permission an edition cannot use must not be asked for. -->
     <!-- "Looks like you ate" labeling prompts (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- AlarmPlayer vibrates directly (channel vibration alone is swallowed on
@@ -30,7 +36,12 @@
     <!-- Doze throttles allow-while-idle alarms to ~1/9min unless the alarm is
          exact; a night hypo alert must not wait that long. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- USE_EXACT_ALARM is declared by the OSS manifest ONLY. Google Play
+         restricts it to alarm/timer/calendar apps (audit P3), and the
+         difference is a user-revocable grant, not a capability: with
+         SCHEDULE_EXACT_ALARM alone the store edition still schedules exact
+         alarms, it just has to be granted them. -->
+
     <!-- Physiology from the on-device Health Connect hub (fed by Zepp). -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />

@@ -5,11 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.diag.DiagLog
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -120,9 +120,9 @@ object StreamStallNotifier {
                     .setAutoCancel(true)
                     .build(),
             )
-            Log.i(TAG, "stall notified: ${context.resources.getResourceEntryName(reason)} (age=$ageMin min)")
+            DiagLog.i(TAG, "stall notified: ${context.resources.getResourceEntryName(reason)} (age=$ageMin min)")
         } catch (e: Exception) {
-            Log.w(TAG, "notify failed: ${e.message}")
+            DiagLog.w(TAG, "notify failed: ${e.message}")
         }
     }
 }

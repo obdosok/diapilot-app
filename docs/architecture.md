@@ -60,6 +60,12 @@ Compose UI, the Claude API client, companion sync. It holds the platform debt �
 no ViewModel, no DI, one recompute-everything state — which is findings A1–A8
 in [`audit.md`](audit.md).
 
+**`:app` is built in two editions**, `oss` and `store`, from this same source.
+`Edition.kt` is the only branching point: two booleans, `prospective` and
+`sensorDirect`, and nothing else reads the flavor. Where the line runs, what
+each gate is, and why the store edition must read as *absent* rather than as
+zero is [`editions.md`](editions.md). `:core` knows nothing about editions.
+
 ---
 
 ## 2. Where the model lives
@@ -151,9 +157,19 @@ two can diverge.
 dictionary was removed, and so were learned per-dish curves. The starting value
 comes from body weight, `core/analysis/CarbSensitivityPriorV1.kt`.
 
-The weight-based CS calculation is written but **not applied** — `baseCs` takes
-a flat constant (the synthetic example person's 0.165 mmol/L per gram). The
-mechanism exists; the door is closed (audit finding M4).
+The weight-based CS is **applied**: `PhysioRuntime.foodDynamicsGlobalPriorV1`
+is called with `Settings.weightKg`, and its median becomes the artifact's
+`globalCs`, i.e. `food.globalFactor` in the model `Forecaster` runs. The order
+is a hand-set override, then the weight-derived prior, then the synthetic
+example person's 0.165 mmol/L per gram for an install that filled in neither.
+The weight is part of the artifact cache key, so changing the field invalidates
+the cached model (audit finding M4, closed in phaseB/b3).
+
+The hand-set override tier is reachable only by an install that stored a value
+under an older build: `carb_sens_override_mmol_per_g` still has no setter, and
+`Settings.carbSensOverrideMmolPerG` cannot report "unset" because its default
+IS the shipped constant. `Settings.storedCarbSensOverrideMmolPerG` is the
+reader that can, and it is the one the chain uses.
 
 **Timing is four layers, all keyed on composition, none on the dish name:**
 
@@ -211,6 +227,11 @@ short insulin tail produces the same sign of error.
 | companion app | `api/DiaForApi.kt`, `core/api/*` | the event journal |
 | companion server | `collect/CompanionSync.kt` | `Forecaster` |
 | settings | `ui/SettingsScreen.kt` | `data/Settings.kt` |
+| data sources | `ui/DataSourcesScreen.kt` | `collect/DiagState` + the system services |
+| diagnostics export | `diag/DiagnosticsReport.kt` → `diag/DiagnosticsBundle.kt` | `collect/DiagState`, the store, `TwinCache.peek()`, `diag/DiagLog` |
+
+Which of these a build actually reaches is the edition's business, not the
+surface's — see [`editions.md`](editions.md).
 
 | alert | file | input |
 |---|---|---|
@@ -234,6 +255,45 @@ closed.
 through to the legacy slot, and the screen picked up a different kernel with a
 different ISF. `WhatIfArmTest` pins it, and the `physio` parameter no longer has
 a default — that default *was* the defect.
+
+**Why nothing is arriving: `collect/DataSources.kt` and `ui/DataSourcesScreen.kt`.**
+The collection chain has thirteen links that fail quietly on a phone that is
+not the maintainer's — xDrip and its glucose broadcast, its web service,
+Nightscout, OOPAlgorithm2, the own-BLE link, the battery policy, the
+notification permission, exact alarms, the collector service, Health Connect,
+the overlay grant, NFC (audit P6); eleven of them in the store edition, which
+has no path to the two sensor-direct ones. `dataSourceRows` turns what
+`DiagState`, the preferences and the system services already know into one
+status per link, plus the system screen that fixes it; it reads no clock, no
+database and no Android API, so each row's state machine is pinned on the JVM.
+The screen is a leaf reached from More and from the Today banner, and the
+banner asks `glucoseStalled` — `StreamStallNotifier`'s own threshold over
+state the screen already holds, not a second alert path. Sensor-direct rows
+are absent rather than inert in the store edition.
+
+**Two diagnostics exports, with opposite rules.**
+`data/DiagnosticsExport.kt` writes `filesDir/diag.json` on every full model
+build: the food corpus with every number in it, for the maintainer's own
+bench. `diag/DiagnosticsReport.kt` writes a text file a tester is asked to
+share after a week, and its rule is that no glucose value, dose, carbohydrate
+amount or note text may appear — each is replaced by its unit and shape
+(`bg <redacted> mmol/L`, `note <redacted, 34 chars>`), and timestamps leave as
+ages in minutes. They are deliberately not one function with a flag.
+
+Redaction is two layers. `diag/Redact.kt` formats every value the bundle knows
+about; the same file's `medicalNumbers` then runs over the finished body and
+rewrites any line still holding a fractional number or a number next to a
+medical unit. The second layer exists because the log section carries lines
+from ~40 call sites, so a helper missed at one of them costs a line of
+diagnostics rather than a value. The property is asserted over a seeded state
+in `DiagnosticsBundleTest`, not against a golden file — regenerating a golden
+file is exactly the moment a leak would be accepted as the new expectation.
+
+`diag/DiagLog.kt` is the ring those log lines come from: the collection chain
+and the alerts write through it (`i`/`w`/`e` are kept, `d` goes to logcat
+only), 24 h wide and capped at 800 lines. The model build ledger and the
+`MainStatePerf` lines stay on `android.util.Log` — they are the maintainer's
+bench instrument and would flood the window.
 
 **The hypo threshold of 3.9 mmol/L against the alert's own trigger range of
 4.4–4.5 mmol/L is an open question**, logged as tech debt. Audit finding M5 is
@@ -273,7 +333,10 @@ stored a value that a current install still reads:
 `carb_sens_override_mmol_per_g` is the deliberate exception: it has no setter
 either, but its default *is* the shipped constant
 (`CARB_SENS_OVERRIDE_DEFAULT`), and the argument for keeping it a setting rather
-than a constant is written at the getter.
+than a constant is written at the getter. That default is also why the key needs
+two readers: `carbSensOverrideMmolPerG` answers "what is applied" and can never
+answer null, while `storedCarbSensOverrideMmolPerG` answers "did somebody choose
+this" — which is the question the carb-sensitivity priority chain asks (§5).
 
 ---
 

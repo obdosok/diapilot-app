@@ -31,7 +31,21 @@ class BackgroundCoefficientsV1Test {
                 checkNotNull(javaClass.getResourceAsStream("/hybrid_runtime_model_v11.json"))
                     .bufferedReader().readText(),
             ),
-        )
+        ).let {
+            // THE SAME COERCION PRODUCTION DOES, and it was missing here.
+            // `PhysioRuntime.buildArtifact` moves the shipped mechanics into
+            // `PhysioBoundsV1` before an artifact is constructed; this fixture
+            // handed the raw JSON straight to the constructor, which only worked
+            // while the end-of-action floor was below the fixture's own tail. The
+            // floor is now 240 (audit M1) and the fixture is a golden file, so the
+            // coercion belongs here rather than in the resource.
+            it.copy(
+                insulin = it.insulin.copy(
+                    tailDurationMin =
+                        it.insulin.tailDurationMin.coerceIn(PhysioBoundsV1().insulinTailMinRange),
+                ),
+            )
+        }
     }
 
     private fun artifact(coefficients: BackgroundCoefficientsV1?) = PhysioArtifactV1(

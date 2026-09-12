@@ -30,7 +30,11 @@
  */
 package com.diapilot.core.analysis
 
-/** Word numerals a note actually uses, plus the inflections seen in the corpus. */
+/**
+ * Word numerals a note actually uses, plus the inflections seen in the corpus.
+ * English is DATA alongside Russian, not a second code path — same map, same
+ * lookup, same 2..20 filter applied afterward in [countFromNoteText].
+ */
 private val WORD_NUMERALS: Map<String, Int> = mapOf(
     "один" to 1, "одна" to 1, "одно" to 1, "одного" to 1, "одну" to 1,
     "два" to 2, "две" to 2, "двух" to 2, "пара" to 2, "пары" to 2, "оба" to 2, "обе" to 2,
@@ -38,19 +42,33 @@ private val WORD_NUMERALS: Map<String, Int> = mapOf(
     "четыре" to 4, "четырёх" to 4, "четырех" to 4,
     "пять" to 5, "пяти" to 5, "шесть" to 6, "шести" to 6,
     "семь" to 7, "семи" to 7, "восемь" to 8, "восьми" to 8,
+    "one" to 1, "two" to 2, "three" to 3, "four" to 4, "five" to 5,
+    "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9, "ten" to 10,
+    "couple" to 2, "pair" to 2, "both" to 2,
 )
 
-/** Mass/volume units — a number carrying one of these is a WEIGHT, never a count. */
-private val MASS_UNITS = Regex("""^(г|гр|грамм\w*|кг|мл|л|литр\w*)$""")
+/** Mass/volume units, Russian and English — a number carrying one of these is a
+ *  WEIGHT, never a count. */
+private val MASS_UNITS = Regex(
+    """^(г|гр|грамм\w*|кг|мл|л|литр\w*|g|gram|grams|kg|ml|l|liter|liters|litre|litres|oz|ounce|ounces|cup|cups|tbsp|tablespoons?|tsp|teaspoons?)$""",
+)
 
 /** "110g", "0.33L" — number and unit fused into one token. */
-private val FUSED_MASS = Regex("""^\d+(?:[.,]\d+)?(г|гр|грамм\w*|кг|мл|л)$""")
+private val FUSED_MASS = Regex(
+    """^\d+(?:[.,]\d+)?(г|гр|грамм\w*|кг|мл|л|g|gram|grams|kg|ml|l|oz|cup|cups|tbsp|tsp)$""",
+)
 
 /** Marks the mass in the clause as PER UNIT, so a count beside it is still real. */
-private val PER_UNIT_MARKERS = setOf("каждый", "каждая", "каждое", "каждого", "каждым", "по", "штука", "шт")
+private val PER_UNIT_MARKERS = setOf(
+    "каждый", "каждая", "каждое", "каждого", "каждым", "по", "штука", "шт",
+    "each", "every", "per", "pcs",
+)
 
 /** Marks the mass as the COMBINED weight of the counted units. */
-private val AGGREGATE_MARKERS = setOf("оба", "обе", "вместе", "всего", "суммарно")
+private val AGGREGATE_MARKERS = setOf(
+    "оба", "обе", "вместе", "всего", "суммарно",
+    "both", "together", "total", "combined", "altogether",
+)
 
 /**
  * A unit count found in the user's own note text.

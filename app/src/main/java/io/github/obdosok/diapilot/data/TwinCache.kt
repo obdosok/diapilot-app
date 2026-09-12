@@ -187,6 +187,15 @@ object TwinCache {
     private const val MIN_EPISODES = 15
 
     /**
+     * Sensor readings in the food era below which [get] returns null and no
+     * model exists at all — about two days of CGM. Named rather than written
+     * at the gate because the diagnostics export quotes it: "readings in era:
+     * 310 (the build gate is 500)" is the difference between a broken install
+     * and a new one.
+     */
+    const val MIN_READINGS_FOR_BUILD = 500
+
+    /**
      * How far BEFORE the calibration epoch a correction candidate is dropped.
      * The lens turns on at an instant inside a continuous CGM stream, so any
      * observation window crossing it would read a fabricated step of the whole
@@ -280,6 +289,24 @@ object TwinCache {
         diskChecked = true
     }
 
+    /** What the cache HOLDS, with nothing built and nothing loaded. */
+    data class Peek(val model: Model?, val builtAtMs: Long, val fromDisk: Boolean)
+
+    /**
+     * A read-only look at the cache, for the diagnostics export.
+     *
+     * IT MUST NOT BUILD AND MUST NOT TOUCH THE DISK. [get] costs ~7.5 s on the
+     * phone and [getForForecast] loads the snapshot on its first call; a button
+     * that reports readiness would then be the thing that creates it, and the
+     * report would say "a model exists" about a model it had just made. What
+     * this returns is the honest answer to "does this process have a model
+     * yet", which is the question a tester's file has to answer.
+     */
+    @Synchronized
+    fun peek(): Peek {
+        cached?.let { return Peek(it, builtAtMs, false) }
+        return diskRestored?.let { Peek(it.model, it.builtAtMs, true) } ?: Peek(null, 0, false)
+    }
 
     /**
      * Returns the model, rebuilding if stale; null while data is insufficient.
@@ -383,7 +410,7 @@ object TwinCache {
         // the trace the kernel/ISF are learned from.
         val foodEraStart = FoodEraSettings.current().startMs
         val readings = store.sensorReadings(foodEraStart, now)
-        if (readings.size < 500) return null
+        if (readings.size < MIN_READINGS_FOR_BUILD) return null
         val tLoad = sinceStart()
 
         // The meter lens must exist BEFORE episode detection, not after it. It

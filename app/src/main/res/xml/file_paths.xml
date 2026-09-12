@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One path per kind of file the app hands to another app, and no path wider
+  than that. `photos/` is the meal photos the camera writes and the food
+  editor shares; `diagnostics/` is the value-free diagnostics export
+  (diag/DiagnosticsReport) a tester sends to the maintainer. A single
+  <files-path path="."/> would have covered both, and also the database, the
+  twin snapshot and the encrypted secrets — so each gets its own entry.
+-->
 <paths>
     <files-path name="photos" path="photos/" />
+    <files-path name="diagnostics" path="diagnostics/" />
 </paths>

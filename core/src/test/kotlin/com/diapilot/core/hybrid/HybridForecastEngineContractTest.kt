@@ -152,7 +152,7 @@ class HybridForecastEngineContractTest {
      */
     @Test
     fun `known macros delay the physio median and widen its interval`() {
-        val base=promotedModel()
+        val base=coercedIntoArtifactDomain(promotedModel())
         val artifact=PhysioArtifactV1("t",base,
             PosteriorV1(base.food.globalFactor,base.food.globalFactor*.9,base.food.globalFactor*1.1,0,0,null),
             PosteriorV1(base.insulin.isf,base.insulin.isf*.9,base.insulin.isf*1.1,0,0,null),
@@ -332,6 +332,25 @@ class HybridForecastEngineContractTest {
     private fun promotedModel(): HybridPersonModel =
         HybridBlindDayParityTest().model(
             JSONObject(resource("/hybrid_runtime_model_v11.json")),
+        )
+
+    /**
+     * The fixture as `PhysioRuntime.buildArtifact` would hand it over.
+     *
+     * Only the tests that construct a [PhysioArtifactV1] need this, and only
+     * those: the artifact's constructor requires the mechanics to be inside
+     * `PhysioBoundsV1`, production coerces them there first, and this helper
+     * used to be skipped because the fixture's own end of action happened to
+     * clear the old floor. The floor is now 240 (audit M1) and the fixture is a
+     * golden file, so the coercion lives here. Every other test keeps the
+     * fixture exactly as shipped.
+     */
+    private fun coercedIntoArtifactDomain(m: HybridPersonModel): HybridPersonModel =
+        m.copy(
+            insulin = m.insulin.copy(
+                tailDurationMin = m.insulin.tailDurationMin
+                    .coerceIn(com.diapilot.core.physio.PhysioBoundsV1().insulinTailMinRange),
+            ),
         )
 
     private fun resource(name: String): String =

@@ -1,7 +1,7 @@
 package io.github.obdosok.diapilot.collect
 
 import android.content.Context
-import android.util.Log
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.Forecaster
 import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
@@ -15,6 +15,7 @@ import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.data.displayHistory
 import io.github.obdosok.diapilot.data.forecastAnchor
 import io.github.obdosok.diapilot.data.tir24h
+import io.github.obdosok.diapilot.diag.DiagLog
 import io.github.obdosok.diapilot.i18n.StatusText
 import io.github.obdosok.diapilot.i18n.TokenText
 import io.github.obdosok.diapilot.i18n.TwinText
@@ -50,7 +51,7 @@ object CompanionSync {
                 val body = buildSnapshot(context, now) ?: return@Thread
                 post("$url/api/push", token, body.toString().toByteArray(), "application/json")
             } catch (e: Exception) {
-                Log.w(TAG, "push failed: ${e.message}")
+                DiagLog.w(TAG, "push failed: ${e.message}")
             }
         }.start()
     }
@@ -104,12 +105,12 @@ object CompanionSync {
                     spool.inputStream().use { it.copyTo(out) }
                     out.write(tail)
                 }
-                Log.i(TAG, "backup uploaded (${spool.length()} bytes)")
+                DiagLog.i(TAG, "backup uploaded (${spool.length()} bytes)")
             } finally {
                 spool.delete()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "backup upload failed: ${e.message}")
+            DiagLog.w(TAG, "backup upload failed: ${e.message}")
         }
     }
 
@@ -137,7 +138,7 @@ object CompanionSync {
             conn.setRequestProperty("Content-Type", contentType)
             conn.outputStream.use { java.io.BufferedOutputStream(it).use(writeBody) }
             val code = conn.responseCode
-            if (code !in 200..299) Log.w(TAG, "POST $url -> $code")
+            if (code !in 200..299) DiagLog.w(TAG, "POST $url -> $code")
         } finally {
             conn.disconnect()
         }
@@ -160,14 +161,21 @@ object CompanionSync {
             conn.setRequestProperty("Content-Type", contentType)
             conn.outputStream.use { it.write(body) }
             val code = conn.responseCode
-            if (code !in 200..299) Log.w(TAG, "POST $url -> $code")
+            if (code !in 200..299) DiagLog.w(TAG, "POST $url -> $code")
         } finally {
             conn.disconnect()
         }
     }
 
-    /** The same lenses as the widget/watch — the dashboard must agree. */
-    private fun buildSnapshot(context: Context, now: Long): JSONObject? {
+    /**
+     * The same lenses as the widget/watch — the dashboard must agree.
+     *
+     * `internal` so `EditionContractTest` can assert the payload's field set
+     * without a network round trip: what an edition publishes is a contract,
+     * and the store edition's promise is that no field of it speaks about
+     * later.
+     */
+    internal fun buildSnapshot(context: Context, now: Long): JSONObject? {
         val text = context.localized()
         val store = Stores.get(context)
         val mgdl = Units.isMgdl(context)
@@ -197,7 +205,13 @@ object CompanionSync {
             ?: com.diapilot.core.twin.trendReadout(minutePts, now)
 
         // Forecast — the ONE shared engine (not re-recorded: mirrors "main").
-        val model = TwinCache.getForForecast(store, context)
+        //
+        // The store edition publishes no statement about later, so the model is
+        // not asked for at all: `forecast` stays empty, the `forecast` array and
+        // the settle headline are left out of the payload entirely (the
+        // dashboard reads both as `|| []` / `|| ''`), and the periodic push
+        // stops triggering a background model build.
+        val model = if (Edition.prospective) TwinCache.getForForecast(store, context) else null
         val forecast = if (model != null) {
             try {
                 Forecaster.forecast(
@@ -312,7 +326,6 @@ object CompanionSync {
             } ?: "")
             .put("delta_mmol", trend?.delta5Mmol)
             .put("nuance", trend?.nuance?.let { TwinText.nuance(context, it) } ?: "")
-            .put("status_line", statusLine)
             .put("insulin_line", insulinLine)
             .put("range_lo", rangeLo)
             .put("range_hi", rangeHi)
@@ -321,6 +334,18 @@ object CompanionSync {
             .put("tir_high", tir?.high)
             .put("events", events)
             .put("history", history)
-            .put("forecast", forecastArr)
+            .apply {
+                // THE TWO PROSPECTIVE KEYS, WRITTEN ONLY WHEN THERE IS ONE.
+                // `status_line` is the settle headline and `forecast` is the
+                // corridor the dashboard fans; both are omitted rather than
+                // sent empty, so a store-edition payload carries no field
+                // about later at all. The dashboard already defaults them
+                // (`d.status_line || ''`, `d.forecast || []`), so an omitted
+                // key renders as absent instead of as a flat line at zero.
+                if (Edition.prospective) {
+                    put("status_line", statusLine)
+                    put("forecast", forecastArr)
+                }
+            }
     }
 }

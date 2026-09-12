@@ -12,6 +12,8 @@ import com.diapilot.core.pen.T4Read
 import com.diapilot.core.pen.T4Reply
 import com.diapilot.core.pen.T4Select
 import com.diapilot.core.pen.T4Update
+import io.github.obdosok.diapilot.diag.DiagLog
+import io.github.obdosok.diapilot.diag.Redact
 import java.nio.ByteBuffer
 
 /**
@@ -49,10 +51,10 @@ class PenNfcScanner {
             isoDep.connect()
             isoDep.timeout = 1000
             if (!doNeededSelection(isoDep)) {
-                Log.w(TAG, "Type 4 selection failed")
+                DiagLog.w(TAG, "Type 4 selection failed")
                 return null
             }
-            Log.i(TAG, "selection ok; mle=$mleMax mlc=$mlcMax")
+            DiagLog.i(TAG, "selection ok; mle=$mleMax mlc=$mlcMax")
 
             val context = PenContext(System.currentTimeMillis())
             val allDoses = mutableListOf<InsulinDose>()
@@ -80,10 +82,13 @@ class PenNfcScanner {
                 }
             }
             val completed = !fsa.doRead
-            Log.i(
+            // The pen's serial named the device rather than the scan, and the
+            // diagnostics export carries this line off the phone
+            // (docs/audit.md, S10). Its shape says "a pen answered".
+            DiagLog.i(
                 TAG,
                 "scan finished: completed=$completed doses=${allDoses.size} " +
-                    "serial=${context.specification?.serial} tx=$transactions",
+                    "serial=${Redact.identifier(context.specification?.serial)} tx=$transactions",
             )
             ScanResult(
                 serial = context.specification?.serial,
@@ -92,7 +97,7 @@ class PenNfcScanner {
                 completed = completed,
             )
         } catch (e: Exception) {
-            Log.w(TAG, "scan failed: $e")
+            DiagLog.w(TAG, "scan failed: $e")
             null
         } finally {
             runCatching { isoDep.close() }

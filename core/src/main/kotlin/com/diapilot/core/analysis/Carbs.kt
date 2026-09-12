@@ -208,6 +208,18 @@ fun parseNameSuggestion(analysis: String): String? =
 const val COMPONENT_LINE_PREFIX = "COMPOSITION"
 
 /**
+ * Diacritics stripped so "crème" and "creme" reach the same key — and, as a
+ * side effect, so does a stressed Cyrillic vowel typed in its plain form,
+ * which decomposes the same way. NFD splits a base letter from its combining
+ * accent mark (Mn = "Mark, nonspacing"); dropping those marks and
+ * re-composing leaves the base letters untouched, so this changes only
+ * accented input and nothing else.
+ */
+private fun stripDiacritics(s: String): String =
+    java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+        .replace(Regex("""\p{Mn}+"""), "")
+
+/**
  * Composite meals, step 1: knowledge transfer needs NAMES that match.
  * The LLM writes something like "Buckwheat (cooked, medium portion ~150–180 g)", the
  * user types "buckwheat" — without normalization the grams learned in one combo
@@ -225,7 +237,7 @@ const val COMPONENT_LINE_PREFIX = "COMPOSITION"
  * key does not error, it just pools less.
  */
 fun normalizeFoodName(raw: String): String =
-    raw.lowercase()
+    stripDiacritics(raw).lowercase()
         .substringBefore('(')
         .substringBefore(',')
         .substringBefore('/')                          // "cutlet/pancake" → first alternative

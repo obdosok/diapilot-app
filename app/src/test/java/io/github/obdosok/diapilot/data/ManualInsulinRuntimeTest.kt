@@ -27,8 +27,14 @@ import org.robolectric.annotation.Config
 class ManualInsulinRuntimeTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
-    /** A synthetic hand-entered shape, distinct from the shipped prior. */
-    private val entered = ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 145.0, isfMmolPerU = 2.5)
+    /**
+     * A synthetic hand-entered shape, distinct from the shipped prior.
+     *
+     * The end of action is 300, not 145: `insulinTailMinRange` now floors it at
+     * 240 (audit M1), so a hand entry of 145 is refused as out of domain and
+     * this fixture would be testing the refusal rather than the shape.
+     */
+    private val entered = ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 300.0, isfMmolPerU = 2.5)
 
     private fun model() = context.assets.open("models/person_model_v11_runtime.json").use {
         HybridPersonModelJson.read(it)
@@ -43,7 +49,7 @@ class ManualInsulinRuntimeTest {
         val back = ManualInsulinRuntime.params(context)
         assertEquals(27.0, checkNotNull(back.onsetMin), 1e-3)
         assertEquals(55.0, checkNotNull(back.peakMin), 1e-3)
-        assertEquals(145.0, checkNotNull(back.tailMin), 1e-3)
+        assertEquals(300.0, checkNotNull(back.tailMin), 1e-3)
         assertEquals(2.5, checkNotNull(back.isfMmolPerU), 1e-3)
         assertNotNull(back.setAtMs)
     }
@@ -70,7 +76,7 @@ class ManualInsulinRuntimeTest {
         // five-minute leak cannot creep into the minutes the user called quiet.
         assertEquals(0.0, after.insulinCdf(27.0), 1e-9)
         assertTrue("action must have started by 35 min", after.insulinCdf(35.0) > 0.0)
-        assertEquals(1.0, after.insulinCdf(145.0), 1e-6)
+        assertEquals(1.0, after.insulinCdf(300.0), 1e-6)
         // Compared across the whole curve rather than at one minute: the
         // shipped prior starts at 30, so a single early probe would agree with
         // the entered 27 by accident and the test would pass while nothing had moved.

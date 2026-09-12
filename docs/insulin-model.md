@@ -155,12 +155,18 @@ contradict each other — they are two different numbers with similar names, and
 that has already caused confusion.
 
 Then `coerceIntoDomain` clamps to population bounds and **names what moved**.
-The bound is `insulinTailMinRange` = 120…600 min.
+The bound is `insulinTailMinRange` = 240…600 min.
 
-⚠ **The caveat "end = 120 is a floor, not a measurement" does not apply by
-default.** It was true for an earlier measurement that fell below the floor;
-once the measured end is above 120 the tail is not being clamped by anything.
-Check the log before carrying the caveat forward.
+⚠ **The floor now clamps, and that is deliberate.** It was 120, which no bolus
+analogue reaches, so it accepted every reading the instrument could produce.
+The instrument cannot see past four hours — `CAP_MS` = 240, `TAIL_HORIZON_MIN` =
+200 clean minutes inside it, and "end" is the rate returning to the pre-dose
+slope, which a rising background meets early — so every measured end lands in
+roughly 150…230 and nothing was ever clamped. The floor is the instrument's own
+reach: a measurement under it is a window limit, the settings screen marks it as
+one, and the installed curve carries 240 rather than the short reading. This
+does not lengthen the measurement; the plateau end landmark that would is
+deferred (audit M1, roadmap O-D).
 
 ### 2.6 Expected result on this baseline
 

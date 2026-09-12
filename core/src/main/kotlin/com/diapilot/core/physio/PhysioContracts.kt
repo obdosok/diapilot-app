@@ -15,7 +15,26 @@ data class PhysioBoundsV1(
     val isfMaxRelativeChangePerIdentifyingDay: Double = 0.15,
     val insulinOnsetMinRange: ClosedFloatingPointRange<Double> = 0.0..60.0,
     val insulinPeakMinRange: ClosedFloatingPointRange<Double> = 20.0..180.0,
-    val insulinTailMinRange: ClosedFloatingPointRange<Double> = 120.0..600.0,
+    /**
+     * END OF INSULIN ACTION, and the FLOOR is the part worth explaining.
+     *
+     * It was 120, which no bolus analogue reaches: the shortest labelled
+     * action time in the profile table is several hours. A floor that low
+     * accepted every measurement the instrument could produce, and the
+     * instrument cannot see past four hours — `InsulinProfileRuntime.CAP_MS`
+     * closes a dose's window at 240 min, `TAIL_HORIZON_MIN` needs 200 clean
+     * minutes before it, and "end" is the rate returning to the pre-dose
+     * slope, which a rising background meets early. So every measured end
+     * lands in roughly 150..230 and nothing ever clamped it — the domain was
+     * agreeing with a ruler that is too short rather than with physiology.
+     *
+     * 240 is the instrument's own reach, which makes the clamp SAY something:
+     * a measurement under it is a window limit, and the screen marks it as one
+     * (audit M1). It does not lengthen the measurement — that is the plateau
+     * end landmark, deferred to O-D — it stops the short reading from being
+     * installed as a fact.
+     */
+    val insulinTailMinRange: ClosedFloatingPointRange<Double> = 240.0..600.0,
     val absorptionOnsetMinRange: ClosedFloatingPointRange<Double> = 0.0..120.0,
     val absorptionPeakMinRange: ClosedFloatingPointRange<Double> = 10.0..240.0,
     val absorptionTailMinRange: ClosedFloatingPointRange<Double> = 30.0..720.0,

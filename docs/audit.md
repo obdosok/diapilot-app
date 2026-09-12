@@ -8,13 +8,13 @@ tree. `./gradlew :core:test` was run (844 tests, 0 failures).
 Severity: **H** — harms a third-party user today; **M** — must be closed
 before a release to strangers; **L** — hygiene.
 
-**Status** is as of the phase-A gate (tag `v1.3.0`) and is one of:
-**Closed**, with the branch that closed it; **Open**; or **Deferred**,
-with the phase in `roadmap.md` that plans it. A finding is Closed only
-when every mechanism it names is addressed — where phase A closed part of
-one, the status stays Open and says which part moved. The findings
-themselves are unchanged; only the Status column and two file references
-were updated.
+**Status** started at the phase-A gate (tag `v1.3.0`) and is kept current
+as later phases close findings. It is one of: **Closed**, with the branch
+that closed it; **Open**; or **Deferred**, with the phase in `roadmap.md`
+that plans it. A finding is Closed only when every mechanism it names is
+addressed — where a phase closed part of one, the status stays Open and
+says which part moved. The findings themselves are unchanged; only the
+Status column and a few file references were updated.
 
 ---
 
@@ -35,7 +35,7 @@ the same phone** and **the media the backups land on**.
 | S7 | M | Deferred — O-C (backup password / restore undo) | `restore()` runs no `PRAGMA integrity_check` and overwrites the live database with no rollback copy. | `BackupRestore.kt:73` |
 | S8 | M | Deferred — O-B (release signing) | The release build is signed with the debug keystore (well-known password, unprotected file). Anyone who obtains it can sign an "update" that installs over the user's data. | `app/build.gradle.kts:62` |
 | S9 | L | Open — a2 corrected the README claim; the server's own limits remain | Companion server: `/api/push` reads unbounded JSON into memory, `/api/backup` writes unbounded uploads to disk, no rate limit on token guesses. `server/README.md` suggests `http://<LAN IP>:8787`, which the app's network security config refuses (cleartext is loopback-only); the root README claims "one LAN host listed" but the file lists none. | `server/main.py`, `app/src/main/res/xml/network_security_config.xml` |
-| S10 | L | Open | Glucose values and hypo decisions are logged at INFO level via `android.util.Log`; no log stripping in release. Readable only via adb / bug report, but a shared bug report carries hours of history. | `collect/HypoAlertNotifier.kt:395`, `collect/XdripBgReceiver.kt:60` |
+| S10 | L | Closed (phaseB/b7) | Glucose values and hypo decisions are logged at INFO level via `android.util.Log`; no log stripping in release. Readable only via adb / bug report, but a shared bug report carries hours of history. | `collect/HypoAlertNotifier.kt:395`, `collect/XdripBgReceiver.kt:60` |
 | S11 | L | Closed (phaseA/a1) | The barcode is interpolated into the OFF URL unencoded. Scanner formats are EAN/UPC only, so practically inert; validate `^\d{8,14}$` anyway. | `app/.../data/OpenFoodFacts.kt:70` |
 
 **What phase A left behind here.** `/info.json` is deliberately still
@@ -50,16 +50,31 @@ sockets but not the three inputs that were never socket-fed: a
 hand-typed bolus or basal, a NovoPen scan, and restore from the app's
 own export.
 
+**What phase B closed here (b7).** S10 was two halves. The logs: every line
+that printed a glucose value, a dose, a carbohydrate amount or a device
+identifier now prints the unit and the decision instead — `collect/`
+(`HypoAlertNotifier`, `XdripBgReceiver`, `CollectorService`,
+`TreatmentsPollWorker`) and `nfc/PenNfcScanner`. The bug report: the
+collection chain's own lines are kept in an in-memory ring
+(`diag/DiagLog.kt`) and leave the phone through a value-free export
+(`diag/DiagnosticsBundle.kt`), so answering "did collection work on your
+phone" no longer needs `adb` or a bug report carrying hours of history.
+`data/DiagnosticsExport.kt` — the maintainer's own `diag.json`, which does
+carry values — is untouched and still in the release build; moving it out is a
+later package.
+
 **Checked and sound:** `SecretStore` (AES-256-GCM in AndroidKeyStore, AAD bound
 to the secret's name, never rewrites plaintext, logs only the name and the
 exception class); manifest (`allowBackup=false` + `dataExtractionRules`,
-FileProvider not exported and limited to `photos/`, `LabelActionReceiver` /
-`BootReceiver` not exported); the LLM command path (parse → `CommandGuard` →
-confirm card → user tap, never an automatic write; API key only in the
-`x-api-key` header; chat is read-only); SQL is parameterised, interpolations
-are table/column constants only; FRAM/NFC parsing is bounds-checked; no
-WebView, no `exec`; no secrets in git, `local.properties` ignored, the gitleaks
-allowlist is narrow; `HttpURLConnection` will not follow https→http.
+FileProvider not exported and limited to two named subdirectories —
+`photos/` plus the `diagnostics/` path b7 added, never a root open onto the
+sandbox, `LabelActionReceiver` / `BootReceiver` not exported); the LLM
+command path (parse → `CommandGuard` → confirm card → user tap, never an
+automatic write; API key only in the `x-api-key` header; chat is read-only);
+SQL is parameterised, interpolations are table/column constants only; FRAM/NFC
+parsing is bounds-checked; no WebView, no `exec`; no secrets in git,
+`local.properties` ignored, the gitleaks allowlist is narrow;
+`HttpURLConnection` will not follow https→http.
 
 ---
 
@@ -67,10 +82,10 @@ allowlist is narrow; `HttpURLConnection` will not follow https→http.
 
 | # | S | Status | Finding | Where |
 |---|---|---|---|---|
-| M1 | H | Deferred — O-B (tail domain 240+), O-D (plateau end landmark) | **Insulin tail is short by construction.** Example model ends at 175 min; domain floor is 120. Against an exponential curve (peak 75, DIA 6 h) the example has 85% acted at 120 min vs ~55%, and 100% at 180 vs ~79% — IOB reads zero on the third hour. The cause is the *instrument*, not a constant: the per-dose window is capped at `CAP_MS = 240 min` and closed by the next injection; the end landmark needs `TAIL_HORIZON_MIN = 200` clean minutes; and "end" is defined as the rate returning to the pre-dose slope, which a rising background meets early (an earlier internal finding, M-54; the plateau alternative is computed but never substituted). A 240-minute ruler cannot measure five hours, so every user's measured end lands in ~150–230 and the 120..600 domain never clamps it. Manual timings (P1) win and accept tail 120..600, but Auto-fit's corridor is ±20% around the *measured* tail and will propose pulling it back unless the knob is locked. | `app/.../data/InsulinProfileRuntime.kt:44`, `core/.../physio/SegmentLandmarksV1.kt:104,278`, `core/.../physio/PhysioContracts.kt:18`, `core/.../physio/PhysioAutoFitV1.kt:364` |
+| M1 | H | Open — b3 raised the domain floor to 240 (the instrument's own reach), moved the example model to tail 300 / main curve 200, pulled the Auto-fit `tail` corridor to 240..480 and marks a measured end under the floor on the settings card; the INSTRUMENT is untouched — `CAP_MS`, `TAIL_HORIZON_MIN` and the pre-dose-slope definition of "end" are the same, so every measurement still lands in ~150..230 and is now clamped rather than believed. The plateau end landmark stays deferred — O-D | **Insulin tail is short by construction.** Example model ends at 175 min; domain floor is 120. Against an exponential curve (peak 75, DIA 6 h) the example has 85% acted at 120 min vs ~55%, and 100% at 180 vs ~79% — IOB reads zero on the third hour. The cause is the *instrument*, not a constant: the per-dose window is capped at `CAP_MS = 240 min` and closed by the next injection; the end landmark needs `TAIL_HORIZON_MIN = 200` clean minutes; and "end" is defined as the rate returning to the pre-dose slope, which a rising background meets early (an earlier internal finding, M-54; the plateau alternative is computed but never substituted). A 240-minute ruler cannot measure five hours, so every user's measured end lands in ~150–230 and the 120..600 domain never clamps it. Manual timings (P1) win and accept tail 120..600, but Auto-fit's corridor is ±20% around the *measured* tail and will propose pulling it back unless the knob is locked. | `app/.../data/InsulinProfileRuntime.kt:44`, `core/.../physio/SegmentLandmarksV1.kt:104,278`, `core/.../physio/PhysioContracts.kt:18`, `core/.../physio/PhysioAutoFitV1.kt:364` |
 | M2 | H | Deferred — O-B (onboarding) | **No "uncalibrated" mode.** From the first minute the bundled synthetic person (ISF 1.8, insulin 20/75/175, CS 0.165) drives the forecast, the hypo alert and the watch hint. No onboarding screen, no calibration status; the only "not measured yet" strings live inside the tuning section. | `app/.../data/HybridModelStore.kt:24` |
 | M3 | M | Deferred — O-D (needs n>1) | ISF, CS and DIA are not separately identifiable from meal days, and the pipeline holds CS constant while reading DIA off the CGM. The measured bias of +4.53 mmol at h=180 is attributed to food amplitude, but a short insulin tail produces the same sign; the fitter itself notes that an ISF read off the bias arm is "partly a food deficit wearing an insulin label". | `docs/architecture.md` §5, `core/.../physio/PhysioAutoFitV1.kt` (header) |
-| M4 | M | Deferred — O-B (weight → CS) | **Weight → CS is not wired.** The weight field exists and `CarbSensitivityPriorV1.fromWeight` exists, but the result is only shown as a hint under the field; `foodDynamicsGlobalPriorV1(weightKg)` is never called with a weight. CS is also outside Auto-fit (deliberately, for identifiability), so manual/weight is the only door. | `app/.../ui/SettingsScreen.kt:242`, `app/.../data/PhysioRuntime.kt:80` |
+| M4 | M | Closed (phaseB/b3) — `foodDynamicsGlobalPriorV1` is called with `Settings.weightKg`, its median becomes the artifact's `globalCs` and so `food.globalFactor` on the live forecast path; the chain is stored manual override → weight → the 0.165 constant, and body weight is part of the artifact cache key. Tier one (`carb_sens_override_mmol_per_g`) still has no setter, so on a fresh phone the chain is weight → default until the onboarding screen writes it | **Weight → CS is not wired.** The weight field exists and `CarbSensitivityPriorV1.fromWeight` exists, but the result is only shown as a hint under the field; `foodDynamicsGlobalPriorV1(weightKg)` is never called with a weight. CS is also outside Auto-fit (deliberately, for identifiability), so manual/weight is the only door. | `app/.../ui/SettingsScreen.kt:242`, `app/.../data/PhysioRuntime.kt:80` |
 | M5 | M | Deferred — O-C (false-alarm feedback), O-D (ramp bench) | **Horizon shrinkage is applied asymmetrically.** `backboneWeight` multiplies each 5-min increment by 1.0 → 0.5@60 → 0.75@120 → 0.75@180; for a 2 U dose that is 59–63% of the physiological effect. It is a fitted trust ramp (Auto-fit axis `ramp`), not physiology: uncertainty belongs in the band, and shrinking the mean rewards a miscalibrated model by hiding amplitude errors. Since `fullCausalInsulinDisplay = true`, insulin on board is drawn in full on both screen and alert, and the What-if dose is deliberately not shrunk — so today the ramp cuts **food, background and drift only**. After a meal with a bolus the rise is drawn at ~60% and the dose at 100%: the line is biased low exactly where the low alert decides. This matches the 15 false hypo alarms / 35 episodes in the recorded episode table. | `core/.../hybrid/HybridForecastEngine.kt:1415,1508`, `app/.../data/Forecaster.kt:205`, `app/.../data/HybridShadow.kt:198` |
 | M6 | M | Deferred — O-D (only after a bench) | Protein and fat are timing-only (delay / tail), never amplitude — "ONE RULE: grams × CS". Gluconeogenesis from protein and fat-induced insulin resistance are not modelled; low-carb / high-protein meals forecast low on the 3–5 h horizon. | `HybridForecastEngine.kt:508` |
 | M7 | L | Open | Activity: the structure exists (exposure with τ=150 min scaling insulin action), but the example model ships `iob_gamma = food_gamma = 0`. | `app/src/main/assets/models/person_model_v11_runtime.json` |
@@ -111,7 +126,7 @@ is concentrated there.
 |---|---|---|---|---|
 | A1 | M | Open — a3 closed the UI half; static `Settings.*` and the `*Runtime` singletons remain | No ViewModel, DI or repository. `Stores.get(context)` at 98 sites (51 in `MainActivity`), static `Settings.*` at 61; composables hit SQLite directly (`AnnotationComposer` 9, `SettingsScreen` 5). | `app/.../MainActivity.kt`, `ui/*.kt` |
 | A2 | M | Deferred — S-4 (needs chart/alerts out of `:app`) | "Recompute everything" state: one `UiState`, `loadState` (~1200 lines) called from 28 sites; the `withHistoryFrom(state).stabiliseHistoryAgainst(state)` patch treats a symptom of the pattern. `DataPulse` is used at 3 sites — no reactive path. | `app/.../MainState.kt:511`, `MainActivity.kt:634` |
-| A3 | M | Open | Research bench ships in the APK: `HybridShadow` ("shadow-9"), `HybridShadowRegistry`, `ForecastComparisonRegistry`, `PhysioExperimentalLedger`; `Stage7–10` in 10 files, `V1/V2` suffixes in 29; 26 constructor knobs on the engine, 9 `*Override` fields on the model; settings with getter, setter and zero setter calls (`setActivityModelV2`, `setNotePreferredFood`) — both since removed, and the count re-derived over every settings holder is now one (`setBolusProduct`, left because its getter is not a constant); flags: fixed in 258cf38, see `architecture.md` § "Settings that cannot be configured". | `app/.../data/HybridShadow*.kt`, `PhysioTuning.kt`, `Settings.kt` |
+| A3 | M | Open — b0 built the two flavors the separation needs (`editions.md`); the bench itself still ships in both | Research bench ships in the APK: `HybridShadow` ("shadow-9"), `HybridShadowRegistry`, `ForecastComparisonRegistry`, `PhysioExperimentalLedger`; `Stage7–10` in 10 files, `V1/V2` suffixes in 29; 26 constructor knobs on the engine, 9 `*Override` fields on the model; settings with getter, setter and zero setter calls (`setActivityModelV2`, `setNotePreferredFood`) — both since removed, and the count re-derived over every settings holder is now one (`setBolusProduct`, left because its getter is not a constant); flags: fixed in 258cf38, see `architecture.md` § "Settings that cannot be configured". | `app/.../data/HybridShadow*.kt`, `PhysioTuning.kt`, `Settings.kt` |
 | A4 | M | Open | Four concurrency models at once: 27 raw `Thread`, 10 `Handler`, 82 `Dispatchers.IO`, WorkManager; 66 `@Volatile`, 10 `synchronized`. The `PhysioRuntime` cache key has nine components, each added after a bug (`tuningIdentity` "was missing" — stale model served while the screen said "applied"). | `app/.../data/PhysioRuntime.kt` |
 | A5 | L | Open | Twelve `*Runtime` singletons, each with its own cache, lock and manual `invalidate()`. | `app/.../data/*Runtime.kt` |
 | A6 | L | Open | `CollectorStore` is a 70-method interface; `SqliteCollectorStore` 2295 lines; `AnnotationComposer` 3335, `GlucoseChart` 2172, `LabelScreen` 2068, `MainActivity` 1801, `MainState` 1707. | `core/.../collector/CollectorStore.kt` |
@@ -131,12 +146,12 @@ runtime that fed nothing. The debt is known and chosen.
 
 | # | S | Status | Finding | Where |
 |---|---|---|---|---|
-| P1 | H | Deferred — O-B (English food parser) | The offline food parser is Russian-only under an English UI. Structure is language-neutral: 51 concepts with English ids and Russian alias lists (188), number words and unit regexes in `ComponentCounts.kt`, 5-char stem matching. English = data, not code: alias lists, `one/two/a couple/half`, `g\|gram\|ml\|oz\|cup\|tbsp\|slice` with typical-gram mapping, `each/per/pcs`. | `core/.../analysis/FoodConcepts.kt:91`, `ComponentCounts.kt:35,44` |
+| P1 | H | Closed (phaseB/b5) | The offline food parser was Russian-only under an English UI. The table had it at 51 concepts; the code always had 52 — fixed here, doc error, not a code one. Structure was language-neutral: 52 concepts with English ids and Russian alias lists (199), number words and unit regexes in `ComponentCounts.kt`, 5-char stem matching. b5 added the English side as data — alias lists, `one/two/.../ten/couple/pair/both`, English `g\|gram\|grams\|ml\|oz\|cup\|tbsp\|tsp` mass units, `each/every/per/pcs` per-unit markers, a portion-word (`slice/cup/tbsp/tsp/glass/bottle/handful`, English and Russian) typical-grams table, and diacritic stripping — without touching the matching logic, the stem length or any threshold. | `core/.../analysis/FoodConcepts.kt:91`, `ComponentCounts.kt:35,44` |
 | P2 | H | Deferred — O-B (onboarding) | No onboarding: disclaimer, ISF / ICR / weight entry, insulin timings with sane defaults, calibration status — see M2. |  |
-| P3 | M | Deferred — S-1 (compliance), O-B (signing) | Google Play: `USE_EXACT_ALARM` is restricted to alarm/timer/calendar apps (drop it, keep `SCHEDULE_EXACT_ALARM`); FGS `specialUse` needs a declaration and is reviewed strictly; no hosted privacy policy; no prominent disclosure before health data leaves for the LLM; no in-app report control for AI-generated content; Health Connect and Health-apps declarations; debug signing (S8); closed testing (12 testers / 14 days) for a personal account. |  |
+| P3 | M | Open — b0 closed the `USE_EXACT_ALARM` item (oss manifest only, `SCHEDULE_EXACT_ALARM` in both) and gave S-0 its flavor; the rest is deferred to S-1 (compliance) and O-B (signing) | Google Play: `USE_EXACT_ALARM` is restricted to alarm/timer/calendar apps (drop it, keep `SCHEDULE_EXACT_ALARM`); FGS `specialUse` needs a declaration and is reviewed strictly; no hosted privacy policy; no prominent disclosure before health data leaves for the LLM; no in-app report control for AI-generated content; Health Connect and Health-apps declarations; debug signing (S8); closed testing (12 testers / 14 days) for a personal account. |  |
 | P4 | M | Open | Regulatory status: a predictive hypoglycaemia alert plus a carbohydrate hint is a medical purpose by function; in the EU that is MDR (rule 11), and a disclaimer does not settle it. xDrip+ / AAPS stay off the stores for this reason. |  |
 | P5 | M | Open | Apple: no iOS code; GPL-3.0 ports of xDrip+ cannot be relicensed for App Store terms; half the architecture (broadcast, 24/7 service, lock-screen overlay, localhost watch server, OOP2) has no iOS equivalent. |  |
-| P6 | L | Deferred — O-B (Nightscout), S-1 (Juggluco) | The xDrip + OOPAlgorithm2 + Health Connect dependency chain is fragile on a stranger's phone. |  |
+| P6 | L | Open — b1 added the Data sources screen (every link with a status, one line of what breaks, and a Fix); the chain itself is unchanged, and Nightscout (O-B) and Juggluco (S-1) are still the way out of the dependency | The xDrip + OOPAlgorithm2 + Health Connect dependency chain is fragile on a stranger's phone. | `app/.../collect/DataSources.kt`, `ui/DataSourcesScreen.kt` |
 
 ---
 
@@ -154,3 +169,12 @@ runtime that fed nothing. The debt is known and chosen.
 5. S6–S8, P1.
 6. A3 (bench flavor) → A1 (composition root) → A2 / A4 → A6 → A7–A9 last
    (mechanical, touches everything).
+
+**Where this order stands after phase B.** Step 1 closed at the phase-A gate.
+Step 2 took its first half — the floor, the example tail and the warning — and
+left the instrument and the plateau landmark to O-D. Step 3 has M4 closed
+**without** the first-run screen it assumed: the weight chain reaches the
+forecast on its own, and the screen is still owed M2 and P2 (and the setter
+that would let it write the manual tier). Step 5 has P1 done and S6–S8 open.
+Steps 4 and 6 are untouched, though b0 built the flavor mechanism A3's fix
+needs.

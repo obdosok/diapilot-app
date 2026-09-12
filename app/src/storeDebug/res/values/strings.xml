@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- THE STORE EDITION'S DEBUG NAME, and it needs its own source set because
+     resource priority puts the BUILD TYPE above the FLAVOR: without this file a
+     store debug install would read "DiaPilot debug" from `src/debug`, i.e.
+     exactly the same launcher label as the oss debug install it is meant to sit
+     beside. A variant source set (flavor + build type) outranks both.
+
+     The store release build takes "DiaPilot Log" from `src/store`; both names
+     are placeholders until the store name is decided — see docs/editions.md. -->
+<resources>
+    <string name="app_name" translatable="false">DiaPilot Log debug</string>
+</resources>

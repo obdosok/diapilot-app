@@ -4,6 +4,7 @@ import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.analysis.mealConceptComponents
 import com.diapilot.core.hybrid.HybridFoodEvent
 import com.diapilot.core.hybrid.HybridForecastEngine
+import io.github.obdosok.diapilot.Edition
 import org.json.JSONObject
 import java.io.InputStream
 import kotlin.math.roundToInt
@@ -507,18 +508,27 @@ object HybridRuntimeMetrics {
      * measured curve there is no honest IOB to show, and null renders as
      * nothing — which is what «unknown» looks like. A number from a model
      * nobody is running looks like knowledge.
+     *
+     * BECAUSE THIS IS THE ONE ENTRY, IT IS ALSO THE EDITION GATE. "How much is
+     * still to act" is future tense, so IOB belongs to [Edition.prospective];
+     * closing it here closes the header number, the status line, the chart
+     * rail, the widget line, the watch payload and the Ask-Claude briefing at
+     * once, and every one of those already treats the null as absence rather
+     * than as zero.
      */
     fun surfaceIobUnits(
         store: CollectorStore,
         context: android.content.Context,
         tsMs: Long,
     ): Double? {
+        if (!Edition.prospective) return null
         physioIobUnits(store, tsMs)?.let { return it }
         return iobUnits(store, tsMs)
     }
 
-    /** Chart-grid counterpart of [surfaceIobUnits], same precedence, so the
-     * rail and the number above it can never disagree. */
+    /** Chart-grid counterpart of [surfaceIobUnits], same precedence and the
+     * same edition gate, so the rail and the number above it can never
+     * disagree. */
     fun surfaceIobSeries(
         store: CollectorStore,
         context: android.content.Context,
@@ -526,6 +536,7 @@ object HybridRuntimeMetrics {
         toMs: Long,
         stepMs: Long = 5L * 60_000L,
     ): List<Pair<Long, Double>> {
+        if (!Edition.prospective) return emptyList()
         physioIobSeries(store, fromMs, toMs, stepMs)
             .takeIf { it.isNotEmpty() }
             ?.let { return it }

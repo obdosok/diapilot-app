@@ -14,23 +14,52 @@ week later, as [`docs/roadmap.md`](docs/roadmap.md) describes.
 
 ## [Unreleased]
 
-Work that is planned but not in a tag yet. The gates are in
+Work done and work still planned, neither in a tag yet. The gates are in
 [`docs/roadmap.md`](docs/roadmap.md); the findings are in
 [`docs/audit.md`](docs/audit.md).
+
+### Added
+
+- Two editions from one trunk: an `oss` build with the forecast, and a `store`
+  build that collects, logs and summarises the past without stating anything
+  about later. One branching point in the code
+  ([`docs/editions.md`](docs/editions.md)).
+- A **Data sources** screen (audit P6): every link of the collection chain —
+  xDrip and its broadcast, its web service, Nightscout, the minute stream, the
+  own-BLE link, the collector service, the battery policy, notifications, exact
+  alarms, Health Connect, the overlay, NFC — with a status, one line of what
+  breaks while it is red, and the system screen that fixes it; plus a banner on
+  Today when data stops arriving.
+- The offline food-note parser reads English as well as Russian: dish
+  aliases, number words, unit words (grams, millilitres, ounces, cups,
+  tablespoons, teaspoons) and per-unit markers, plus a typical-grams table for
+  portion words ("2 slices", "a cup", "a handful") and diacritic-insensitive
+  matching ("crème"/"creme"). The Open Food Facts barcode lookup now asks for
+  the label in the app's own language (audit P1).
+- A **diagnostics export that carries no values** (audit S10): a text file a
+  tester can share in which every glucose value, dose, carbohydrate amount,
+  note and device identifier is replaced by its unit and shape. The logs it
+  draws on no longer print those values either.
+- Body weight reaches the carbohydrate-sensitivity prior, so the forecast's
+  global carbohydrate factor follows the weight the user entered instead of a
+  fixed constant (audit M4).
+
+### Changed
+
+- The insulin tail domain starts at 240 minutes rather than 120 — the reach of
+  the instrument that measures it — the bundled example person's tail moved to
+  300 minutes, Auto-fit searches 240–480, and the settings card marks a
+  measured end of action that lands short of the floor (audit M1, the first
+  half; the measurement itself is unchanged and still lands short).
 
 ### Planned for 1.4.0 (phase O-B, "first users")
 
 - Onboarding: the disclaimer, manual ISF / ICR / weight, insulin presets, and a
   visible calibration status, so the bundled example person no longer drives a
   stranger's forecast on day one (audit M2, P2).
-- Body weight wired into the carbohydrate-sensitivity prior (audit M4).
-- Insulin tail domain raised so a five-hour tail is reachable, and a warning
-  when the measured end of action lands short of it (audit M1).
 - Release signing with a real upload key, and signed APKs on GitHub Releases
   (audit S8).
-- An English food parser: the offline note reader is Russian-only today
-  (audit P1).
-- A Nightscout glucose source, and a diagnostics export that carries no values.
+- A Nightscout glucose source — the data-sources screen already has its row.
 
 ## [1.3.0] — phase A, "portfolio" — September 2026
 

@@ -56,6 +56,7 @@ import com.diapilot.core.collector.scanMeals
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
+import io.github.obdosok.diapilot.collect.glucoseStalled
 import io.github.obdosok.diapilot.data.DishDialogRuntime
 import io.github.obdosok.diapilot.data.FoodCalculationRegistry
 import io.github.obdosok.diapilot.data.FoodCalculationV1
@@ -94,6 +95,7 @@ internal fun TodayScreen(
     onQuickDextrose: () -> Unit = {},
     onConnectHc: () -> Unit = {},
     onOpenLabel: () -> Unit = {},
+    onOpenDataSources: () -> Unit = {},
     onAddBasal: (Long, Double) -> Unit = { _, _ -> },
     onTagBolus: (Long, String?) -> Unit = { _, _ -> },
     onEditBolusUnits: (Long, Double) -> Unit = { _, _ -> },
@@ -155,10 +157,15 @@ internal fun TodayScreen(
     // can be watched as new data arrive. Trust changes the warning, not access.
     val insulinForecastTrusted =
         state.forecastHealth == com.diapilot.core.twin.ForecastHealth.TRUSTED
-    val hasWhatIfEngine =
-        (state.selectedArmWhatIf && state.hybridWhatIfProfile != null) ||
-            state.twinKernel.isNotEmpty()
-    val activityWhatIfAvailable =
+    // What-if is future tense twice over — a dose nobody has taken, on a line
+    // that has not happened — so the store edition does not carry it. The
+    // panel further down is composed only while this is true, so that edition
+    // loses a block rather than gaining an empty one, and the chart's what-if
+    // overlays stay at their empty defaults and draw nothing.
+    val hasWhatIfEngine = Edition.prospective &&
+        ((state.selectedArmWhatIf && state.hybridWhatIfProfile != null) ||
+            state.twinKernel.isNotEmpty())
+    val activityWhatIfAvailable = Edition.prospective &&
         state.selectedArmWhatIf && state.hybridWhatIfProfile != null
     val whatIfDoses = remember(wiUnits, wiOffset, wiSecond, wiUnits2, wiOffset2) {
         buildList {
@@ -327,6 +334,50 @@ internal fun TodayScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.onSizeChanged { topPx = it.height },
         ) {
+        // DATA STOPPED ARRIVING. Every other line on this screen is about the
+        // last reading the app has, however old it is, so this is the one
+        // banner that belongs above the hero number: while the stream is down
+        // the number is not wrong, it is stale, and nothing else on the screen
+        // says so.
+        //
+        // NOT A NEW ALERT PATH. The threshold is `glucoseStalled`, which is
+        // StreamStallNotifier's own [StreamStallNotifier.STALL_MIN] over the
+        // freshest of the two streams — the same question the notification
+        // already asks, put to state this screen is already holding. It waits
+        // for a loaded state (`readings` is -1 until then), so the first frame
+        // of a cold start cannot flash it.
+        if (state.readings >= 0) {
+            val freshestMs = maxOf(state.lastReading?.tsMs ?: 0L, state.lastMinute?.tsMs ?: 0L)
+            if (glucoseStalled(now, freshestMs)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) {
+                    Column(
+                        Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            if (freshestMs > 0) {
+                                stringResource(
+                                    R.string.data_sources_banner_stalled,
+                                    (now - freshestMs) / 60_000,
+                                )
+                            } else {
+                                stringResource(R.string.data_sources_banner_never)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = onOpenDataSources) {
+                            Text(stringResource(R.string.data_sources_banner_action))
+                        }
+                    }
+                }
+            }
+        }
         state.lastReading?.let { r ->
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(

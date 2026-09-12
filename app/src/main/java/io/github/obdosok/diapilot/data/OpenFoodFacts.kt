@@ -75,15 +75,30 @@ object OpenFoodFacts {
      */
     internal val BARCODE = Regex("""^\d{8,14}$""")
 
-    /** Blocking HTTP lookup — invoke on Dispatchers.IO. Null = not found,
-     *  network failure, or a string that is not a barcode; the manual path
-     *  stays available either way. */
-    fun lookup(barcode: String): Product? {
+    /** Only what [BARCODE] is to the path: a shape check before interpolation,
+     *  never a claim that every caller already passes something safe. */
+    private val LANG_TAG = Regex("""^[a-z]{2}$""")
+
+    /**
+     * Blocking HTTP lookup — invoke on Dispatchers.IO. Null = not found,
+     * network failure, or a string that is not a barcode; the manual path
+     * stays available either way.
+     *
+     * [lang] asks OFF for the product name and brand IN that language when it
+     * has one — the app's own UI language ("en"/"ru"; see [io.github.obdosok.diapilot.i18n.uiLanguage]),
+     * not the phone's, so an English-language install gets English label text
+     * instead of whatever the crowd entered first. Falls back to English on
+     * anything that isn't a two-letter tag, same as an unrecognised system
+     * language already does in [io.github.obdosok.diapilot.i18n.AppLanguage].
+     */
+    fun lookup(barcode: String, lang: String = "en"): Product? {
         if (!BARCODE.matches(barcode)) return null
+        val lc = lang.lowercase().takeIf { LANG_TAG.matches(it) } ?: "en"
         return try {
             val conn = URL(
                 "https://world.openfoodfacts.org/api/v2/product/$barcode.json" +
-                    "?fields=product_name,brands,nutriments,serving_quantity,serving_quantity_unit",
+                    "?fields=product_name,brands,nutriments,serving_quantity,serving_quantity_unit" +
+                    "&lc=$lc",
             ).openConnection() as HttpURLConnection
             try {
                 conn.requestMethod = "GET"

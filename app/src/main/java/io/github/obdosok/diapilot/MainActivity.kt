@@ -2,6 +2,7 @@ package io.github.obdosok.diapilot
 
 
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
@@ -91,6 +92,7 @@ import io.github.obdosok.diapilot.nfc.PenNfcScanner
 import io.github.obdosok.diapilot.ui.AnalysisScreen
 import io.github.obdosok.diapilot.ui.AnnotationComposer
 import io.github.obdosok.diapilot.ui.AskScreen
+import io.github.obdosok.diapilot.ui.DataSourcesScreen
 import io.github.obdosok.diapilot.ui.ForecastAtPointStrip
 import io.github.obdosok.diapilot.ui.GlucoseChart
 import io.github.obdosok.diapilot.ui.SettingsScreen
@@ -141,8 +143,19 @@ class MainActivity : AppCompatActivity() {
         // escalate to the full alarm while the user is already looking.
         Settings.markAppOpened(this)
         // NFC reader mode while the app is visible. Two tag families:
-        //  - NovoPen (IsoDep / NFC-A): dose log import
-        //  - Libre 2 (NfcV / ISO-15693): sensor FRAM read
+        //  - NovoPen (IsoDep / NFC-A): dose log import — both editions
+        //  - Libre 2 (NfcV / ISO-15693): sensor FRAM read — sensor-direct
+        //
+        // The EDITION decides which families the reader even asks for. Without
+        // FLAG_READER_NFC_V the sensor's tag is never dispatched to this app at
+        // all, so holding a sensor to a store-edition phone does exactly
+        // nothing visible — which is the honest outcome. Refusing it with the
+        // "turn it on in Settings" toast would point at a switch that edition
+        // does not have.
+        val readerFlags = android.nfc.NfcAdapter.FLAG_READER_NFC_A or
+            android.nfc.NfcAdapter.FLAG_READER_NFC_B or
+            android.nfc.NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK or
+            if (Edition.sensorDirect) android.nfc.NfcAdapter.FLAG_READER_NFC_V else 0
         android.nfc.NfcAdapter.getDefaultAdapter(this)?.enableReaderMode(
             this,
             { tag ->
@@ -153,10 +166,7 @@ class MainActivity : AppCompatActivity() {
                     else toast(getString(R.string.main_activity_libre_nfc_off))
                 } else handlePenTag(tag)
             },
-            android.nfc.NfcAdapter.FLAG_READER_NFC_A or
-                android.nfc.NfcAdapter.FLAG_READER_NFC_B or
-                android.nfc.NfcAdapter.FLAG_READER_NFC_V or
-                android.nfc.NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
+            readerFlags,
             null,
         )
     }
@@ -417,66 +427,74 @@ class MainActivity : AppCompatActivity() {
                     " · generation ${com.diapilot.core.hybrid.CarbTrianglesV1.GENERATION}",
             )
         }
-        Thread {
-            runCatching {
-                val store = graph.store
-                val artifact = PhysioRuntime.artifact(
-                    store, System.currentTimeMillis(),
-                ) ?: return@runCatching
-                val ins = artifact.personModelAt(12.0, emptySet()).insulin
-                android.util.Log.i(
-                    "PhysioTuning",
-                    ("APPLIED to model: onset %.0f · peak %.0f · tail %.0f · ISF %.3f")
-                        .format(
-                            java.util.Locale.ROOT,
-                            ins.onsetMin, ins.peakMin, ins.tailDurationMin, ins.isf,
-                        ) +
-                        // WHERE THAT ISF CAME FROM, split three ways. The applied
-                        // number is base × circadian × promoted contracts, and
-                        // with only the product printed a session cannot tell a
-                        // promotion that stopped applying from a base that moved.
-                        " · base %.3f · daily at 12h %.3f · pinned by hand %b · global %.3f · learned alternative %s · modifiers %d".format(
-                            java.util.Locale.ROOT,
-                            artifact.baseMechanics.insulin.isf, artifact.effectiveIsf(12.0),
-                            artifact.isfPinnedByHand, artifact.globalIsf.median,
-                            artifact.learnedIsfAlternative?.median
-                                ?.let { "%.3f".format(java.util.Locale.ROOT, it) } ?: "none",
-                            artifact.promotedModifiers.size,
-                        ) + " · artifact ${artifact.artifactId.take(80)}",
-                )
-                // WHAT THE LEDGER LAST STORED FOR THE SCREEN, and it is here
-                // because a test could not answer it. There was a window where
-                // the app recorded the BASE TWIN under `main` while drawing the
-                // physio line, and nothing on the device said so:
-                // rows kept appearing, at the right cadence, with plausible
-                // numbers, and only their CONTENT was the wrong arm. One line
-                // at startup makes the next such divergence visible without a
-                // database pull, which the release build does not allow.
+        // THE LAST BACKGROUND MODEL BUILD ON THE LAUNCH PATH, and it exists to
+        // report the FORECAST model: which ISF and which insulin landmarks
+        // reached the line, and whether the ledger's last screen run matches
+        // the arm being drawn. Both questions are meaningless in an edition
+        // that draws no line, and the build behind them is not free — so the
+        // store edition does not start this thread.
+        if (Edition.prospective) {
+            Thread {
                 runCatching {
-                    (store as SqliteCollectorStore).readableDatabase.rawQuery(
-                        "SELECT algo_version, anchor_ts_ms FROM forecast_runs " +
-                            "WHERE consumer='main' ORDER BY created_at_ms DESC LIMIT 1",
-                        null,
-                    ).use { c ->
-                        if (!c.moveToFirst()) {
-                            android.util.Log.w("PhysioTuning", "ledger: no runs for the screen")
-                        } else {
-                            val tag = c.getString(0)
-                            val ageMin = (System.currentTimeMillis() - c.getLong(1)) / 60_000
-                            val live = HYBRID_V11_SHADOW_ALGO_VERSION
-                            android.util.Log.i(
-                                "PhysioTuning",
-                                "ledger: last screen run $tag, anchor $ageMin min ago" +
-                                    if (tag == live) " — matches the shown model"
-                                    else " — DOES NOT MATCH the shown model ($live)",
-                            )
+                    val store = graph.store
+                    val artifact = PhysioRuntime.artifact(
+                        store, System.currentTimeMillis(),
+                    ) ?: return@runCatching
+                    val ins = artifact.personModelAt(12.0, emptySet()).insulin
+                    android.util.Log.i(
+                        "PhysioTuning",
+                        ("APPLIED to model: onset %.0f · peak %.0f · tail %.0f · ISF %.3f")
+                            .format(
+                                java.util.Locale.ROOT,
+                                ins.onsetMin, ins.peakMin, ins.tailDurationMin, ins.isf,
+                            ) +
+                            // WHERE THAT ISF CAME FROM, split three ways. The applied
+                            // number is base × circadian × promoted contracts, and
+                            // with only the product printed a session cannot tell a
+                            // promotion that stopped applying from a base that moved.
+                            " · base %.3f · daily at 12h %.3f · pinned by hand %b · global %.3f · learned alternative %s · modifiers %d".format(
+                                java.util.Locale.ROOT,
+                                artifact.baseMechanics.insulin.isf, artifact.effectiveIsf(12.0),
+                                artifact.isfPinnedByHand, artifact.globalIsf.median,
+                                artifact.learnedIsfAlternative?.median
+                                    ?.let { "%.3f".format(java.util.Locale.ROOT, it) } ?: "none",
+                                artifact.promotedModifiers.size,
+                            ) + " · artifact ${artifact.artifactId.take(80)}",
+                    )
+                    // WHAT THE LEDGER LAST STORED FOR THE SCREEN, and it is here
+                    // because a test could not answer it. There was a window where
+                    // the app recorded the BASE TWIN under `main` while drawing the
+                    // physio line, and nothing on the device said so:
+                    // rows kept appearing, at the right cadence, with plausible
+                    // numbers, and only their CONTENT was the wrong arm. One line
+                    // at startup makes the next such divergence visible without a
+                    // database pull, which the release build does not allow.
+                    runCatching {
+                        (store as SqliteCollectorStore).readableDatabase.rawQuery(
+                            "SELECT algo_version, anchor_ts_ms FROM forecast_runs " +
+                                "WHERE consumer='main' ORDER BY created_at_ms DESC LIMIT 1",
+                            null,
+                        ).use { c ->
+                            if (!c.moveToFirst()) {
+                                android.util.Log.w("PhysioTuning", "ledger: no runs for the screen")
+                            } else {
+                                val tag = c.getString(0)
+                                val ageMin = (System.currentTimeMillis() - c.getLong(1)) / 60_000
+                                val live = HYBRID_V11_SHADOW_ALGO_VERSION
+                                android.util.Log.i(
+                                    "PhysioTuning",
+                                    "ledger: last screen run $tag, anchor $ageMin min ago" +
+                                        if (tag == live) " — matches the shown model"
+                                        else " — DOES NOT MATCH the shown model ($live)",
+                                )
+                            }
                         }
                     }
+                }.onFailure {
+                    android.util.Log.w("PhysioTuning", "could not read the applied model: ${it.message}")
                 }
-            }.onFailure {
-                android.util.Log.w("PhysioTuning", "could not read the applied model: ${it.message}")
-            }
-        }.start()
+            }.start()
+        }
         if (android.os.Build.VERSION.SDK_INT >= 33 && !MealNotifier.canNotify(this)) {
             notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -626,6 +644,11 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     val graph = LocalAppGraph.current
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(0) }
+    // A LEAF, NOT A TAB. "Data sources" is reached from More and from the
+    // Today banner, and it has to come back to whichever of the two the user
+    // arrived from — so it is a flag over the tab content rather than a sixth
+    // nav slot, which is also the one thing the nav bar has no room for.
+    var showDataSources by rememberSaveable { mutableStateOf(false) }
     var state by remember { mutableStateOf(UiState()) }
 
     // Refresh while the app is open: broadcasts land every ~5 min, the
@@ -1528,7 +1551,10 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     // read as visual noise on a 6-slot bar.
                     NavigationBarItem(
                         selected = tab == i,
-                        onClick = { tab = i },
+                        // Leaving the Data sources leaf too: without this the
+                        // nav bar would highlight a tab whose content the leaf
+                        // is still covering.
+                        onClick = { tab = i; showDataSources = false },
                         icon = { AppNavIcon(t, selected = tab == i) },
                         label = { Text(tabLabel(t), maxLines = 1) },
                         alwaysShowLabel = false,
@@ -1552,7 +1578,11 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             )
         }
         val mod = Modifier.padding(innerPadding)
-        when (Tab.entries[tab]) {
+        // System back leaves the leaf screen instead of the app.
+        BackHandler(enabled = showDataSources) { showDataSources = false }
+        if (showDataSources) {
+            DataSourcesScreen(onBack = { showDataSources = false }, modifier = mod)
+        } else when (Tab.entries[tab]) {
             Tab.TODAY -> Refreshable(refreshing, ::refresh, mod) {
                 TodayScreen(
                     state,
@@ -1561,6 +1591,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     onQuickDextrose = ::quickDextrose,
                     onConnectHc = onConnectHc,
                     onOpenLabel = { tab = Tab.LABEL.ordinal },
+                    onOpenDataSources = { showDataSources = true },
                     onAddBasal = ::addBasal,
                     onTagBolus = ::tagBolus,
                     onEditBolusUnits = ::editBolusUnits,
@@ -1727,6 +1758,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             Tab.ASK -> AskScreen(modifier = mod)
             Tab.SETTINGS -> SettingsScreen(
                 modifier = mod,
+                onOpenDataSources = { showDataSources = true },
                 // The auto-fit lists the episodes it used; each is tappable and
                 // lands on the chart at that moment. Same path History already
                 // takes, and for the same reason — an episode months back is

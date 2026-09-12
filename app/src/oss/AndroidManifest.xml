@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  THE OSS EDITION'S OWN PERMISSIONS — the two the store edition must not ask
+  for. Everything else lives in `src/main/AndroidManifest.xml`, which both
+  editions share; see docs/editions.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Own BLE link to the sensor (LibreBleClient). Sensor-direct, so the
+         store edition has no caller for it and therefore does not declare it. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Exact alarms WITHOUT the user-revocable grant. Play restricts this one
+         to alarm/timer/calendar apps (audit P3): a store submission carrying it
+         is rejected on the manifest alone. SCHEDULE_EXACT_ALARM stays in the
+         shared manifest, so the store edition keeps the capability and only
+         loses the automatic grant. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+</manifest>

@@ -1,0 +1,15 @@
+<resources>
+    <!--
+      PLACEHOLDER, AND THE REAL NAME IS STILL AN OPEN DECISION.
+
+      `roadmap.md` lists "store name" as a checkpoint before O-B; this value
+      exists so the two editions are already distinguishable on one phone (the
+      launcher, the notification header, the share sheet) and so nothing in the
+      code has to ask which edition it is running in to spell its own name.
+      Replace it with the chosen name — do not build a listing on it.
+
+      `translatable="false"` matches the shared `app_name`: the name is a brand,
+      the same in both languages, so there is no values-ru counterpart.
+    -->
+    <string name="app_name" translatable="false">DiaPilot Log</string>
+</resources>

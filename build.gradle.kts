@@ -26,7 +26,18 @@ tasks.register("verifyProjectIsolation") {
 
 allprojects {
     tasks.configureEach {
-        if (name in setOf("test", "testDebugUnitTest", "compileDebugAndroidTestKotlin", "assembleDebug")) {
+        // MATCHED BY SHAPE, NOT BY A FIXED LIST. `:app` is built in two
+        // editions, so the variant task names carry the flavor —
+        // `testOssDebugUnitTest`, `assembleStoreDebug`,
+        // `compileOssDebugAndroidTestKotlin`. The literal set that used to be
+        // here named only the flavorless `…Debug…` tasks, which after the
+        // edition split exist no more: every build would have run with the
+        // isolation check silently unwired.
+        val checksIsolation = name == "test" ||
+            (name.startsWith("test") && name.endsWith("UnitTest")) ||
+            (name.startsWith("compile") && name.endsWith("AndroidTestKotlin")) ||
+            name.startsWith("assemble")
+        if (checksIsolation) {
             dependsOn(rootProject.tasks.named("verifyProjectIsolation"))
         }
     }

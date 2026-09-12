@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.MGDL_PER_MMOL_F
 import io.github.obdosok.diapilot.AppIdentity
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.LocalAppGraph
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.collect.AlarmPlayer
@@ -63,7 +64,11 @@ import kotlinx.coroutines.launch
  * display units but stored in mmol/L (the storage truth).
  */
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit = {}) {
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    onShowOnChart: (Long) -> Unit = {},
+    onOpenDataSources: () -> Unit = {},
+) {
     val context = LocalContext.current
     val graph = LocalAppGraph.current
     var mgdl by remember { mutableStateOf(Units.isMgdl(context)) }
@@ -105,7 +110,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
 
         // High on the screen on purpose: this is the section under active tuning,
         // and it is also the section that can change when an alarm fires.
-        PhysioTuningSection(modifier = Modifier.fillMaxWidth(), onShowOnChart = onShowOnChart)
+        //
+        // THE WHOLE TUNING SURFACE IS PROSPECTIVE, Auto-fit included — every
+        // knob in it moves the forward line, and the section's own readouts are
+        // about what the model will do. The store edition therefore does not
+        // compose it at all: the card is absent, not present and inert.
+        if (Edition.prospective) {
+            PhysioTuningSection(modifier = Modifier.fillMaxWidth(), onShowOnChart = onShowOnChart)
+        }
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
@@ -354,6 +366,9 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             model, artifact, profileState?.curve, deviations,
                             profileState?.let { InsulinProfileRuntime.explain(it, context) },
                             profileState?.refusals.orEmpty(),
+                            profileState?.let {
+                                InsulinProfileRuntime.measuredTailBelowFloorMin(it)
+                            },
                         )
                     }
                 }
@@ -452,6 +467,23 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                             style = MaterialTheme.typography.labelSmall,
                             color = if (measuredShape) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // NEXT TO THE MEASURED NUMBER, not in a warning banner.
+                    // The line above states an end of action, and a reader has
+                    // no way to tell a measurement from the edge of the
+                    // measurement window, which for this instrument is four
+                    // hours (audit M1). So the mark sits where the number is.
+                    insulinView?.measuredTailBelowFloorMin?.let { measuredEnd ->
+                        Text(
+                            String.format(
+                                java.util.Locale.ROOT,
+                                stringResource(R.string.settings_screen_measured_tail_below_floor),
+                                measuredEnd,
+                                InsulinProfileRuntime.TAIL_DOMAIN_FLOOR_MIN,
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     // And who was refused, because a "perfectly compensated
@@ -813,89 +845,119 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
             }
         }
 
+        // THE SENSOR-DIRECT CARD. Both switches in it talk to the sensor
+        // itself — the NFC FRAM read and the own BLE link, which needs the keys
+        // that read produces — so the store edition, which stays on the sources
+        // another app already owns, does not compose the card at all. A card
+        // whose every control is unreachable is worse than a missing one: it
+        // tells the user a capability exists and then refuses it.
+        if (Edition.sensorDirect) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_screen_libre_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    // Libre NFC scan: opt-in, because the OOP2 decode reply is a
+                    // broadcast every listening app receives (see
+                    // Settings.libreNfcEnabled). Own BLE needs it: the keys come
+                    // from a scan.
+                    var libreNfc by remember { mutableStateOf(Settings.libreNfcEnabled(context)) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_screen_libre_nfc_label),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = libreNfc,
+                            onCheckedChange = {
+                                libreNfc = it
+                                Settings.setLibreNfcEnabled(context, it)
+                            },
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.settings_screen_libre_nfc_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    var ownBle by remember { mutableStateOf(Settings.ownBleEnabled(context)) }
+                    val btPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                    ) { granted ->
+                        if (granted) {
+                            Settings.setOwnBleEnabled(context, true)
+                            ownBle = true
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.settings_screen_own_ble_label))
+                        Switch(
+                            checked = ownBle,
+                            onCheckedChange = { on ->
+                                if (on && android.os.Build.VERSION.SDK_INT >= 31 &&
+                                    context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) !=
+                                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    btPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
+                                } else {
+                                    Settings.setOwnBleEnabled(context, on)
+                                    ownBle = on
+                                }
+                            },
+                        )
+                    }
+                    val bleState = remember(ownBle) {
+                        Libre2State.load(context)
+                    }
+                    Text(
+                        if (bleState != null) {
+                            stringResource(
+                                R.string.settings_screen_libre_state_info,
+                                bleState.serial, bleState.mac, bleState.connectionIndex, bleState.unlockArray.size,
+                            )
+                        } else {
+                            stringResource(R.string.settings_screen_libre_no_keys)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.settings_screen_libre_warning),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        // THE CHAIN, NOT THE FIELDS. The card below this one dumps the live
+        // numbers a maintainer reads; this one leads to the screen that names
+        // every link a stranger's phone can break (audit P6) and what to do
+        // about each. Both editions have it: collection is the store
+        // edition's whole job.
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    stringResource(R.string.settings_screen_libre_title),
+                    stringResource(R.string.data_sources_settings_button),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                // Libre NFC scan: opt-in, because the OOP2 decode reply is a
-                // broadcast every listening app receives (see
-                // Settings.libreNfcEnabled). Own BLE needs it: the keys come
-                // from a scan.
-                var libreNfc by remember { mutableStateOf(Settings.libreNfcEnabled(context)) }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.settings_screen_libre_nfc_label),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = libreNfc,
-                        onCheckedChange = {
-                            libreNfc = it
-                            Settings.setLibreNfcEnabled(context, it)
-                        },
-                    )
-                }
                 Text(
-                    stringResource(R.string.settings_screen_libre_nfc_hint),
+                    stringResource(R.string.data_sources_settings_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                var ownBle by remember { mutableStateOf(Settings.ownBleEnabled(context)) }
-                val btPermission = androidx.activity.compose.rememberLauncherForActivityResult(
-                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) {
-                        Settings.setOwnBleEnabled(context, true)
-                        ownBle = true
-                    }
+                TextButton(onClick = onOpenDataSources) {
+                    Text(stringResource(R.string.data_sources_settings_open))
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.settings_screen_own_ble_label))
-                    Switch(
-                        checked = ownBle,
-                        onCheckedChange = { on ->
-                            if (on && android.os.Build.VERSION.SDK_INT >= 31 &&
-                                context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) !=
-                                android.content.pm.PackageManager.PERMISSION_GRANTED
-                            ) {
-                                btPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
-                            } else {
-                                Settings.setOwnBleEnabled(context, on)
-                                ownBle = on
-                            }
-                        },
-                    )
-                }
-                val bleState = remember(ownBle) {
-                    Libre2State.load(context)
-                }
-                Text(
-                    if (bleState != null) {
-                        stringResource(
-                            R.string.settings_screen_libre_state_info,
-                            bleState.serial, bleState.mac, bleState.connectionIndex, bleState.unlockArray.size,
-                        )
-                    } else {
-                        stringResource(R.string.settings_screen_libre_no_keys)
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.settings_screen_libre_warning),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
 
@@ -988,6 +1050,38 @@ fun SettingsScreen(modifier: Modifier = Modifier, onShowOnChart: (Long) -> Unit 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // THE SAME CARD, because the file is this card plus the app's
+                // own log lines — and the file is the only way those lines
+                // leave the phone without a cable. Both editions: a collection
+                // problem is not a prospective feature.
+                val diagShareScope = androidx.compose.runtime.rememberCoroutineScope()
+                androidx.compose.material3.TextButton(onClick = {
+                    diagShareScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val intent = runCatching {
+                            io.github.obdosok.diapilot.diag.DiagnosticsReport
+                                .shareIntent(context, graph.store)
+                        }.getOrNull()
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            if (intent == null) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    context.localized()
+                                        .getString(R.string.settings_screen_diagnostics_share_failed),
+                                    android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            } else {
+                                context.startActivity(
+                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        }
+                    }
+                }) { Text(stringResource(R.string.settings_screen_diagnostics_share)) }
+                Text(
+                    stringResource(R.string.settings_screen_diagnostics_share_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
@@ -1632,6 +1726,10 @@ data class InsulinCardView(
     /** Doses that gave no landmark at all, by named reason â€” a "perfectly
      * compensated meal" is one of them and must be visible. */
     val refusals: Map<com.diapilot.core.physio.LandmarkRefusal, Int> = emptyMap(),
+    /** The measured end of action when it fell under the domain floor, so the
+     * card can say the window ran out rather than the insulin ran out - see
+     * [InsulinProfileRuntime.measuredTailBelowFloorMin]. */
+    val measuredTailBelowFloorMin: Double? = null,
 )
 
 /**

@@ -3,12 +3,13 @@ package io.github.obdosok.diapilot.collect
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.diapilot.core.collector.ACTION_BG
 import com.diapilot.core.collector.Reading
 import com.diapilot.core.collector.parseBgBroadcast
 import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.Stores
+import io.github.obdosok.diapilot.diag.DiagLog
+import io.github.obdosok.diapilot.diag.Redact
 
 /**
  * Receives xDrip BgEstimate broadcasts and persists each glucose reading.
@@ -43,7 +44,7 @@ class XdripBgReceiver(
             // intent comes from something else, and glucose is the forecast
             // anchor. There is nothing to ignore selectively here.
             if (!XdripApp.installed(context)) {
-                Log.w(TAG, "BgEstimate received while xDrip is not installed — dropped")
+                DiagLog.w(TAG, "BgEstimate received while xDrip is not installed — dropped")
                 return null
             }
             val extras = intent.extras ?: return null
@@ -54,20 +55,29 @@ class XdripBgReceiver(
             val reading = parseBgBroadcast(map, System.currentTimeMillis())
             if (reading == null) {
                 // Keys only: a value out of bounds is still a value.
-                Log.w(TAG, "BgEstimate broadcast refused, keys=${map.keys}")
+                DiagLog.w(TAG, "BgEstimate broadcast refused, keys=${map.keys}")
                 return null
             }
             // Own-BLE mode: DiaPilot is the single glucose source. xDrip's
             // scale differs slightly from the minute calibration — mixing
             // them makes a 5-minute sawtooth and flips the delta sign.
             if (Settings.ownBleEnabled(context)) {
-                Log.d(TAG, "own-BLE mode: xDrip reading ignored")
+                DiagLog.d(TAG, "own-BLE mode: xDrip reading ignored")
                 TreatmentsPollWorker.pollIfStale(context)
                 return null
             }
             Stores.get(context).upsertReading(reading)
             DataPulse.pulse()   // release any watch long-poll instantly
-            Log.d(TAG, "BG ${"%.1f".format(reading.mmol)} mmol/L @ ${reading.tsMs} (${reading.trend})")
+            // THE ARRIVAL, NOT THE VALUE (docs/audit.md, S10). The value was
+            // printed here at debug level, so a shared bug report carried
+            // hours of a stranger's glucose history. What debugging this path
+            // needs is that a reading arrived, how old it was and which way it
+            // was pointing — the number itself never answered a question.
+            DiagLog.i(
+                TAG,
+                "BG ${Redact.glucose(mgdl = false)} arrived, " +
+                    "${Redact.minutesAgo(System.currentTimeMillis(), reading.tsMs)} (${reading.trend})",
+            )
             // Each broadcast doubles as a background wake-up: catch up on
             // treatments/pebble if the periodic worker has been dozing.
             TreatmentsPollWorker.pollIfStale(context)

@@ -32,7 +32,10 @@ jobs:
       # this image and settings.gradle.kts / build.gradle.kts never read
       # sdk.dir, so nothing needs to be generated here.
       - name: Build and test
-        run: ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug --console=plain
+        # `:app:test` and `:app:assembleDebug` are the aggregates over both
+        # editions (oss and store, see docs/editions.md), so the edition
+        # contract is checked on each flavor.
+        run: ./gradlew :core:test :app:test :app:assembleDebug --console=plain
 
   secrets:
     name: Secret scan

@@ -41,8 +41,12 @@ class CoexistenceTest {
         io.github.obdosok.diapilot.data.Secrets.reset()
     }
 
+    /** The oss edition's id; the store edition adds `.store` to it. */
+    private val publicId = "io.github.obdosok.diapilot" +
+        if (BuildConfig.FLAVOR == "store") ".store" else ""
+
     @Test fun `the public build has its own applicationId`() {
-        assertEquals("io.github.obdosok.diapilot", BuildConfig.APPLICATION_ID)
+        assertEquals(publicId, BuildConfig.APPLICATION_ID)
         assertEquals(BuildConfig.APPLICATION_ID, AppIdentity.APPLICATION_ID)
         assertEquals(BuildConfig.APPLICATION_ID, context.packageName)
     }
@@ -84,7 +88,13 @@ class CoexistenceTest {
         val ours = AppIdentity.autoBackupPrefix()
         val other = AppIdentity.autoBackupName(3, applicationId = legacyId)
         val suffixed = AppIdentity.autoBackupName(3, applicationId = BuildConfig.APPLICATION_ID + ".dev")
-        assertEquals("io.github.obdosok.diapilot-auto-backup-3.sqlite", AppIdentity.autoBackupName(3))
+        assertEquals("$publicId-auto-backup-3.sqlite", AppIdentity.autoBackupName(3))
+        // And the two editions' own copies never match each other either: the
+        // suffixed id is not a prefix of the clean one, in either direction.
+        assertFalse(
+            AppIdentity.autoBackupName(3, applicationId = "io.github.obdosok.diapilot.store")
+                .startsWith(AppIdentity.autoBackupPrefix("io.github.obdosok.diapilot")),
+        )
         assertTrue(AppIdentity.autoBackupName(3).startsWith(ours))
         assertFalse(other.startsWith(ours))
         assertFalse(suffixed.startsWith(ours))
@@ -109,7 +119,11 @@ class CoexistenceTest {
         Settings.setLibreNfcEnabled(context, true)
         assertTrue(Settings.watchServerEnabled(context))
         assertTrue(Settings.autoBackupEnabled(context))
-        assertTrue(Settings.libreNfcEnabled(context))
+        // The Libre scan is sensor-direct, so the EDITION has the last word:
+        // in the store edition the switch writes the preference and the
+        // capability still reports off. `EditionContractTest` owns that rule;
+        // here it only keeps this test honest about what it observes.
+        assertEquals(Edition.sensorDirect, Settings.libreNfcEnabled(context))
         assertEquals(
             BackupRestore.AutoBackupTargets(downloads = true, cloud = false, companion = false),
             BackupRestore.autoBackupTargets(context),

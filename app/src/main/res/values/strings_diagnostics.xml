@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The value-free diagnostics export (diag/DiagnosticsReport): the button in
+  Settings, the share sheet, and what to say when the file cannot be written.
+  The FILE's own text is English by design — see DiagnosticsBundle.
+-->
+<resources>
+    <string name="settings_screen_diagnostics_share">Send diagnostics</string>
+    <string name="settings_screen_diagnostics_share_hint">Makes a text file about data collection and offers to send it. It contains statuses, counts, ages in minutes and the app\'s own log lines; every glucose value, dose, carbohydrate amount and note is replaced by its unit, and the sensor serial is removed. The file says at the top what was removed and what was kept, and you can read it before sending.</string>
+    <string name="settings_screen_diagnostics_share_failed">The diagnostics file could not be written.</string>
+    <string name="diagnostics_share_subject">DiaPilot diagnostics (no values)</string>
+    <string name="diagnostics_share_chooser">Send diagnostics</string>
+</resources>

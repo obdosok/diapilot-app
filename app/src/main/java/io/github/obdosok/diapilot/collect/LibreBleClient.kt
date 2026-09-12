@@ -14,6 +14,7 @@ import android.os.Looper
 import android.util.Log
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.Libre2State
+import io.github.obdosok.diapilot.diag.DiagLog
 import io.github.obdosok.diapilot.i18n.localized
 import java.util.UUID
 
@@ -186,7 +187,7 @@ class LibreBleClient(private val context: Context) {
      *  even disconnect() never calls back (true zombie GATT). */
     private fun forceReconnect(reason: String) {
         val g = gatt
-        Log.w(TAG, "watchdog: $reason — forcing reconnect")
+        DiagLog.w(TAG, "watchdog: $reason — forcing reconnect")
         status = context.localized().getString(R.string.libre_ble_client_status_stream_stalled)
         loginSentThisSession = false        // not a login reject; don't advance the probe
         reconnectDelayMs = RECONNECT_DELAY_MS  // sensor was reachable — retry fast
@@ -237,14 +238,14 @@ class LibreBleClient(private val context: Context) {
             } else {
                 text.getString(R.string.libre_ble_client_status_connecting, state.mac)
             }
-            Log.i(TAG, "connecting to ${state.mac}, connectionIndex=${state.connectionIndex}, auto=$auto")
+            DiagLog.i(TAG, "connecting to ${state.mac}, connectionIndex=${state.connectionIndex}, auto=$auto")
             bufferFilled = 0
             packetsThisSession = 0
             linkUp = false
             markProgress()   // arm the watchdog for this attempt
             gatt = device.connectGatt(context, auto, callback, android.bluetooth.BluetoothDevice.TRANSPORT_LE)
         } catch (e: Exception) {
-            Log.w(TAG, "connect failed: ${e.message}")
+            DiagLog.w(TAG, "connect failed: ${e.message}")
             scheduleReconnect()
         }
     }
@@ -290,7 +291,7 @@ class LibreBleClient(private val context: Context) {
         // is stale, cancel the pending retry and reconnect now.
         val silence = now - maxOf(lastPacketMs, lastProgressMs)
         if (silence > STREAM_SILENCE_MS) {
-            Log.w(TAG, "doze wake: no link, stream silent ${silence / 1000}s — reconnecting")
+            DiagLog.w(TAG, "doze wake: no link, stream silent ${silence / 1000}s — reconnecting")
             wake()
             handler.removeCallbacks(reconnectRunnable)
             reconnectDelayMs = RECONNECT_DELAY_MS
@@ -300,7 +301,7 @@ class LibreBleClient(private val context: Context) {
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, s: Int, newState: Int) {
-            Log.i(TAG, "connection state=$newState status=$s packets=$packetsThisSession")
+            DiagLog.i(TAG, "connection state=$newState status=$s packets=$packetsThisSession")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 packetsThisSession = 0
                 linkUp = true
@@ -308,7 +309,7 @@ class LibreBleClient(private val context: Context) {
                 markProgress()
                 status = context.localized().getString(R.string.libre_ble_client_status_discovering)
                 if (!g.discoverServices()) {
-                    Log.w(TAG, "discoverServices() rejected — reconnecting")
+                    DiagLog.w(TAG, "discoverServices() rejected — reconnecting")
                     g.disconnect()
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -338,7 +339,7 @@ class LibreBleClient(private val context: Context) {
                     // the exponential ladder is for an absent sensor.
                     probeIdx = (probeIdx + 1) % probeOffsets.size
                     reconnectDelayMs = RECONNECT_DELAY_MS
-                    Log.w(TAG, "login rejected; probing nonce offset ${probeOffsets[probeIdx]}")
+                    DiagLog.w(TAG, "login rejected; probing nonce offset ${probeOffsets[probeIdx]}")
                     if (probeIdx == 0) {
                         // Full circle, nothing accepted — the counter is far
                         // out of the probe range (today: sensor at 1, we at
@@ -354,7 +355,7 @@ class LibreBleClient(private val context: Context) {
                     // sensor pausing its advertising. Direct 30s windows will
                     // keep missing the moment it frees; ARM a passive
                     // autoConnect that grabs it the instant it advertises.
-                    if (!autoConnectMode) Log.w(TAG, "establish failed — arming passive autoConnect")
+                    if (!autoConnectMode) DiagLog.w(TAG, "establish failed — arming passive autoConnect")
                     autoConnectMode = true
                     reconnectDelayMs = RECONNECT_DELAY_MS   // armed gatt waits; no ladder needed
                 }
@@ -369,12 +370,12 @@ class LibreBleClient(private val context: Context) {
             c: BluetoothGattCharacteristic,
             s: Int,
         ) {
-            Log.i(TAG, "characteristic write ${c.uuid} status=$s")
+            DiagLog.i(TAG, "characteristic write ${c.uuid} status=$s")
             if (c.uuid != LOGIN_CHAR) return
             if (s != BluetoothGatt.GATT_SUCCESS) {
                 // The write itself failed — the sensor won't stream. Drop the
                 // link so the reconnect path (and probe) gets another go.
-                Log.w(TAG, "login write failed status=$s — reconnecting")
+                DiagLog.w(TAG, "login write failed status=$s — reconnecting")
                 g.disconnect()
                 return
             }
@@ -382,7 +383,7 @@ class LibreBleClient(private val context: Context) {
             // Login is in → arm the CCCD so the stream has somewhere to land.
             val cccd = g.getService(SERVICE)?.getCharacteristic(DATA_CHAR)?.getDescriptor(CCCD)
             if (cccd == null) {
-                Log.w(TAG, "CCCD missing — reconnecting")
+                DiagLog.w(TAG, "CCCD missing — reconnecting")
                 g.disconnect()
                 return
             }
@@ -390,7 +391,7 @@ class LibreBleClient(private val context: Context) {
             cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             @Suppress("DEPRECATION")
             if (!g.writeDescriptor(cccd)) {
-                Log.w(TAG, "writeDescriptor rejected — reconnecting")
+                DiagLog.w(TAG, "writeDescriptor rejected — reconnecting")
                 g.disconnect()
                 return
             }
@@ -399,13 +400,13 @@ class LibreBleClient(private val context: Context) {
 
         override fun onServicesDiscovered(g: BluetoothGatt, s: Int) {
             if (s != BluetoothGatt.GATT_SUCCESS) {
-                Log.w(TAG, "service discovery failed status=$s — reconnecting")
+                DiagLog.w(TAG, "service discovery failed status=$s — reconnecting")
                 g.disconnect()
                 return
             }
             val svc = g.getService(SERVICE)
             if (svc == null) {
-                Log.w(TAG, "fde3 service missing; reconnecting")
+                DiagLog.w(TAG, "fde3 service missing; reconnecting")
                 g.disconnect()
                 return
             }
@@ -417,14 +418,14 @@ class LibreBleClient(private val context: Context) {
             // no packets and nothing to reconnect it — a silent stall.
             val data = svc.getCharacteristic(DATA_CHAR)
             if (data == null) {
-                Log.w(TAG, "data characteristic missing — reconnecting")
+                DiagLog.w(TAG, "data characteristic missing — reconnecting")
                 g.disconnect()
                 return
             }
             g.setCharacteristicNotification(data, true)
             val state = Libre2State.load(context)
             if (state == null) {
-                Log.w(TAG, "no credentials — reconnecting")
+                DiagLog.w(TAG, "no credentials — reconnecting")
                 g.disconnect()
                 return
             }
@@ -432,14 +433,14 @@ class LibreBleClient(private val context: Context) {
             val unlock = state.unlockArray.getOrNull(probedIndex - state.unlockStartIndex)
             if (unlock == null) {
                 status = context.localized().getString(R.string.libre_ble_client_status_unlock_exhausted)
-                Log.w(TAG, "no unlock buffer for index $probedIndex")
+                DiagLog.w(TAG, "no unlock buffer for index $probedIndex")
                 probeIdx = (probeIdx + 1) % probeOffsets.size
                 g.disconnect()
                 return
             }
             val login = svc.getCharacteristic(LOGIN_CHAR)
             if (login == null) {
-                Log.w(TAG, "login characteristic missing — reconnecting")
+                DiagLog.w(TAG, "login characteristic missing — reconnecting")
                 g.disconnect()
                 return
             }
@@ -448,17 +449,17 @@ class LibreBleClient(private val context: Context) {
             login.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             @Suppress("DEPRECATION")
             if (!g.writeCharacteristic(login)) {
-                Log.w(TAG, "login writeCharacteristic rejected — reconnecting")
+                DiagLog.w(TAG, "login writeCharacteristic rejected — reconnecting")
                 g.disconnect()
                 return
             }
             loginSentThisSession = true
             status = context.localized().getString(R.string.libre_ble_client_status_login_sent, probedIndex)
-            Log.i(TAG, "login sent first, ${unlock.size} bytes, index=$probedIndex")
+            DiagLog.i(TAG, "login sent first, ${unlock.size} bytes, index=$probedIndex")
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, s: Int) {
-            Log.i(TAG, "descriptor write status=$s")
+            DiagLog.i(TAG, "descriptor write status=$s")
             if (s != BluetoothGatt.GATT_SUCCESS) {
                 status = context.localized().getString(R.string.libre_ble_client_status_subscribe_failed, s)
                 g.disconnect()

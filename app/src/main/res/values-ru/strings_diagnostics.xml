@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_screen_diagnostics_share">Отправить диагностику</string>
+    <string name="settings_screen_diagnostics_share_hint">Создаёт текстовый файл о сборе данных и предлагает его отправить. В нём статусы, количества, давность в минутах и собственные строки журнала приложения; каждое значение глюкозы, доза, количество углеводов и заметка заменены на единицу измерения, серийный номер сенсора удалён. В начале файла написано, что удалено и что оставлено, — файл можно прочитать перед отправкой.</string>
+    <string name="settings_screen_diagnostics_share_failed">Не удалось записать файл диагностики.</string>
+    <string name="diagnostics_share_subject">Диагностика DiaPilot (без значений)</string>
+    <string name="diagnostics_share_chooser">Отправить диагностику</string>
+</resources>

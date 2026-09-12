@@ -139,7 +139,9 @@ class PhysioTuningTest {
             onsetMin = 28.0,
             fullSpeedMin = 40.0,
             phaseMin = 30.0,
-            tailMin = 165.0,
+            // Inside `insulinTailMinRange`, whose floor is now 240 (audit M1):
+            // `tuned` returns null for a candidate the domain would have to move.
+            tailMin = 300.0,
             emptyingKcalPerHour = 200.0,
             carbSieving = 0.80,
             carbSpread = 1.1,

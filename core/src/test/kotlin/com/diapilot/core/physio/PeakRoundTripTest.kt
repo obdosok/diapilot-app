@@ -20,7 +20,9 @@ import org.junit.Test
 class PeakRoundTripTest {
 
     private fun roundTrip(peak: Double): Double? {
-        val want = InsulinShapeLandmarksV1(23.0, peak, peak + 18.0, 190.0)
+        // 300, not 190: `tuned`/`coerceIntoDomain` refuse a candidate the
+        // domain has to move, and the end-of-action floor is now 240 (audit M1).
+        val want = InsulinShapeLandmarksV1(23.0, peak, peak + 18.0, 300.0)
         if (!want.ordered) return null
         val (lm, moved) = InsulinShapeV1.coerceIntoDomain(want)
         if (moved.isNotEmpty()) return null

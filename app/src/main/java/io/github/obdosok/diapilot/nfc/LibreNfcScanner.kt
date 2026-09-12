@@ -2,8 +2,8 @@ package io.github.obdosok.diapilot.nfc
 
 import android.nfc.Tag
 import android.nfc.tech.NfcV
-import android.util.Log
 import com.diapilot.core.libre.FRAM_SIZE
+import io.github.obdosok.diapilot.diag.DiagLog
 
 /**
  * Libre 2 NFC transport: read patchInfo and the (encrypted) 344-byte FRAM
@@ -39,7 +39,7 @@ class LibreNfcScanner {
             val fram = readFram(nfcv) ?: return null
             RawScan(uid, patchInfo, fram)
         } catch (e: Exception) {
-            Log.w(TAG, "scan failed: ${e.message}")
+            DiagLog.w(TAG, "scan failed: ${e.message}")
             null
         } finally {
             runCatching { nfcv.close() }
@@ -59,13 +59,13 @@ class LibreNfcScanner {
             val cmd = byteArrayOf(0x02, 0xA1.toByte(), mfr) + nfcUnlock
             val res = nfcv.transceive(cmd)
             if (res.size != 7) {
-                Log.w(TAG, "enableStreaming: unexpected reply len ${res.size}")
+                DiagLog.w(TAG, "enableStreaming: unexpected reply len ${res.size}")
                 return null
             }
             res.copyOfRange(1, 7).reversedArray()
                 .joinToString(":") { "%02X".format(it) }
         } catch (e: Exception) {
-            Log.w(TAG, "enableStreaming failed: ${e.message}")
+            DiagLog.w(TAG, "enableStreaming failed: ${e.message}")
             null
         } finally {
             runCatching { nfcv.close() }
@@ -85,7 +85,7 @@ class LibreNfcScanner {
                 try {
                     nfcv.transceive(byteArrayOf(0x02, 0x23, i.toByte(), 0x00))
                 } catch (e2: Exception) {
-                    Log.w(TAG, "block $i read failed: ${e2.message}")
+                    DiagLog.w(TAG, "block $i read failed: ${e2.message}")
                     return null
                 }
             }

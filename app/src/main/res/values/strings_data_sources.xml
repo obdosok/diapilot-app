@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "Data sources" screen: one row per link in the collection chain, the
+     stalled-data banner on Today, and the entry point under More. -->
+<resources>
+    <string name="data_sources_title">Data sources</string>
+    <string name="data_sources_intro">Everything the app needs to receive data. Anything that is not green is a reason data may stop arriving.</string>
+    <string name="data_sources_back">Back</string>
+    <string name="data_sources_recheck">Check again</string>
+
+    <!-- More -> Data sources -->
+    <string name="data_sources_settings_button">Data sources</string>
+    <string name="data_sources_settings_hint">xDrip, its web service, the collector, permissions — what is arriving and what is not.</string>
+    <string name="data_sources_settings_open">Open</string>
+
+    <!-- Today banner: shown while no reading has arrived for a while. -->
+    <string name="data_sources_banner_stalled">No new glucose for %1$d min.</string>
+    <string name="data_sources_banner_never">No glucose data yet.</string>
+    <string name="data_sources_banner_action">Check the data sources</string>
+
+    <!-- Row titles -->
+    <string name="data_sources_row_xdrip_app_title">xDrip+ installed</string>
+    <string name="data_sources_row_xdrip_broadcast_title">Glucose broadcast</string>
+    <string name="data_sources_row_xdrip_web_title">xDrip web service</string>
+    <string name="data_sources_row_nightscout_title">Nightscout</string>
+    <string name="data_sources_row_oop2_title">OOPAlgorithm2 minute stream</string>
+    <string name="data_sources_row_own_ble_title">Own sensor link (BLE)</string>
+    <string name="data_sources_row_battery_title">Battery optimization</string>
+    <string name="data_sources_row_notifications_title">Notifications</string>
+    <string name="data_sources_row_exact_alarms_title">Exact alarms</string>
+    <string name="data_sources_row_collector_service_title">Collector service</string>
+    <string name="data_sources_row_health_connect_title">Health Connect</string>
+    <string name="data_sources_row_overlay_title">Lock-screen chip</string>
+    <string name="data_sources_row_nfc_title">NFC</string>
+
+    <!-- One line per row: what breaks while it is red. -->
+    <string name="data_sources_row_xdrip_app_why">xDrip+ owns the sensor. Without it the app receives no glucose at all.</string>
+    <string name="data_sources_row_xdrip_broadcast_why">The main glucose feed. When it stops, the chart, the status and the alerts stop with it.</string>
+    <string name="data_sources_row_xdrip_web_why">Doses and missed readings are fetched over this service. Without it insulin is absent and gaps in the chart stay empty.</string>
+    <string name="data_sources_row_nightscout_why">A second glucose source. Without one, a break in xDrip leaves the app with nothing to read.</string>
+    <string name="data_sources_row_oop2_why">The per-minute glucose stream. Without it no alert can fire at all — the hypo alert and rapid-fall detection both run on this beat; the widget falls back to its 30-minute refresh.</string>
+    <string name="data_sources_row_own_ble_why">This app\'s own link to the sensor. While it is off, glucose comes from xDrip only.</string>
+    <string name="data_sources_row_battery_why">Under battery optimization Android puts the app to sleep, and collection sleeps with it — usually overnight.</string>
+    <string name="data_sources_row_notifications_why">Blocked notifications mean the low-glucose warning cannot reach you.</string>
+    <string name="data_sources_row_exact_alarms_why">Without exact alarms the night-time checks are deferred by the system and a warning can arrive late.</string>
+    <string name="data_sources_row_collector_service_why">The service that listens for readings. Stopped, nothing is collected while the app is closed.</string>
+    <string name="data_sources_row_health_connect_why">Heart rate, sleep and steps arrive from here. Without them the model cannot see activity.</string>
+    <string name="data_sources_row_overlay_why">Shows glucose over the lock screen. Off, the app has to be opened to look.</string>
+    <string name="data_sources_row_nfc_why">NFC reads the insulin pen\'s dose log.</string>
+    <string name="data_sources_row_nfc_why_sensor_direct">NFC reads the insulin pen\'s dose log and scans the sensor.</string>
+
+    <!-- Statuses -->
+    <string name="data_sources_status_fresh">%1$d min ago</string>
+    <string name="data_sources_status_late">late — %1$d min ago</string>
+    <string name="data_sources_status_stalled">stopped — nothing for %1$d min</string>
+    <string name="data_sources_status_never">nothing yet</string>
+    <string name="data_sources_status_installed">installed</string>
+    <string name="data_sources_status_missing">not installed</string>
+    <string name="data_sources_status_reachable">answered %1$d min ago</string>
+    <string name="data_sources_status_unreachable">no answer</string>
+    <string name="data_sources_status_not_checked">not checked yet</string>
+    <string name="data_sources_status_configured">configured</string>
+    <string name="data_sources_status_not_configured">not configured</string>
+    <string name="data_sources_status_allowed">allowed</string>
+    <string name="data_sources_status_restricted">restricted</string>
+    <string name="data_sources_status_granted">granted</string>
+    <string name="data_sources_status_denied">not granted</string>
+    <string name="data_sources_status_steps_missing">granted, steps missing</string>
+    <string name="data_sources_status_running">running</string>
+    <string name="data_sources_status_not_running">not running</string>
+    <string name="data_sources_status_on">on</string>
+    <string name="data_sources_status_off">off</string>
+    <string name="data_sources_status_permission_missing">on, permission missing</string>
+    <string name="data_sources_status_radio_off">switched off</string>
+    <string name="data_sources_status_no_hardware">this phone has no NFC</string>
+    <string name="data_sources_status_unavailable">not on this phone</string>
+
+    <!-- Fix actions -->
+    <string name="data_sources_fix_open_xdrip">Open xDrip+</string>
+    <string name="data_sources_fix_battery">Battery settings</string>
+    <string name="data_sources_fix_notifications">Notification settings</string>
+    <string name="data_sources_fix_exact_alarms">Alarm settings</string>
+    <string name="data_sources_fix_start_collector">Start the collector</string>
+    <string name="data_sources_fix_health_connect">Health Connect settings</string>
+    <string name="data_sources_fix_overlay">Grant the permission</string>
+    <string name="data_sources_fix_nfc">NFC settings</string>
+    <string name="data_sources_fix_no_screen">This phone has no screen for that setting.</string>
+
+    <!-- What to do where no screen can fix it. -->
+    <string name="data_sources_advice_install_xdrip">Install xDrip+ (it is not on Google Play), then turn on Settings → Inter-app settings → Broadcast locally.</string>
+    <string name="data_sources_advice_needs_xdrip">Install xDrip+ first — the rest of this chain reads from it.</string>
+    <string name="data_sources_advice_nightscout">This build has no Nightscout source yet; it is planned for the next release.</string>
+    <string name="data_sources_advice_oop2">Install OOPAlgorithm2 and let xDrip+ hand it the sensor packet.</string>
+    <string name="data_sources_advice_own_ble">Hold the phone to the sensor to scan it over NFC, and check that Bluetooth is on.</string>
+    <string name="data_sources_advice_health_connect">Health Connect is not on this phone. Install it to read heart rate, sleep and steps.</string>
+</resources>

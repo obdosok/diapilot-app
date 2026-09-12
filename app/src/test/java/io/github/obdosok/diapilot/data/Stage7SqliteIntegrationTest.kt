@@ -18,6 +18,18 @@ import com.diapilot.core.physio.*
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class Stage7SqliteIntegrationTest {
+    // KEEP THE METHOD NAMES SHORT, and the reason is the file system rather
+    // than taste. Robolectric builds each test's sandbox as
+    // `<java.io.tmpdir>/robolectric-<Class>_<method><nanos>/<applicationId>-dataDir/databases/<db>`,
+    // and on Windows the whole thing has to fit in 260 characters. This class
+    // has the longest names in the module and the deepest database names, so it
+    // is the one that hits the wall first: the edition split added six
+    // characters to the applicationId (`.store`) and two tests in here stopped
+    // being able to CREATE their database at all — a
+    // SQLiteCantOpenDatabaseException that says nothing about path length.
+    // Roughly 115 characters are available for a method name plus its database
+    // file name together; stay well under it.
+
     /** Data below is laid out relative to a fixed synthetic era start. */
     @Before fun fixFoodEra() { TestFoodEra.install() }
 
@@ -156,7 +168,7 @@ class Stage7SqliteIntegrationTest {
         context.deleteDatabase(name)
     }
 
-    @Test fun v42MigrationPreservesRawHistoryButResetsPreStrictEraLearnedProducts() {
+    @Test fun v42MigrationKeepsRawHistoryResetsLearnedProducts() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val name="strict-era-v42-migration-${System.nanoTime()}.sqlite"
         context.openOrCreateDatabase(name,0,null).use{db->
@@ -312,7 +324,7 @@ class Stage7SqliteIntegrationTest {
         context.deleteDatabase(name)
     }
 
-    @Test fun extremeSupportedCheckpointIsBoundedAndFlaggableRatherThanAcceptedAsCoefficient() {
+    @Test fun extremeSupportedCheckpointIsBoundedNotAccepted() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
         HybridShadowRegistry.install(model,"extreme")

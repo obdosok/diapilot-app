@@ -43,6 +43,7 @@
     <string name="settings_screen_shape_prior">⏱ Shape is a population prior, NOT your data</string>
     <string name="settings_screen_refusal_line">gave no landmark: %1$s — %2$d</string>
     <string name="settings_screen_curve_not_applied">curve built, but NOT applied to the forecast — see the artifact’s divergences</string>
+    <string name="settings_screen_measured_tail_below_floor">measured end %1$.0f min — shorter than the domain floor of %2$.0f min: the measurement window cannot see further</string>
     <string name="settings_screen_manual_set_title">Set manually</string>
     <string name="settings_screen_manual_set_hint">Minutes from the injection: onset · active phase from and to · full end. An empty field means we compute it ourselves. A filled one takes priority over the measured curve, and we can only report where ours came out differently.</string>
     <string name="settings_screen_onset_label">onset</string>

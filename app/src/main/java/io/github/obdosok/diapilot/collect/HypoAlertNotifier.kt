@@ -7,8 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
-import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.Forecaster
@@ -18,6 +18,8 @@ import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.data.TwinCache
 import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.data.trustedHistory
+import io.github.obdosok.diapilot.diag.DiagLog
+import io.github.obdosok.diapilot.diag.Redact
 import io.github.obdosok.diapilot.i18n.localized
 
 /**
@@ -168,7 +170,18 @@ object HypoAlertNotifier {
             // even when the twin is unbuilt or the forecast is untrustworthy
             // (the old hard returns here meant a confirmed 43 mg/dl could be
             // silent). forecastOk gates only the prediction and the hyper side.
-            val model = TwinCache.getForForecast(store, context)
+            //
+            // AND THAT GRACEFUL DEGRADATION IS EXACTLY THE EDITION BOUNDARY.
+            // Withholding the model here is the same state the code already
+            // handles for an unbuilt twin: `forecastOk` goes false, `hit` stays
+            // null, `predictedHit` is false, and the low side keeps every alarm
+            // it can raise from the reading itself — observed low, sustained
+            // low, sensor artifact. What the store edition loses is the two
+            // alerts that announce a crossing that has not happened, and with
+            // them the model build this call would have triggered in the
+            // background (this is the collector's heartbeat, so that build was
+            // the app's main off-screen one).
+            val model = if (Edition.prospective) TwinCache.getForForecast(store, context) else null
             val result = if (model != null) {
                 try {
                     Forecaster.forecast(
@@ -197,7 +210,7 @@ object HypoAlertNotifier {
                         // recorded choice.
                     )
                 } catch (e: Exception) {
-                    Log.w(TAG, "forecast failed: ${e.message}"); null
+                    DiagLog.w(TAG, "forecast failed: ${e.message}"); null
                 }
             } else null
             val forecastOk = result != null &&
@@ -399,7 +412,13 @@ object HypoAlertNotifier {
                     }
                 }
                 if (decision.action != com.diapilot.core.twin.HypoAction.NONE) {
-                    Log.i(TAG, "hypo ${decision.action} bg=%.1f".format(anchorMmol))
+                    // THE DECISION, NOT THE VALUE (docs/audit.md, S10). The
+                    // anchor was printed at INFO level, so "what was the
+                    // user's sugar at 03:40" was answerable from any bug
+                    // report. Which action fired is what a false alarm is
+                    // investigated with; the value is in the database for the
+                    // one person entitled to read it.
+                    DiagLog.i(TAG, "hypo ${decision.action}, anchor ${Redact.glucose(mgdl)}")
                     // An ACTIVE low-side alert owns priority — never warn about a
                     // high while a hypo is in play. But when the low side is quiet
                     // (action == NONE) we must fall through: an unconditional
@@ -446,7 +465,11 @@ object HypoAlertNotifier {
                             com.diapilot.core.analysis.fmtBg(v.peakMmol, mgdl),
                         ),
                     )
-                    Log.i(TAG, "sustained high: %d min, peak %.1f".format(v.minutesAbove, v.peakMmol))
+                    DiagLog.i(
+                        TAG,
+                        "sustained high fired: %d min above the threshold, peak %s"
+                            .format(v.minutesAbove, Redact.glucose(mgdl)),
+                    )
                 }
             }
 
@@ -470,11 +493,14 @@ object HypoAlertNotifier {
                             com.diapilot.core.analysis.fmtBg(hit.maxMmol, mgdl),
                         ),
                     )
-                    Log.i(TAG, "hyper fired: lead=%.0f min, crest=%.1f".format(hit.leadMin, hit.maxMmol))
+                    DiagLog.i(
+                        TAG,
+                        "hyper fired: lead=%.0f min, crest %s".format(hit.leadMin, Redact.glucose(mgdl)),
+                    )
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "check failed: ${e.message}")
+            DiagLog.w(TAG, "check failed: ${e.message}")
         }
     }
 

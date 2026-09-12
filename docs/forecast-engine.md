@@ -813,8 +813,15 @@ reproduced the old constant by converting it to an implied weight and back, and
 floating point returned a value one ulp away from it; two integration tests that
 pin the bundled artifact's exact contract caught it.
 
-Audit finding M4 is open here: the weight field exists and the prior exists, but
-nothing calls the prior with a weight yet.
+The prior is now CALLED with the weight (audit M4, closed in phaseB/b3). The
+chain is a hand-set override, then the weight, then the shipped constant, and it
+is stated inside `foodDynamicsGlobalPriorV1` rather than at the call site so
+"which door won" has one answer and one test. Both ends of the scaled band are
+then held inside `PhysioBoundsV1` at the artifact, because `PhysioArtifactV1`
+requires the posterior to sit inside them and a stored override may be any value
+an older build wrote. The weight joined the artifact's cache key with it: the
+artifact is cached per model-input revision, and without that component typing a
+weight would leave the previous amplitude serving for the rest of the process.
 
 ---
 
