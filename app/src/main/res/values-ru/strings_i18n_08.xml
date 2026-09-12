@@ -37,10 +37,11 @@
     <string name="rapid_fall_notifier_title">⬇ Сахар быстро падает</string>
     <string name="rapid_fall_notifier_text">Сейчас %1$s · %2$s в минуту · через ~20 мин может быть %3$s</string>
     <string name="rapid_fall_notifier_channel_name">Быстрое падение сахара</string>
-    <string name="rapid_fall_notifier_channel_desc">Раннее предупреждение по минутному потоку — на 3–4 минуты раньше обычных алармов</string>
+    <string name="rapid_fall_notifier_channel_desc">Раннее предупреждение по тренду последних значений — раньше обычных алармов</string>
 
     <!-- PhysioAutoFitRuntime.kt -->
     <string name="physio_auto_fit_runtime_safety_label">коридор ±20%% вокруг измеренного %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+    <string name="physio_auto_fit_runtime_tail_held_by_hand"> · конец действия остаётся вашим — подбор его не трогает</string>
 
     <!-- AnalysisOverviewScreen.kt -->
     <string name="analysis_overview_screen_title">Анализ</string>

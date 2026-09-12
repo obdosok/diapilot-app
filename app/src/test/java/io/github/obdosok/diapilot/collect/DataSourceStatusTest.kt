@@ -42,6 +42,8 @@ class DataSourceStatusTest {
         overlayGranted = false,
         nfcPresent = true,
         nfcEnabled = true,
+        alertsEnabled = true,
+        freshestReadingMs = now - 2 * 60_000,
     )
 
     private fun row(inputs: DataSourceInputs, id: DataSourceId): DataSourceRow? =
@@ -65,6 +67,73 @@ class DataSourceStatusTest {
         // needs the radio in both editions.
         assertEquals(DataSourceId.entries.size - 2, ids.size)
         assertTrue(DataSourceId.NFC in ids)
+    }
+
+    /**
+     * THE ROW THE WHOLE SCREEN EXISTS FOR, in the order the answers stop being
+     * true. Each "no" has its own reason because each needs a different thing
+     * of the user: a permission, a setting they turned off themselves, or
+     * patience while the first reading arrives.
+     */
+    @Test fun `the alerts row says plainly whether an alarm can fire`() {
+        assertEquals(DataSourceStatus.ARMED, status(healthy(), DataSourceId.ALERTS))
+        assertEquals(DataSourceLevel.OK, status(healthy(), DataSourceId.ALERTS).level)
+
+        // Nothing the alerts decide can reach the user.
+        val denied = row(healthy().copy(notificationsEnabled = false), DataSourceId.ALERTS)!!
+        assertEquals(DataSourceStatus.DENIED, denied.status)
+        assertEquals(DataSourceFix.NOTIFICATION_SETTINGS, denied.fix)
+
+        // A choice, not a fault — and no control, because nothing is broken.
+        val off = row(healthy().copy(alertsEnabled = false), DataSourceId.ALERTS)!!
+        assertEquals(DataSourceStatus.OFF, off.status)
+        assertEquals(DataSourceLevel.ABSENT, off.status.level)
+        assertEquals(DataSourceFix.NONE, off.fix)
+
+        // A blocked notification outranks a switched-off alert: the user can
+        // undo their own switch, and cannot undo the grant from in here.
+        assertEquals(
+            DataSourceStatus.DENIED,
+            status(
+                healthy().copy(notificationsEnabled = false, alertsEnabled = false),
+                DataSourceId.ALERTS,
+            ),
+        )
+
+        // A stranger's phone starts here: armed, with nothing to judge.
+        assertEquals(
+            DataSourceStatus.NEVER,
+            status(healthy().copy(freshestReadingMs = 0), DataSourceId.ALERTS),
+        )
+    }
+
+    /**
+     * The stall threshold is [StreamStallNotifier]'s own, asked through
+     * [glucoseStalled] — so the row, the Today banner and the notification
+     * cannot disagree about when the app has gone blind.
+     */
+    @Test fun `the alerts row goes blind on the notifier's own threshold`() {
+        fun alerts(ageMin: Long) =
+            row(healthy().copy(freshestReadingMs = now - ageMin * 60_000), DataSourceId.ALERTS)!!
+        assertEquals(DataSourceStatus.ARMED, alerts(StreamStallNotifier.STALL_MIN - 1).status)
+        val stalled = alerts(StreamStallNotifier.STALL_MIN + 3)
+        assertEquals(DataSourceStatus.STALLED, stalled.status)
+        assertEquals(StreamStallNotifier.STALL_MIN + 3, stalled.ageMin)
+        // An armed row carries no age: "can fire" is a state, not an interval.
+        assertNull(alerts(2).ageMin)
+    }
+
+    /**
+     * The Alerts row is in both editions and is never sensor-direct: the store
+     * edition's whole job is collection, so the row that says whether an alarm
+     * can fire is the last one it could do without.
+     */
+    @Test fun `the alerts row leads the screen in both editions`() {
+        assertEquals(DataSourceId.ALERTS, dataSourceRows(healthy()).first().id)
+        assertEquals(
+            DataSourceId.ALERTS,
+            dataSourceRows(healthy(sensorDirect = false)).first().id,
+        )
     }
 
     @Test fun `xDrip installed or not`() {

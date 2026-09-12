@@ -18,6 +18,17 @@ data class RunRow(
      *  not run at all — such a run has no points and is excluded from the
      *  accuracy numbers; see [MissingDataException] and docs/accuracy.md. */
     val algoVersion: String,
+    /**
+     * `forecast_runs.applied` — the insulin block and food knobs the phone was
+     * RUNNING when it drew this forecast, as `ForecastLedger.appliedSummary`
+     * formats them: `onset/peak/tail isf=... ramp=... kcal=... sieve=...`.
+     *
+     * Null on a row written before that column existed, which is a real case
+     * on an old database: such a run cannot be assigned to a tail arm, and it
+     * is left OUT of the comparison rather than folded into whichever arm
+     * looks likelier. See [parseAppliedTailMin].
+     */
+    val applied: String? = null,
 )
 
 /** One row of `forecast_points`: what the app actually drew for one horizon

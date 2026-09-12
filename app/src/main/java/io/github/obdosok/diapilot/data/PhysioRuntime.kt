@@ -266,6 +266,13 @@ object PhysioRuntime {
                     maxOf(safeOnset + 1, bounds.insulinPeakMinRange.start)..bounds.insulinPeakMinRange
                             .endInclusive
                 )
+            // THE ASSET'S OWN TAIL, held in the INSTRUMENT's domain, and that
+            // is the right one: `base` is the bundled model JSON, which nobody
+            // typed. The hand tier is applied further down (`manualParams` ->
+            // `ManualInsulinRuntime.apply`) against its own wider domain and
+            // does not pass through this clamp — see
+            // `PhysioBoundsV1.insulinTailMinManualRange`. The example person
+            // ships at 300 and clears this floor without being moved.
             val safeTail =
                 base.insulin.tailDurationMin.coerceIn(
                     maxOf(safePeak + 2, bounds.insulinTailMinRange.start)..bounds.insulinTailMinRange

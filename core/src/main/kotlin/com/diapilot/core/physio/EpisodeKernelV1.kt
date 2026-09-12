@@ -309,6 +309,15 @@ class EpisodeKernelModelV1(
         val isfLow = (isfMedian * exp(-1.2816 * isfSigma)).coerceAtLeast(config.bounds.isfMmolPerLUmin)
         val isfHigh = (isfMedian * exp(1.2816 * isfSigma)).coerceAtMost(config.bounds.isfMmolPerLUmax)
         val peak = (base.peakMin * timing).coerceIn(config.bounds.insulinPeakMinRange)
+        // THE AUTOMATIC RANGE, AND THIS ONE IS NOT A HAND VALUE. `base` is the
+        // FROZEN PRIOR (`EpisodeKernelPriorsV1.PHYSIOLOGICAL_V1`, DIA 240) and
+        // `timing` is a promoted multiplier from the kernel-effect ledger — a
+        // number no person ever typed, so `insulinTailMinRange` is exactly the
+        // right domain for it. The hand-entered end of action reaches an
+        // episode kernel by a DIFFERENT route,
+        // [hybridEpisodeKernelV1], which reads `person.insulin.tailDurationMin`
+        // and passes it through unclamped. Audit M1 named this line as a place
+        // that coerces a manual DIA; it never saw one.
         val dia = (base.diaMin * timing).coerceIn(config.bounds.insulinTailMinRange)
         val n = (dia / 5.0).toInt()
         val points =

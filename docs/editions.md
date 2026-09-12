@@ -92,14 +92,14 @@ or `Edition.sensorDirect`.
 | predictive low, predicted high | `HypoAlertNotifier.kt` — the model is not fetched, so `forecastOk` is false and `predictedHit` false. The reading-driven alarms (observed low, sustained low, sensor artifact, sustained high) are untouched |
 | `predict*` in `/info.json` | `WatchServer.kt` — `predictIOB` is written only when IOB is known; `predictionPoints` returns empty, which removes `predictBWP` and the `predict` / `predLo` / `predHi` graph lines |
 | forecast in the companion push | `CompanionSync.kt` — `forecast` and `status_line` are omitted from the payload, not sent empty (the dashboard defaults both) |
-| background model builds | the three off-screen builders are the three consumers above: the collector heartbeat's alert call, the watch payload and the companion push. Plus `MainActivity`'s launch-time "APPLIED to model" thread, which builds the physio artifact only to report the forecast model |
+| background model builds | the three off-screen builders are the three consumers above: `AlertTick`'s call into the hypo alert, the watch payload and the companion push. Plus `MainActivity`'s launch-time "APPLIED to model" thread, which builds the physio artifact only to report the forecast model |
 
 ### `Edition.sensorDirect`
 
 | capability | gate |
 |---|---|
 | NFC Libre scanning | `MainActivity.onResume` omits `FLAG_READER_NFC_V`, so an ISO-15693 tag is never dispatched to the app; `Settings.libreNfcEnabled` is false regardless of the stored preference; the Settings card is not composed. The **NovoPen** scan stays in both editions — it reads a pen's dose log, not a sensor |
-| OOP2 decoded minute stream | `CollectorService.kt` — the payload is not parsed and no minute reading is written. The receiver itself stays registered in both editions; see the finding below |
+| OOP2 decoded minute stream | `CollectorService.kt` — the payload is not parsed and no minute reading is written. The receiver itself stays registered in both editions, because it is also one caller of `AlertTick`; see the note below |
 | own BLE link | `Settings.ownBleEnabled` is false, so the client is never started and the collector never enters own-BLE mode; `BLUETOOTH_CONNECT` is declared in the `oss` manifest only |
 | the OOP2 and own-BLE rows of the Data sources screen | `collect/DataSources.kt` — `dataSourceRows` does not build them, so the screen is two rows shorter rather than reporting on sources this edition has no path to. The NFC row stays in both, because the NovoPen scan needs the radio there too; only its one-line explanation differs, and the store edition's does not mention a sensor scan |
 
@@ -113,32 +113,41 @@ adds the two permissions the store edition must not ask for:
   edition keeps the capability and only loses the automatic grant.
 - **`BLUETOOTH_CONNECT`** — its only caller is the own-BLE client.
 
-## Two things this scaffold does not settle
+## Two things this scaffold did not settle — one of them now is
 
-**The alerts are coupled to OOP2.** The tail of `CollectorService`'s OOP2
-receiver is the app's only per-minute heartbeat: the xDrip receiver stores a
-reading and returns, and the periodic worker polls but never alerts. Gating the
-receiver off would therefore have taken every alert with it, in the edition
-whose entire job is collection. So both editions still register it and only the
-ingestion is gated.
+**The alerts were coupled to OOP2, and are not any more.** The tail of
+`CollectorService`'s OOP2 receiver used to be the app's only alert driver: the
+xDrip receiver stored a reading and returned, and the periodic worker polled but
+never alerted. Gating the receiver off for the store edition would therefore
+have taken every alarm with it, in the edition whose entire job is collection,
+so both editions registered it and only the ingestion was gated. Re-derived at
+the phase-B gate — the paragraph here had claimed more than the code did — and
+closed by `phaseB/b9` as audit finding **P7**.
 
-Re-derived at the phase-B gate, because this paragraph used to claim more than
-the code does. What that tail is the **only** caller of:
-`HypoAlertNotifier.maybeNotify` (so *all* of it — the predictive low and the
-reading-driven low, sustained low, sensor artifact and sustained high),
-`RapidFallNotifier.maybeNotify` and `CompanionSync.pushIfDue`. What survives
-without it: the widget, which also has the 30-minute system period in
-`widget_bg_info.xml` as a safety net, so it goes stale rather than dead; the
-watch long-poll, which `XdripBgReceiver` releases too; and the stall
-notification, which the worker raises. The bug is therefore narrower and worse
-than "no heartbeat" — on a phone without OOPAlgorithm2 the app keeps
-collecting, drawing and answering the watch while **no alarm can fire at all**,
-which is the one thing a user would never infer from a working screen. Not a
-bug any of these packages created. Separating the alerts from that source
-belongs in O-B, next to the Nightscout source. The data-sources screen has
-since landed and does not fix this — it reports it: the OOP2 row's own line
-names the beat, which is what makes such a phone visible to its owner instead
-of only to this file.
+What it was the only caller of: `HypoAlertNotifier.maybeNotify` (so *all* of it
+— the predictive low and the reading-driven low, sustained low, sensor artifact
+and sustained high), `RapidFallNotifier.maybeNotify` and
+`CompanionSync.pushIfDue`. What survived without it: the widget, on the
+30-minute system period in `widget_bg_info.xml`; the watch long-poll, which
+`XdripBgReceiver` releases too; and the stall notification, which the worker
+raised — but only in own-BLE mode, which is sensor-direct and therefore never
+reached in the store edition.
+
+`collect/AlertTick.kt` is now the one entry point, and every source calls it
+after storing its reading: the xDrip broadcast, the OOP2 minute stream, the
+web-service poll, the Libre NFC scan, a hand-entered fingerstick. The
+15-minute `TreatmentsPollWorker` calls it at the end of every run whether or not
+anything arrived — the backstop, and edition-neutral: it depends on nothing
+sensor-direct, and the one place it asks about `ownBleEnabled` is to choose
+which sentence the stall notification carries, never whether it fires. The OOP2
+receiver stays registered in both editions for the same reason as before, but
+now it is one caller of the tick among five rather than the only one, and the
+minute cadence is simply the fastest of them.
+
+The Data sources screen gained a leading **Alerts** row that states whether an
+alarm can fire and why not, and the OOP2 row's own line was corrected: it used
+to say that without OOPAlgorithm2 no alert can fire at all, which was true when
+it was written and is the string b9 had to change in both languages.
 
 **Sustained high.** `roadmap.md` puts it in the OSS column, but it is an
 observation over past readings ("it has been above 13.9 for an hour"), it
@@ -149,11 +158,21 @@ one — say so and it moves behind `Edition.prospective` in one line.
 
 Two smaller judgement calls, recorded so they are not re-decided silently:
 
-- **Rapid fall** stays in both editions. Its detection is a slope over the
-  per-minute stream with no model in it, which is the roadmap's "rapid fall by
-  slope"; the 20-minute number in its text is a linear extrapolation of that
-  slope, not a forecast. In the store edition it has no minute stream to read
-  and simply never fires.
+- **Rapid fall** stays in both editions, and after `phaseB/b9` it actually
+  fires there. Its detection is a slope with no model in it, which is the
+  roadmap's "rapid fall by slope"; the 20-minute number in its text is a linear
+  extrapolation of that slope, not a forecast. It used to read the per-minute
+  stream only, so the store edition had nothing to measure and the alert never
+  fired; `AlertTick` now fits the same slope over a thirty-minute window on the
+  five-minute grid when no minute stream is live. **The consequence is open and
+  belongs to whoever signs the store submission**: the notification's own
+  sentence is "in ~20 min could be X", which the tense rule reads as a
+  prospective claim, and the roadmap's table puts "rapid fall by projection" in
+  the OSS column while putting "rapid fall by slope" in the store one. Nothing
+  in the store edition published that sentence before, because the alert could
+  not fire. Either the store edition's rapid-fall text drops the projection
+  clause, or the alert moves behind `Edition.prospective` there — one line
+  either way, and it is a wording decision rather than a technical one.
 - **COB** ("what is left of what was eaten") is still in the status line in
   both editions. It is future tense by the rule and the roadmap's "carb hint"
   row is adjacent, but the work package named IOB and not COB, and the carb

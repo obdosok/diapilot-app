@@ -81,6 +81,14 @@ class XdripBgReceiver(
             // Each broadcast doubles as a background wake-up: catch up on
             // treatments/pebble if the periodic worker has been dozing.
             TreatmentsPollWorker.pollIfStale(context)
+            // THE ALERTS, ON THE FEED NEARLY EVERY PHONE ACTUALLY HAS. This
+            // receiver used to store the reading and return, so on a phone
+            // without OOPAlgorithm2 nothing evaluated an alarm at all
+            // (docs/audit.md, P7). The tick is asynchronous — this receiver is
+            // registered in the manifest too and therefore may run on the main
+            // thread — and it de-duplicates against the catch-up poll above,
+            // whose `/sgv.json` answer carries the reading just stored.
+            AlertTick.fire(context, AlertTick.Source.XDRIP_BROADCAST)
             return reading
         }
     }

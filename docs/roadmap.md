@@ -132,45 +132,70 @@ consumer app.
 | Phase | Content | Gate |
 |---|---|---|
 | **O-A Portfolio** | close S1–S5; engine diary → docs; architecture overview + history split; README with screenshots, Status, Install; CHANGELOG; audit with Status column; imports instead of FQNs; optional accuracy report on the golden set | audit committed with statuses; tag `v1.3.0`; announce to code reviewers |
-| **O-B First users** | edition scaffold (**done**, see [`editions.md`](editions.md)); data-sources screen (**done**); onboarding with manual ISF/ICR/weight and insulin presets (tail 300); weight → CS (**done**); tail domain 240+ (**done**, the floor only — the end landmark itself is O-D); release signing + GitHub Releases; English food parser (**done**); Nightscout source; diagnostics export without values (**done**, `diag/` — see [`architecture.md`](architecture.md) §7) | `v1.4.0`; 5 strangers' phones report data for 7 days via diagnostics export |
+| **O-B First users** | edition scaffold (**done**, see [`editions.md`](editions.md)); data-sources screen (**done**); alerts independent of OOPAlgorithm2 (**done**, `collect/AlertTick.kt` — audit P7); onboarding with manual ISF/ICR/weight and insulin presets (tail 300); weight → CS (**done**); tail domain 240+ (**done**, the automatic floor only — the hand tier keeps 120..600 and the end landmark itself is O-D); release signing + GitHub Releases; English food parser (**done**); Nightscout source; diagnostics export without values (**done**, `diag/` — see [`architecture.md`](architecture.md) §7) | `v1.4.0`; 5 strangers' phones report data for 7 days via diagnostics export |
 | **O-C Usable by day 10** | day-10 checkpoint; threshold alerts alongside predictive; backup password / restore undo; accuracy report | `v1.5.0`; ≥3 users reach a measured model; first false-alarm feedback |
 | **O-D Model on n>1** | M1 end landmark by plateau; M5 ramp policy bench; cold-start calibration on several people; M6 protein/fat amplitude only after a bench | every number change ships with a multi-person walk-forward |
 | **O-E Distribution** | F-Droid — needs a flavor without ML Kit (ZXing); reproducible build | accepted |
 
-**What O-B still owes `v1.4.0`.** Six of its nine items are in `public`: the
-edition scaffold, the data-sources screen, weight → CS, the tail domain floor,
-the English food parser and the value-free diagnostics export. Three are not,
-and none of them is optional for the gate — **onboarding** with the disclaimer,
-manual ISF / ICR / weight and insulin presets (audit M2, P2; every preset tail
-must be ≥ 240 now that the floor is), **release signing** with a real upload
-key (S8), and the **Nightscout source** (P6), whose row already exists on the
-data-sources screen and needs one argument wired. Phase B also planned to move
-the research bench behind a build of its own (A3); that did not run either, so
-the bench still ships in both editions. There is no `v1.4.0` tag until the
-three land.
+**What O-B still owes `v1.4.0`.** Seven of its ten items are in `public`: the
+edition scaffold, the data-sources screen, the alert path off OOPAlgorithm2,
+weight → CS, the tail domain (both halves of it — the automatic floor and the
+hand tier's own range), the English food parser and the value-free diagnostics
+export. Three are not, and none of them is optional for the gate —
+**onboarding** with the disclaimer, manual ISF / ICR / weight and insulin
+presets (audit M2, P2; a preset is written into the hand tier, whose domain is
+120..600, so the presets themselves decide what they offer — they are not
+forced to ≥ 240 by a bound any more, and the shipped example person stays at
+300), **release signing** with a real upload key (S8), and the **Nightscout
+source** (P6), whose row already exists on the data-sources screen and needs
+one argument wired — plus, now, one `AlertTick.fire` call and one `Source`
+entry, which is all a new source needs to get the whole alert set. Phase B
+also planned to move the research bench behind a build of its own (A3); that
+did not run either, so the bench still ships in both editions. There is no
+`v1.4.0` tag until the three land.
 
-**One bug the gate inherited rather than fixed, and re-derived.** On a phone
-without OOPAlgorithm2 installed — which is every stranger's phone — **no alert
-can fire at all** in either edition: `HypoAlertNotifier.maybeNotify` (the
-predictive low *and* the reading-driven low, sustained low, sensor artifact and
-sustained high), `RapidFallNotifier.maybeNotify` and `CompanionSync.pushIfDue`
-have exactly one caller each, and it is the tail of the OOP2 receiver. The app
-still collects, draws and answers the watch, so nothing on screen says the
-alarms are gone. `editions.md` used to describe this as "no heartbeat" and
-count the widget and the watch among the casualties; both survive — the widget
-on its 30-minute system period, the watch long-poll through `XdripBgReceiver`
-— which makes the bug narrower and worse than the note claimed. The
-data-sources screen reports it and its OOP2 row now says so; nothing fixes it.
-This probably belongs ahead of the three items above.
+**One bug the gate inherited rather than fixed, and re-derived — now closed by
+`phaseB/b9`.** On a phone without OOPAlgorithm2 installed — which is every
+stranger's phone — **no alert could fire at all** in either edition:
+`HypoAlertNotifier.maybeNotify` (the predictive low *and* the reading-driven
+low, sustained low, sensor artifact and sustained high), `RapidFallNotifier`
+and `CompanionSync.pushIfDue` had exactly one caller each, and it was the tail
+of the OOP2 receiver; the stall notification had one too, inside the poll
+worker's own-BLE branch. The app still collected, drew and answered the watch,
+so nothing on screen said the alarms were gone. `editions.md` used to describe
+this as "no heartbeat" and count the widget and the watch among the casualties;
+both survived — the widget on its 30-minute system period, the watch long-poll
+through `XdripBgReceiver` — which made the bug narrower and worse than the note
+claimed.
+
+b9 took it ahead of the three items above, because an onboarding screen, a
+release key and a second glucose source are all worth less on a phone where no
+alarm can fire. `collect/AlertTick.kt` is now the single entry point, called
+from every path a reading arrives on (broadcast, OOP2 minute stream, web poll,
+NFC scan, hand-entered fingerstick) and from the existing 15-minute
+`TreatmentsPollWorker` as the periodic backstop; the Data sources screen leads
+with an **Alerts** row saying whether an alarm can fire and, if not, why. Two
+consequences worth stating plainly: the data-stalled detector now fires on every
+phone rather than in own-BLE mode alone, and the rapid-fall alert is reachable
+without the per-minute stream for the first time — fitted over a thirty-minute
+window on the five-minute grid, with the detector's own slope threshold and
+projection untouched. Recorded as audit finding **P7**.
 
 **Decisions the phase-B packages raised and did not take** (each is one line of
 code away, none of them was the package's to settle):
 
-- **A hand-entered insulin tail under 240 min is now refused.** One constant,
-  `insulinTailMinRange`, serves the measured clamp, the Auto-fit corridor and
-  P1's manual validation, so raising the floor took the user's ability to state
-  a shorter tail with it. If the manual tier should keep the wider 120..600
-  domain, it needs its own bound at the resolver.
+- ~~**A hand-entered insulin tail under 240 min is now refused.**~~ **Taken in
+  phaseB/b10**, the way this line proposed. The manual tier has a bound of its
+  own — `PhysioBoundsV1.insulinTailMinManualRange` = 120..600 — checked at the
+  resolver and carried through the artifact's own invariant, so a stated end of
+  action reaches the kernel, IOB, the forecast, What-if and the alert exactly as
+  entered. `insulinTailMinRange` = 240..600 keeps serving the AUTOMATIC doors:
+  the measured clamp, the Auto-fit corridor and the bundled asset. The corridor
+  is now held inside that floor instead of proposing under it and discarding the
+  candidates one at a time, and with a tail set by hand the fit locks that axis
+  rather than arguing with it. See `docs/insulin-model.md` §2.5.1, and the
+  end-of-action comparison added to `docs/accuracy.md` for how to settle the
+  underlying disagreement with a database instead of a ruling.
 - **Carbohydrates on board in the store edition.** IOB is off there; COB —
   "what is left of what was eaten" — is the same tense and is still in the
   status line in both, because the package that gated IOB named IOB.
@@ -183,8 +208,28 @@ code away, none of them was the package's to settle):
 - **The diagnostics export's body is English in both editions.** The button,
   hint and share sheet around it are translated; the log lines inside it cannot
   be. Only the header block could be.
-- **`settings_screen_insulin_engine_note`** still offers "tail 120" as a worked
-  example, which is no longer a legal value.
+- ~~**`settings_screen_insulin_engine_note`** still offers "tail 120" as a
+  worked example, which is no longer a legal value.~~ **Overtaken by
+  phaseB/b10**, in both directions: the string no longer quotes a worked
+  example at all (it states the two ranges), and 120 is a legal hand-entered
+  value again. `physio_tuning_section_curve_shape_explainer`'s stale bench
+  quote of "28 · 40 · 30 · 165" went with it — the fitter's own corridor
+  cannot produce 165.
+- **The rapid-fall alert now fires in the store edition, and its text says
+  "in ~20 min could be X".** b9 gave the detector a five-minute-grid fallback,
+  so the alarm the table calls "rapid fall by slope" is reachable there for the
+  first time — carrying a sentence about later that the tense rule assigns to
+  `oss`, and that the table's own OSS column calls "rapid fall by projection".
+  Drop the projection clause from the store edition's text, or gate the alert
+  behind `Edition.prospective` there. One line either way; nobody has chosen.
+- **The data-stalled notification now reaches a phone that never had a
+  reading.** It used to fire only in own-BLE mode. On a fresh install with no
+  source configured it will arrive within about fifteen minutes and then every
+  forty-five — which is the honest half of P7 ("nothing said the alarms were
+  gone"), but it lands on someone who has not finished setting the app up,
+  because onboarding does not exist yet. Holding it back until a first reading
+  has ever arrived is one condition in `AlertTick.stall`, and it costs the "you
+  installed this and it never worked" signal.
 
 ## Store track
 

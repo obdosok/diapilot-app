@@ -39,6 +39,15 @@ data class CollectionState(
     val lastMainReadingSource: String?,
     val lastMinuteReadingMs: Long,
     val minuteCalibrationN: Int?,
+    /**
+     * When the alert set was last actually evaluated
+     * ([io.github.obdosok.diapilot.collect.DiagState.lastAlertTickMs]). The
+     * one line that answers "is anything judging these readings on your
+     * phone" — the question the app could not answer while every alert hung
+     * off one optional third-party app (docs/audit.md, P7). Appended LAST: a
+     * field inserted mid-struct breaks positional callers silently.
+     */
+    val lastAlertTickMs: Long,
 )
 
 /**

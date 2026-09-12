@@ -66,6 +66,14 @@ class InsulinModelDocTest {
     @Test fun `the bounds section states the population range that coerces the tail`() {
         val b = PhysioBoundsV1()
         states("`insulinTailMinRange` = ${b.insulinTailMinRange.start.toInt()}…${b.insulinTailMinRange.endInclusive.toInt()}")
+        // BOTH RANGES, because the whole point of the split is that a reader
+        // can tell which number governs which door. A document naming only the
+        // instrument's floor is how the hand tier came to be read as clamped.
+        states(
+            "`insulinTailMinManualRange` = " +
+                "${b.insulinTailMinManualRange.start.toInt()}…" +
+                "${b.insulinTailMinManualRange.endInclusive.toInt()}",
+        )
     }
 
     /**

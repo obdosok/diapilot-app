@@ -360,7 +360,18 @@ data class PhysioArtifactV1(
         }
         require(baseMechanics.insulin.onsetMin in bounds.insulinOnsetMinRange)
         require(baseMechanics.insulin.peakMin in bounds.insulinPeakMinRange)
-        require(baseMechanics.insulin.tailDurationMin in bounds.insulinTailMinRange)
+        // THE WIDER OF THE TWO TAIL RANGES, deliberately. By the time mechanics
+        // reach this constructor the hand tier (P1) has already been applied on
+        // top of the measured curve, so this number can legitimately be one a
+        // person typed — and `insulinTailMinRange`'s floor is a statement about
+        // the measuring WINDOW, not about what a body may do. Checking the
+        // narrow range here made the artifact throw on a hand entry of 130 and
+        // take the whole PHYSIO arm down with it. The instrument's floor is
+        // enforced at its own doors — `InsulinShapeV1.coerceIntoDomain`,
+        // `PhysioAutoFitV1.boundsAround`, the bundled asset's own coercion —
+        // where it can name what it moved. What stays here is the numerical
+        // invariant: see [PhysioBoundsV1.insulinTailMinManualRange].
+        require(baseMechanics.insulin.tailDurationMin in bounds.insulinTailMinManualRange)
         require(baseMechanics.food.defaultShape.delayMin in bounds.absorptionOnsetMinRange)
         require(baseMechanics.food.defaultShape.peakMin in bounds.absorptionPeakMinRange)
         require(baseMechanics.food.defaultShape.durationMin in bounds.absorptionTailMinRange)

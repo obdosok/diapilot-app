@@ -8,6 +8,7 @@
     <!-- StreamStallNotifier: why the stream is considered stalled. -->
     <string name="stream_stall_notifier_reason_stopped">The sensor stream stopped</string>
     <string name="stream_stall_notifier_reason_login_rejected">The sensor rejected the BLE login at every nearby index</string>
+    <string name="stream_stall_notifier_reason_no_glucose">No new glucose is arriving</string>
 
     <!-- PhysioTuning: summary of the applied tuning and the carb-triangle field labels. -->
     <string name="physio_tuning_as_shipped">as shipped</string>

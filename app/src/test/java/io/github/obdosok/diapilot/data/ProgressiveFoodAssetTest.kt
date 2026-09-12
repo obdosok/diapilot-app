@@ -39,6 +39,14 @@ class ProgressiveFoodAssetTest {
      * the instrument's own reach, 240 (audit M1), and the example carries 300 —
      * a value the domain accepts as stated rather than one
      * `PhysioRuntime.buildArtifact` has to move before it can be installed.
+     *
+     * ⚠ AND IT STAYS AT 300 NOW THAT A HAND ENTRY MAY BE SHORTER. Opening the
+     * hand tier down to 120 min says nothing about the bundled example: nobody
+     * entered it, so no testimony backs it, and whoever runs it is a stranger
+     * the app knows nothing about. A too-short tail UNDER-reads insulin on
+     * board, and an under-read IOB is the direction that hides a coming low —
+     * so the default errs the other way, and the four landmarks are pinned
+     * exactly here rather than left to drift with the domain.
      */
     @Test
     fun `the bundled insulin block is inside the artifact's domain`() {
@@ -47,6 +55,8 @@ class ProgressiveFoodAssetTest {
         val bounds = com.diapilot.core.physio.PhysioBoundsV1()
         assertEquals(300.0, model.insulin.tailDurationMin, 0.0)
         assertEquals(200.0, model.insulin.shortDurationMin, 0.0)
+        assertEquals(20.0, model.insulin.onsetMin, 0.0)
+        assertEquals(75.0, model.insulin.peakMin, 0.0)
         assertTrue(
             "end of action ${model.insulin.tailDurationMin} outside ${bounds.insulinTailMinRange}",
             model.insulin.tailDurationMin in bounds.insulinTailMinRange,

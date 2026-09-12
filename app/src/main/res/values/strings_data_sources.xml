@@ -18,6 +18,7 @@
     <string name="data_sources_banner_action">Check the data sources</string>
 
     <!-- Row titles -->
+    <string name="data_sources_row_alerts_title">Alerts</string>
     <string name="data_sources_row_xdrip_app_title">xDrip+ installed</string>
     <string name="data_sources_row_xdrip_broadcast_title">Glucose broadcast</string>
     <string name="data_sources_row_xdrip_web_title">xDrip web service</string>
@@ -33,11 +34,12 @@
     <string name="data_sources_row_nfc_title">NFC</string>
 
     <!-- One line per row: what breaks while it is red. -->
+    <string name="data_sources_row_alerts_why">Low, high, rapid fall and a stopped stream. Every source that delivers a reading has them evaluated, and a check every 15 minutes runs even when nothing arrives.</string>
     <string name="data_sources_row_xdrip_app_why">xDrip+ owns the sensor. Without it the app receives no glucose at all.</string>
     <string name="data_sources_row_xdrip_broadcast_why">The main glucose feed. When it stops, the chart, the status and the alerts stop with it.</string>
     <string name="data_sources_row_xdrip_web_why">Doses and missed readings are fetched over this service. Without it insulin is absent and gaps in the chart stay empty.</string>
     <string name="data_sources_row_nightscout_why">A second glucose source. Without one, a break in xDrip leaves the app with nothing to read.</string>
-    <string name="data_sources_row_oop2_why">The per-minute glucose stream. Without it no alert can fire at all — the hypo alert and rapid-fall detection both run on this beat; the widget falls back to its 30-minute refresh.</string>
+    <string name="data_sources_row_oop2_why">The per-minute glucose stream. It sees a fall three to four minutes before the five-minute feed does. Without it the alerts still run, on the slower cadence.</string>
     <string name="data_sources_row_own_ble_why">This app\'s own link to the sensor. While it is off, glucose comes from xDrip only.</string>
     <string name="data_sources_row_battery_why">Under battery optimization Android puts the app to sleep, and collection sleeps with it — usually overnight.</string>
     <string name="data_sources_row_notifications_why">Blocked notifications mean the low-glucose warning cannot reach you.</string>
@@ -49,6 +51,7 @@
     <string name="data_sources_row_nfc_why_sensor_direct">NFC reads the insulin pen\'s dose log and scans the sensor.</string>
 
     <!-- Statuses -->
+    <string name="data_sources_status_armed">can fire</string>
     <string name="data_sources_status_fresh">%1$d min ago</string>
     <string name="data_sources_status_late">late — %1$d min ago</string>
     <string name="data_sources_status_stalled">stopped — nothing for %1$d min</string>
@@ -86,6 +89,7 @@
     <string name="data_sources_fix_no_screen">This phone has no screen for that setting.</string>
 
     <!-- What to do where no screen can fix it. -->
+    <string name="data_sources_advice_alerts">Alerts need glucose to judge. Nothing can be noticed while nothing is arriving — fix the red rows below first.</string>
     <string name="data_sources_advice_install_xdrip">Install xDrip+ (it is not on Google Play), then turn on Settings → Inter-app settings → Broadcast locally.</string>
     <string name="data_sources_advice_needs_xdrip">Install xDrip+ first — the rest of this chain reads from it.</string>
     <string name="data_sources_advice_nightscout">This build has no Nightscout source yet; it is planned for the next release.</string>

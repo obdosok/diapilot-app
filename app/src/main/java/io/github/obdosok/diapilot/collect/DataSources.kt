@@ -36,6 +36,17 @@ enum class DataSourceLevel {
 
 /** One link in the chain. The order of the entries is the order on screen. */
 enum class DataSourceId {
+    /**
+     * Can an alarm fire right now, and if not, why not.
+     *
+     * FIRST on the screen because it is the outcome of every row below it, and
+     * because the question used to have no answer anywhere on the phone: the
+     * alerts hung off the OOPAlgorithm2 minute receiver alone, so without that
+     * app the whole chain could read healthy while no alarm could ever fire
+     * (audit P7). Not a source — the one row that reports what the sources are
+     * FOR.
+     */
+    ALERTS,
     XDRIP_APP,
     XDRIP_BROADCAST,
     XDRIP_WEB,
@@ -61,6 +72,13 @@ enum class DataSourceId {
  * text it is about to show.
  */
 enum class DataSourceStatus(val level: DataSourceLevel) {
+    /**
+     * Alerts can fire: they are switched on, notifications are granted, and
+     * there is a fresh reading to judge. It says nothing about whether an
+     * alarm SHOULD fire — only that this phone is in a state where one could.
+     */
+    ARMED(DataSourceLevel.OK),
+
     /** Data arrived recently enough. Carries an age. */
     FRESH(DataSourceLevel.OK),
 
@@ -153,6 +171,21 @@ data class DataSourceInputs(
     val overlayGranted: Boolean,
     val nfcPresent: Boolean,
     val nfcEnabled: Boolean,
+    /**
+     * Is at least one glucose alert switched on (the low side or the high
+     * side)? Both default to on; a user who turned both off has chosen
+     * silence, which the Alerts row reports as absent rather than as a fault.
+     * No default here, like every other field: a caller that forgets it should
+     * not silently claim the alerts are armed.
+     */
+    val alertsEnabled: Boolean,
+    /**
+     * The newest reading of either stream — the same `max` of the main and the
+     * per-minute tables that [StreamStallNotifier] and [glucoseStalled] ask
+     * about, so the Alerts row cannot disagree with the stall notification
+     * about when the app has gone blind.
+     */
+    val freshestReadingMs: Long,
 )
 
 /**
@@ -191,6 +224,11 @@ const val DATA_SOURCE_WEB_OK_MAX_MIN = 35L
 /**
  * The chain as it stands, in screen order.
  *
+ * [DataSourceId.ALERTS] leads, and it is the only row that is not a link: it
+ * states whether an alarm can fire at all, which is what the links are for and
+ * what a user opening this screen is really asking. It is present in both
+ * editions and in every state of the chain.
+ *
  * Sensor-direct rows (OOP2, own BLE) are absent — not greyed out — where
  * [DataSourceInputs.sensorDirect] is false: the store edition has no such
  * source, and a row about a capability the build does not carry is exactly the
@@ -198,6 +236,7 @@ const val DATA_SOURCE_WEB_OK_MAX_MIN = 35L
  * stays in both editions because the NovoPen scan needs the radio there too.
  */
 fun dataSourceRows(inputs: DataSourceInputs): List<DataSourceRow> = buildList {
+    add(alertsRow(inputs))
     add(
         DataSourceRow(
             DataSourceId.XDRIP_APP,
@@ -332,6 +371,49 @@ fun dataSourceRows(inputs: DataSourceInputs): List<DataSourceRow> = buildList {
             fix = if (inputs.nfcPresent) DataSourceFix.NFC_SETTINGS else DataSourceFix.NONE,
         ),
     )
+}
+
+/**
+ * CAN AN ALARM FIRE RIGHT NOW — the one row that answers a question about the
+ * app rather than about a source, in the order the answers stop being true.
+ *
+ * Four ways for the answer to be no, and they are not interchangeable:
+ *
+ *  1. **notifications denied** — the alerts run and decide, and nothing they
+ *     decide can reach the user. The worst of the four, and the only one with
+ *     a screen that fixes it, so it is asked first even though the user may
+ *     also have switched the alerts off: a phone in that state has two
+ *     problems, and this is the one it cannot recover from on its own.
+ *  2. **both alerts off** — a choice, not a fault. [DataSourceLevel.ABSENT],
+ *     and no advice: telling someone how to re-enable what they turned off is
+ *     how a diagnostics screen starts nagging.
+ *  3. **no reading has ever arrived** — a stranger's phone starts here. The
+ *     alerts are armed and have nothing to judge.
+ *  4. **the stream has stalled** — the app has gone blind. This is the state
+ *     the stall notification fires on, and it asks
+ *     [glucoseStalled], so the screen and the notification share one
+ *     threshold.
+ *
+ * WHAT IS DELIBERATELY NOT ASKED: whether a tick recently ran. Every source
+ * drives [AlertTick] and the 15-minute poll drives it whether or not it
+ * collected anything, so "is something evaluating" is a property of the build,
+ * not of this phone — and a stamp reset by a process restart would paint that
+ * row red on a healthy phone, which is the one thing this screen must never
+ * do. `DiagState.lastAlertTickMs` carries the stamp for the diagnostics
+ * export, where a wrong guess costs a line of text instead of trust.
+ */
+private fun alertsRow(inputs: DataSourceInputs): DataSourceRow = when {
+    !inputs.notificationsEnabled -> DataSourceRow(
+        DataSourceId.ALERTS, DataSourceStatus.DENIED, fix = DataSourceFix.NOTIFICATION_SETTINGS,
+    )
+    !inputs.alertsEnabled -> DataSourceRow(DataSourceId.ALERTS, DataSourceStatus.OFF)
+    inputs.freshestReadingMs <= 0 -> DataSourceRow(DataSourceId.ALERTS, DataSourceStatus.NEVER)
+    glucoseStalled(inputs.nowMs, inputs.freshestReadingMs) -> DataSourceRow(
+        DataSourceId.ALERTS,
+        DataSourceStatus.STALLED,
+        ageMin = (inputs.nowMs - inputs.freshestReadingMs) / 60_000,
+    )
+    else -> DataSourceRow(DataSourceId.ALERTS, DataSourceStatus.ARMED)
 }
 
 /** The age ladder every arriving stream is judged by. */

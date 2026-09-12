@@ -18,6 +18,7 @@ object DataSourceText {
 
     fun title(context: Context, id: DataSourceId): String = context.localized().getString(
         when (id) {
+            DataSourceId.ALERTS -> R.string.data_sources_row_alerts_title
             DataSourceId.XDRIP_APP -> R.string.data_sources_row_xdrip_app_title
             DataSourceId.XDRIP_BROADCAST -> R.string.data_sources_row_xdrip_broadcast_title
             DataSourceId.XDRIP_WEB -> R.string.data_sources_row_xdrip_web_title
@@ -43,6 +44,7 @@ object DataSourceText {
     fun why(context: Context, id: DataSourceId, sensorDirect: Boolean): String =
         context.localized().getString(
             when (id) {
+                DataSourceId.ALERTS -> R.string.data_sources_row_alerts_why
                 DataSourceId.XDRIP_APP -> R.string.data_sources_row_xdrip_app_why
                 DataSourceId.XDRIP_BROADCAST -> R.string.data_sources_row_xdrip_broadcast_why
                 DataSourceId.XDRIP_WEB -> R.string.data_sources_row_xdrip_web_why
@@ -68,6 +70,7 @@ object DataSourceText {
         val text = context.localized()
         val age = row.ageMin ?: 0L
         return when (row.status) {
+            DataSourceStatus.ARMED -> text.getString(R.string.data_sources_status_armed)
             DataSourceStatus.FRESH -> text.getString(R.string.data_sources_status_fresh, age)
             DataSourceStatus.LATE -> text.getString(R.string.data_sources_status_late, age)
             DataSourceStatus.STALLED -> text.getString(R.string.data_sources_status_stalled, age)
@@ -127,6 +130,7 @@ object DataSourceText {
         if (row.fix != DataSourceFix.NONE) return null
         if (row.status.level == DataSourceLevel.OK || row.status == DataSourceStatus.OFF) return null
         val id = when (row.id) {
+            DataSourceId.ALERTS -> R.string.data_sources_advice_alerts
             DataSourceId.XDRIP_APP -> R.string.data_sources_advice_install_xdrip
             DataSourceId.XDRIP_BROADCAST, DataSourceId.XDRIP_WEB ->
                 R.string.data_sources_advice_needs_xdrip

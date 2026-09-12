@@ -193,6 +193,13 @@ object InsulinProfileRuntime {
         // curve was built, displayed, and then refused by the code that
         // installs it. A population bound may move a measurement; it may not
         // silently discard one.
+        //
+        // This is the AUTOMATIC door — an instrument installing its own reading
+        // with no human in the loop — so the floor here is the instrument's own
+        // reach (`insulinTailMinRange`). What a person states by hand does not
+        // pass through it; see `InsulinParameterResolverV1.resolve`. And
+        // `measured` itself is carried onto the curve unchanged, so the card
+        // can print the measurement rather than the floor it was lifted to.
         val (landmarks, coerced) = InsulinShapeV1.coerceIntoDomain(measured)
         // ONE shape implementation: the same rate-then-integrate construction
         // the manual (P1) path uses, so the curve drawn, the curve forecast and
@@ -205,6 +212,7 @@ object InsulinProfileRuntime {
             independentDays = contributingDays.size,
             supportWeight = samples.size.toDouble(),
             landmarks = landmarks,
+            measuredLandmarks = measured,
             measuredKnots = knots,
             coerced = coerced,
             usesUntagged = samples.isNotEmpty() &&
@@ -250,6 +258,13 @@ object InsulinProfileRuntime {
             context?.let { PhysioText.coerced(it, moved) } ?: moved.joinToString(", ")
         fun conflictText(c: com.diapilot.core.physio.OrderingConflict) =
             context?.let { PhysioText.orderingConflict(it, c) } ?: c.toString()
+        // THE LINE SAYS "MEASURED", SO IT PRINTS THE MEASUREMENT. It used to
+        // print `curve.landmarks`, i.e. the set AFTER the domain floor was
+        // applied, so a corpus whose end of action came out at 180 min was
+        // reported as 240 — the artifact's floor wearing the words "measured
+        // from N doses". The coerced clause that follows names the lift, and
+        // the settings card marks the window limit beside it; between the three
+        // the reader can see both numbers and which is which (audit M1).
         if (context == null) {
             // Developer log line only (see the call site below) — plain English
             // in its data form, no resources: there is no Context to resolve them.
@@ -258,8 +273,8 @@ object InsulinProfileRuntime {
                     "measured from %d doses, %d days · onset %.0f · peak %.0f · active until %.0f · end %.0f min"
                         .format(
                             curve.observations, curve.independentDays,
-                            curve.landmarks.onsetMin, curve.landmarks.peakMin,
-                            curve.landmarks.activeEndMin, curve.landmarks.tailMin,
+                            curve.measuredLandmarks.onsetMin, curve.measuredLandmarks.peakMin,
+                            curve.measuredLandmarks.activeEndMin, curve.measuredLandmarks.tailMin,
                         ) +
                         (if (p.arm == com.diapilot.core.physio.ProfileArmV1.FOOD_FREE)
                             " · from doses with no food active"
@@ -281,8 +296,8 @@ object InsulinProfileRuntime {
                 res.resources.getQuantityString(
                     R.plurals.insulin_profile_runtime_measured, curve.observations,
                     curve.observations, curve.independentDays,
-                    curve.landmarks.onsetMin, curve.landmarks.peakMin,
-                    curve.landmarks.activeEndMin, curve.landmarks.tailMin,
+                    curve.measuredLandmarks.onsetMin, curve.measuredLandmarks.peakMin,
+                    curve.measuredLandmarks.activeEndMin, curve.measuredLandmarks.tailMin,
                 ) +
                     // The arm is part of the answer. When it flips, the profile
                     // can move by several minutes in one step, and without this

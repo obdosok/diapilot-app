@@ -34,4 +34,17 @@ object DiagState {
      */
     @Volatile var lastXdripWebProbeMs: Long = 0
     @Volatile var lastXdripWebOkMs: Long = 0
+
+    /**
+     * When [AlertTick] last actually evaluated the alert set — not when it was
+     * last called, so a tick suppressed as a duplicate does not count.
+     *
+     * It exists because the defect it observes was invisible: the app kept
+     * collecting and drawing while no alarm could fire, and no screen, log or
+     * export could answer "is anything judging these readings" (docs/audit.md,
+     * P7). Observation only — the Data sources screen derives its Alerts row
+     * from what the alerts NEED, never from this stamp, so a fresh process
+     * cannot make that row read broken.
+     */
+    @Volatile var lastAlertTickMs: Long = 0
 }

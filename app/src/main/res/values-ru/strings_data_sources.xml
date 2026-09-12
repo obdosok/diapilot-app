@@ -13,6 +13,7 @@
     <string name="data_sources_banner_never">Данных о глюкозе пока нет.</string>
     <string name="data_sources_banner_action">Проверить источники данных</string>
 
+    <string name="data_sources_row_alerts_title">Предупреждения</string>
     <string name="data_sources_row_xdrip_app_title">xDrip+ установлен</string>
     <string name="data_sources_row_xdrip_broadcast_title">Broadcast с глюкозой</string>
     <string name="data_sources_row_xdrip_web_title">Веб-сервис xDrip</string>
@@ -27,11 +28,12 @@
     <string name="data_sources_row_overlay_title">Плашка на экране блокировки</string>
     <string name="data_sources_row_nfc_title">NFC</string>
 
+    <string name="data_sources_row_alerts_why">Низкая, высокая, быстрое падение и остановка потока. Каждый источник, доставивший измерение, запускает их проверку, а раз в 15 минут проверка идёт даже если ничего не пришло.</string>
     <string name="data_sources_row_xdrip_app_why">Сенсором владеет xDrip+. Без него приложение не получает глюкозу вообще.</string>
     <string name="data_sources_row_xdrip_broadcast_why">Основной канал глюкозы. Когда он останавливается, вместе с ним останавливаются график, статус и оповещения.</string>
     <string name="data_sources_row_xdrip_web_why">Через этот сервис приходят дозы и пропущенные измерения. Без него нет инсулина, а пробелы на графике остаются пустыми.</string>
     <string name="data_sources_row_nightscout_why">Второй источник глюкозы. Без него перерыв в xDrip оставляет приложение без данных.</string>
-    <string name="data_sources_row_oop2_why">Поминутный поток глюкозы. Без него не срабатывает ни одна тревога — гипо-тревога и детектор быстрого падения работают на этом такте; виджет обновляется только раз в 30 минут.</string>
+    <string name="data_sources_row_oop2_why">Поминутный поток глюкозы. Он видит падение на три-четыре минуты раньше пятиминутного канала. Без него предупреждения всё равно работают, просто на медленном такте.</string>
     <string name="data_sources_row_own_ble_why">Собственный канал приложения к сенсору. Пока он выключен, глюкоза идёт только из xDrip.</string>
     <string name="data_sources_row_battery_why">При оптимизации батареи Android усыпляет приложение, а вместе с ним и сбор данных — обычно на ночь.</string>
     <string name="data_sources_row_notifications_why">Если уведомления запрещены, предупреждение о низкой глюкозе до вас не дойдёт.</string>
@@ -42,6 +44,7 @@
     <string name="data_sources_row_nfc_why">По NFC читается журнал доз инсулиновой ручки.</string>
     <string name="data_sources_row_nfc_why_sensor_direct">По NFC читается журнал доз инсулиновой ручки и сканируется сенсор.</string>
 
+    <string name="data_sources_status_armed">могут сработать</string>
     <string name="data_sources_status_fresh">%1$d мин назад</string>
     <string name="data_sources_status_late">с опозданием — %1$d мин назад</string>
     <string name="data_sources_status_stalled">остановлено — ничего %1$d мин</string>
@@ -77,6 +80,7 @@
     <string name="data_sources_fix_nfc">Настройки NFC</string>
     <string name="data_sources_fix_no_screen">В этом телефоне нет экрана для этой настройки.</string>
 
+    <string name="data_sources_advice_alerts">Предупреждениям нужна глюкоза, чтобы что-то оценивать. Пока ничего не приходит, заметить нечего — сначала разберитесь с красными строками ниже.</string>
     <string name="data_sources_advice_install_xdrip">Установите xDrip+ (его нет в Google Play) и включите Settings → Inter-app settings → Broadcast locally.</string>
     <string name="data_sources_advice_needs_xdrip">Сначала установите xDrip+ — остальная цепочка читает из него.</string>
     <string name="data_sources_advice_nightscout">В этой сборке источника Nightscout ещё нет; он запланирован на следующий выпуск.</string>

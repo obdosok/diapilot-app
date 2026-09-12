@@ -45,6 +45,7 @@ class DiagnosticsBundleTest {
             lastMainReadingSource = "xdrip_broadcast",
             lastMinuteReadingMs = now - 60_000,
             minuteCalibrationN = 42,
+            lastAlertTickMs = now - 60_000,
         ),
         sources = sources,
         journal = JournalState(

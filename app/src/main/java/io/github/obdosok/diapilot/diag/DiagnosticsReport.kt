@@ -103,6 +103,7 @@ object DiagnosticsReport {
                 lastMainReadingSource = lastMain?.source,
                 lastMinuteReadingMs = lastMinute?.tsMs ?: 0,
                 minuteCalibrationN = cal?.n,
+                lastAlertTickMs = diag.lastAlertTickMs,
             ),
             sources = sources(store, nowMs),
             journal = journal(store, nowMs),

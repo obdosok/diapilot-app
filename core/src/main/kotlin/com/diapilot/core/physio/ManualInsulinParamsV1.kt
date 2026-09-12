@@ -161,6 +161,15 @@ object InsulinShapeV1 {
      * below the 120-minute floor was built, displayed, and then silently
      * refused by the code that installs it. The screen said "curve built, but
      * NOT applied".
+     *
+     * ⚠ THIS IS THE AUTOMATIC DOOR ONLY. Every caller is an instrument feeding
+     * the model on its own — the measured segment profile and the Auto-fit's
+     * candidate builder — so it uses [PhysioBoundsV1.insulinTailMinRange], the
+     * ruler's own reach. A hand-entered curve does NOT come through here: it is
+     * checked against [PhysioBoundsV1.insulinTailMinManualRange] in
+     * [InsulinParameterResolverV1.resolve] and applied as entered. Sending a
+     * manual value through this function would silently lift it to 240, which
+     * is the defect this split exists to close.
      */
     fun coerceIntoDomain(read:InsulinShapeLandmarksV1):Pair<InsulinShapeLandmarksV1,List<CoercedLandmark>> {
         val bounds=PhysioBoundsV1()
@@ -515,11 +524,21 @@ object InsulinParameterResolverV1 {
         // Validate the RESOLVED triple, not the entered fields. Setting only
         // the onset can still order it after a measured peak, and a curve whose
         // onset follows its peak is not a curve.
+        //
+        // THE END OF ACTION IS CHECKED AGAINST THE HAND TIER'S OWN RANGE.
+        // `insulinTailMinRange` is the instrument's reach (240 min); this tier
+        // is a person stating what they watched, and the two are different
+        // claims — see [PhysioBoundsV1.insulinTailMinManualRange]. CHECKED, not
+        // clamped: a bound may correct a measurement, it may not rewrite
+        // someone's own statement into a different one behind their back. Out
+        // of range the whole shape is refused and SAID so — SHAPE_OUT_OF_DOMAIN
+        // reaches the card and the startup log — which is the one honest
+        // outcome left when the number cannot be built into a curve.
         val shapeUsable = manual.anyShape && wanted.ordered &&
             wanted.onsetMin in bounds.insulinOnsetMinRange &&
             wanted.peakMin in bounds.insulinPeakMinRange &&
             wanted.activeEndMin in bounds.insulinPeakMinRange &&
-            wanted.tailMin in bounds.insulinTailMinRange
+            wanted.tailMin in bounds.insulinTailMinManualRange
         if (manual.anyShape && !shapeUsable) rejected += SHAPE_OUT_OF_DOMAIN
 
         // Warp when a measured curve can carry the request, synthesize when it

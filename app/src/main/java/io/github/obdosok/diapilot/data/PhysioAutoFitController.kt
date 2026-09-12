@@ -207,6 +207,12 @@ object PhysioAutoFitController {
             val bounds = safety?.first ?: PhysioAutoFitV1.PLAUSIBLE_PHYSIOLOGY
             val corridor = safety?.second
                 ?: app.localized().getString(R.string.physio_auto_fit_controller_corridor_unmeasured)
+            // AND WHAT THE USER HAS ALREADY ANSWERED IS NOT SEARCHED. The tail
+            // corridor is held at the instrument's floor, so an end of action
+            // the user entered below it would be "improved" upward on the first
+            // pass — a fit proposing to overrule testimony it cannot measure.
+            // See PhysioAutoFitRuntime.handHeldAxes.
+            val handHeld = PhysioAutoFitRuntime.handHeldAxes(app)
             _state.value = State.Running(metric, 0, episodes.size)
             val finished = AtomicInteger(0)
             val gate = Semaphore(maxOf(1, Runtime.getRuntime().availableProcessors() - 1))
@@ -215,7 +221,8 @@ object PhysioAutoFitController {
                     val f = gate.withPermit {
                         PhysioAutoFitV1.fitOne(
                             scored, e, start, metric, PhysioAutoFitRuntime.GRID,
-                            locked = locked + PHONE_LOCKED, minPoints = 6, bounds = bounds,
+                            locked = locked + PHONE_LOCKED + handHeld, minPoints = 6,
+                            bounds = bounds,
                         )
                     }
                     _state.value = State.Running(metric, finished.incrementAndGet(), episodes.size)

@@ -21,9 +21,14 @@ import org.junit.Test
  *
  * Raising the floor to the instrument's own reach makes the clamp SAY
  * something: below it, the number describes the window and not the insulin.
- * These tests pin the three places that must now agree on that — the clamp, the
- * hand entry, and the search corridor — because the previous state had them
- * agreeing on a floor that could not be reached (audit M1).
+ * These tests pin the places that must agree on that — the clamp and the search
+ * corridor — because the previous state had them agreeing on a floor that could
+ * not be reached (audit M1).
+ *
+ * ⚠ THIS FLOOR IS ABOUT THE INSTRUMENT ONLY. A person stating their own end of
+ * action is not reporting a truncated measurement, so the hand tier has a
+ * domain of its own ([PhysioBoundsV1.insulinTailMinManualRange]) and is applied
+ * as entered — see [ManualInsulinTailV1Test], which pins the other half.
  */
 class InsulinTailDomainV1Test {
 
@@ -64,12 +69,22 @@ class InsulinTailDomainV1Test {
     }
 
     /**
-     * The hand path REFUSES rather than clamps, and that is deliberate: a
-     * measurement may be corrected by a population bound, a person's own
-     * statement may not be silently rewritten into a different one.
+     * THE HAND PATH DOES NOT PASS THROUGH THIS FLOOR AT ALL.
+     *
+     * It used to: the resolver checked the entered end of action against
+     * `insulinTailMinRange`, so a person stating 200 got their whole shape
+     * refused and the measured curve stayed in charge. That check now runs
+     * against the hand tier's own domain, which starts at 120 — this test pins
+     * that the two really are separate numbers, so a later edit to one does not
+     * quietly move the other.
      */
     @Test
-    fun `a hand entered end below the floor is refused, not clamped`() {
+    fun `the hand tier's domain is not the instrument's domain`() {
+        assertEquals(120.0, bounds.insulinTailMinManualRange.start, 0.0)
+        assertTrue(
+            "the hand floor must sit below the instrument's reach",
+            bounds.insulinTailMinManualRange.start < bounds.insulinTailMinRange.start,
+        )
         val measured = listOf(
             0.0 to 0.0, 20.0 to .02, 40.0 to .28, 60.0 to .60, 120.0 to .95, 260.0 to 1.0,
         ).map { (m, f) -> HybridCdfKnot(m, f) }
@@ -81,12 +96,10 @@ class InsulinTailDomainV1Test {
             InsulinParamTierV1.TAGGED_CORRECTION,
             InsulinShapeLandmarksV1(15.0, 75.0, tailMin = 300.0),
         )
-        assertTrue(
-            "expected an out-of-domain refusal, got ${r.rejected}",
-            InsulinParameterResolverV1.SHAPE_OUT_OF_DOMAIN in r.rejected,
-        )
-        assertEquals("the measured curve stays in charge", measured, r.knots)
-        assertEquals(InsulinParamTierV1.TAGGED_CORRECTION, r.shapeTier)
+        assertTrue("unexpected refusal: ${r.rejected}", r.rejected.isEmpty())
+        assertEquals(InsulinParamTierV1.MANUAL, r.shapeTier)
+        assertEquals(200.0, checkNotNull(r.landmarks).tailMin, 1e-9)
+        assertEquals(200.0, checkNotNull(r.knots).last().minute, 1e-6)
     }
 
     /**
@@ -101,6 +114,46 @@ class InsulinTailDomainV1Test {
         assertEquals(480.0, high, 0.0)
         assertTrue(low >= bounds.insulinTailMinRange.start)
         assertTrue(high <= bounds.insulinTailMinRange.endInclusive)
+    }
+
+    /**
+     * AND THE CORRIDOR BUILT AROUND A MEASUREMENT CANNOT ESCAPE THAT RANGE.
+     *
+     * `boundsAround` OVERRIDES the flat table in `fitOne`, so a ±20% band
+     * around a measured end of action opened below the floor — 192 around a
+     * measured 240 — and every candidate down there was then discarded one at a
+     * time by `tuned`'s own domain check, silently, while the corridor printed
+     * on the card claimed the region was searchable. The band is now held
+     * inside the range: the fit REFUSES to go under the floor instead of
+     * proposing and discarding.
+     */
+    @Test
+    fun `the auto-fit cannot propose an end of action below the floor from a measurement`() {
+        val (floor, ceiling) = PhysioAutoFitV1.rangeOf("tail")
+        // The value every measured corpus on this instrument actually produces,
+        // once the clamp has lifted it to the floor.
+        val atFloor = PhysioAutoFitV1.boundsAround(
+            InsulinShapeLandmarksV1(20.0, 55.0, plateauEndMin = 90.0, tailMin = 240.0),
+        ).getValue("tail")
+        assertEquals(floor, atFloor.first, 1e-9)
+        assertTrue("the band must still have room upward: $atFloor", atFloor.second > floor)
+        assertTrue(atFloor.second <= ceiling)
+
+        // And an uncoerced short measurement collapses ONTO the floor rather
+        // than handing the search a region entirely below it.
+        val short = PhysioAutoFitV1.boundsAround(
+            InsulinShapeLandmarksV1(20.0, 55.0, plateauEndMin = 90.0, tailMin = 150.0),
+        ).getValue("tail")
+        assertEquals(floor, short.first, 1e-9)
+        assertEquals(floor, short.second, 1e-9)
+
+        // A measurement in the middle of the domain keeps its full band: the
+        // clamp must bind only where it has to.
+        val middle = PhysioAutoFitV1.boundsAround(
+            InsulinShapeLandmarksV1(20.0, 55.0, plateauEndMin = 90.0, tailMin = 360.0),
+        ).getValue("tail")
+        assertEquals(288.0, middle.first, 1e-9)
+        assertEquals(432.0, middle.second, 1e-9)
     }
 
     /** And a candidate under the floor produces no model at all, rather than one

@@ -82,7 +82,7 @@ parsing is bounds-checked; no WebView, no `exec`; no secrets in git,
 
 | # | S | Status | Finding | Where |
 |---|---|---|---|---|
-| M1 | H | Open — b3 raised the domain floor to 240 (the instrument's own reach), moved the example model to tail 300 / main curve 200, pulled the Auto-fit `tail` corridor to 240..480 and marks a measured end under the floor on the settings card; the INSTRUMENT is untouched — `CAP_MS`, `TAIL_HORIZON_MIN` and the pre-dose-slope definition of "end" are the same, so every measurement still lands in ~150..230 and is now clamped rather than believed. The plateau end landmark stays deferred — O-D | **Insulin tail is short by construction.** Example model ends at 175 min; domain floor is 120. Against an exponential curve (peak 75, DIA 6 h) the example has 85% acted at 120 min vs ~55%, and 100% at 180 vs ~79% — IOB reads zero on the third hour. The cause is the *instrument*, not a constant: the per-dose window is capped at `CAP_MS = 240 min` and closed by the next injection; the end landmark needs `TAIL_HORIZON_MIN = 200` clean minutes; and "end" is defined as the rate returning to the pre-dose slope, which a rising background meets early (an earlier internal finding, M-54; the plateau alternative is computed but never substituted). A 240-minute ruler cannot measure five hours, so every user's measured end lands in ~150–230 and the 120..600 domain never clamps it. Manual timings (P1) win and accept tail 120..600, but Auto-fit's corridor is ±20% around the *measured* tail and will propose pulling it back unless the knob is locked. | `app/.../data/InsulinProfileRuntime.kt:44`, `core/.../physio/SegmentLandmarksV1.kt:104,278`, `core/.../physio/PhysioContracts.kt:18`, `core/.../physio/PhysioAutoFitV1.kt:364` |
+| M1 | H | Open — b3 raised the domain floor to 240 (the instrument's own reach), moved the example model to tail 300 / main curve 200, pulled the Auto-fit `tail` corridor to 240..480 and marks a measured end under the floor on the settings card; b10 split the domain in two so the clamp applies only where an instrument feeds the model on its own — the MANUAL tier now has `insulinTailMinManualRange` = 120..600 and is applied as entered end to end, the measured landmark is stored and displayed as measured rather than as the floor it was lifted to, the Auto-fit corridor is held inside the floor instead of proposing under it, a hand-set tail locks that axis, and `:tools:accuracy` can split a ledger by the tail the phone was running. The INSTRUMENT is still untouched — `CAP_MS`, `TAIL_HORIZON_MIN` and the pre-dose-slope definition of "end" are the same, so every MEASUREMENT still lands in ~150..230 and is clamped rather than believed. The plateau end landmark stays deferred — O-D | **Insulin tail is short by construction.** Example model ends at 175 min; domain floor is 120. Against an exponential curve (peak 75, DIA 6 h) the example has 85% acted at 120 min vs ~55%, and 100% at 180 vs ~79% — IOB reads zero on the third hour. The cause is the *instrument*, not a constant: the per-dose window is capped at `CAP_MS = 240 min` and closed by the next injection; the end landmark needs `TAIL_HORIZON_MIN = 200` clean minutes; and "end" is defined as the rate returning to the pre-dose slope, which a rising background meets early (an earlier internal finding, M-54; the plateau alternative is computed but never substituted). A 240-minute ruler cannot measure five hours, so every user's measured end lands in ~150–230 and the 120..600 domain never clamps it. Manual timings (P1) win and accept tail 120..600, but Auto-fit's corridor is ±20% around the *measured* tail and will propose pulling it back unless the knob is locked. | `app/.../data/InsulinProfileRuntime.kt:44`, `core/.../physio/SegmentLandmarksV1.kt:104,278`, `core/.../physio/PhysioContracts.kt:18`, `core/.../physio/PhysioAutoFitV1.kt:364` |
 | M2 | H | Deferred — O-B (onboarding) | **No "uncalibrated" mode.** From the first minute the bundled synthetic person (ISF 1.8, insulin 20/75/175, CS 0.165) drives the forecast, the hypo alert and the watch hint. No onboarding screen, no calibration status; the only "not measured yet" strings live inside the tuning section. | `app/.../data/HybridModelStore.kt:24` |
 | M3 | M | Deferred — O-D (needs n>1) | ISF, CS and DIA are not separately identifiable from meal days, and the pipeline holds CS constant while reading DIA off the CGM. The measured bias of +4.53 mmol at h=180 is attributed to food amplitude, but a short insulin tail produces the same sign; the fitter itself notes that an ISF read off the bias arm is "partly a food deficit wearing an insulin label". | `docs/architecture.md` §5, `core/.../physio/PhysioAutoFitV1.kt` (header) |
 | M4 | M | Closed (phaseB/b3) — `foodDynamicsGlobalPriorV1` is called with `Settings.weightKg`, its median becomes the artifact's `globalCs` and so `food.globalFactor` on the live forecast path; the chain is stored manual override → weight → the 0.165 constant, and body weight is part of the artifact cache key. Tier one (`carb_sens_override_mmol_per_g`) still has no setter, so on a fresh phone the chain is weight → default until the onboarding screen writes it | **Weight → CS is not wired.** The weight field exists and `CarbSensitivityPriorV1.fromWeight` exists, but the result is only shown as a hint under the field; `foodDynamicsGlobalPriorV1(weightKg)` is never called with a weight. CS is also outside Auto-fit (deliberately, for identifiability), so manual/weight is the only door. | `app/.../ui/SettingsScreen.kt:242`, `app/.../data/PhysioRuntime.kt:80` |
@@ -105,11 +105,11 @@ and rejected alternatives.
 
 | Step | Reality |
 |---|---|
-| Manual ISF and insulin shape | Present, tier P1, validated against domain bounds (`ManualInsulinParamsV1.kt:496`). |
+| Manual ISF and insulin shape | Present, tier P1, validated against the HAND tier's own domain and applied as entered — end of action 120..600 (`PhysioBoundsV1.insulinTailMinManualRange`), checked at `ManualInsulinParamsV1.kt:541` and never clamped; out of range the shape is refused and said so. |
 | Manual CS | Present (`carb_sens_override_mmol_per_g`, default 0.165). |
 | Measured insulin timings | Continuous; the "clean" arm switches in at 8 samples, before that "from all doses (too few clean ones yet)". Applied automatically unless a field is set by hand (manual → measured → prior). |
 | ISF learning | Daily balance, needs ≥3 valid days in a 10-day window; applied only with `IsfSource = ADAPTIVE` (default `MANUAL`). |
-| Auto-fit | "Auto-fit from the last 10 episodes", needs ≥3 episodes; axes `isf, onset, fullSpeed, phase, tail, tailShare, kcal, sieve, spread, ramp`; timings within ±20% of measured, ISF free 1–5; **proposes into fields, applied only by Apply**; per-knob lock. Does not fit CS or the carb triangles themselves (only `spread`; triangles are importable via `carbTrianglesOverride`). |
+| Auto-fit | "Auto-fit from the last 10 episodes", needs ≥3 episodes; axes `isf, onset, fullSpeed, phase, tail, tailShare, kcal, sieve, spread, ramp`; timings within ±20% of measured, ISF free 1–5; **proposes into fields, applied only by Apply**; per-knob lock. The `tail` band is additionally held inside the instrument's own 240..480 (`PhysioAutoFitV1.boundsAround`, b10) instead of proposing under the floor and discarding the candidates in silence, and the axis is locked outright when an end of action has been entered by hand. Does not fit CS or the carb triangles themselves (only `spread`; triangles are importable via `carbTrianglesOverride`). |
 | Collection-only phase | **Does not exist** — see M2. |
 
 ---
@@ -152,6 +152,26 @@ runtime that fed nothing. The debt is known and chosen.
 | P4 | M | Open | Regulatory status: a predictive hypoglycaemia alert plus a carbohydrate hint is a medical purpose by function; in the EU that is MDR (rule 11), and a disclaimer does not settle it. xDrip+ / AAPS stay off the stores for this reason. |  |
 | P5 | M | Open | Apple: no iOS code; GPL-3.0 ports of xDrip+ cannot be relicensed for App Store terms; half the architecture (broadcast, 24/7 service, lock-screen overlay, localhost watch server, OOP2) has no iOS equivalent. |  |
 | P6 | L | Open — b1 added the Data sources screen (every link with a status, one line of what breaks, and a Fix); the chain itself is unchanged, and Nightscout (O-B) and Juggluco (S-1) are still the way out of the dependency | The xDrip + OOPAlgorithm2 + Health Connect dependency chain is fragile on a stranger's phone. | `app/.../collect/DataSources.kt`, `ui/DataSourcesScreen.kt` |
+| P7 | H | Closed (phaseB/b9) | **No alert could fire without OOPAlgorithm2.** `HypoAlertNotifier.maybeNotify` — the predictive low *and* the reading-driven low, sustained low, sensor artifact and sustained high — `RapidFallNotifier.maybeNotify` and `CompanionSync.pushIfDue` had exactly one caller each, and it was the tail of the OOP2 minute receiver. The stall notification had one too, inside the poll worker's `if (ownBle)`. So on a phone without that third-party app — every stranger's phone, and the whole point of the store edition — the app kept collecting, drawing, updating the widget and answering the watch while no alarm of any kind could fire, and nothing on any screen said so. Not a finding phase B created; re-derived at its gate as "decision 1" and closed here. b9 introduced one entry point (`collect/AlertTick.kt`) called from every path a reading arrives on, plus the existing 15-minute `TreatmentsPollWorker` as the periodic backstop, and gave the Data sources screen a leading Alerts row that states whether an alarm can fire and why not. | `app/.../collect/AlertTick.kt`, and its callers `CollectorService.kt:216`, `XdripBgReceiver.kt:91`, `TreatmentsPollWorker.kt:185`, `MainActivity.kt:261,1131,1148`; `collect/DataSources.kt` |
+
+**What phase B closed here (b9), and what it deliberately changed.** P7 is the
+only finding in this file that was not in the original external read: it was
+re-derived at the phase-B gate and is closed by the branch that added it. One
+entry point, `collect/AlertTick.kt`, now evaluates the whole alert set — low,
+high, rapid fall, stall — plus the companion push and the widget, and is called
+after the reading is stored from the xDrip broadcast receiver, the OOP2 minute
+stream, the web-service poll, the Libre NFC scan and a hand-entered fingerstick.
+The same poll worker that fetches `/sgv.json` calls it at the end of every run
+whether or not anything arrived, which is the backstop for a phone whose only
+source is that poll. Two things the tick decides that the notifiers do not, and
+both are the caller's job rather than a threshold change: which series the
+rapid-fall slope is measured over (the per-minute stream while it is live,
+otherwise a thirty-minute window on the five-minute grid, because the detector's
+ten-minute default can never hold five points there), and which sentence the
+stall notification carries (the NFC advice only where the app owns the sensor
+link). The stall alert therefore now fires on every phone rather than in
+own-BLE mode alone — a deliberate extension, and the one place b9 changed what a
+user sees rather than who calls it.
 
 ---
 
@@ -172,9 +192,19 @@ runtime that fed nothing. The debt is known and chosen.
 
 **Where this order stands after phase B.** Step 1 closed at the phase-A gate.
 Step 2 took its first half — the floor, the example tail and the warning — and
-left the instrument and the plateau landmark to O-D. Step 3 has M4 closed
+left the instrument and the plateau landmark to O-D. b10 then corrected that
+half's own side effect: one constant had been serving the instrument's clamp
+AND the hand tier's validation, so raising the floor silently took with it the
+user's ability to state a shorter end of action. They are separate constants
+now, and a stated tail is applied as entered; the instrument itself is still the
+open half. Step 3 has M4 closed
 **without** the first-run screen it assumed: the weight chain reaches the
 forecast on its own, and the screen is still owed M2 and P2 (and the setter
 that would let it write the manual tier). Step 5 has P1 done and S6–S8 open.
 Steps 4 and 6 are untouched, though b0 built the flavor mechanism A3's fix
 needs.
+
+**And one step that was not on the list.** P7 sits ahead of all of it: an
+onboarding screen, a release key and a second glucose source are all worth less
+on a phone where no alarm can fire, so b9 took it before the three items O-B
+still owes.

@@ -11,6 +11,7 @@
     <string name="stream_stall_notifier_title_no_age">📡 Нет данных с сенсора</string>
     <string name="stream_stall_notifier_title_with_age">📡 Нет данных с сенсора уже %1$d мин</string>
     <string name="stream_stall_notifier_body">%1$s. Приложи телефон к сенсору (NFC) — скан восстановит связь и добьёт пропуск из памяти сенсора.</string>
+    <string name="stream_stall_notifier_body_sources">%1$s. Пока ничего не приходит, ни одно предупреждение сработать не может. Открой «Источники данных» в приложении — там видно, какое звено встало.</string>
 
     <!-- BackupRestore.kt -->
     <string name="backup_restore_file_unavailable">файл недоступен</string>
@@ -87,7 +88,7 @@
     <string name="physio_tuning_section_label_full_speed">полн. скорость</string>
     <string name="physio_tuning_section_label_phase">фаза, мин</string>
     <string name="physio_tuning_section_label_tail">хвост, мин</string>
-    <string name="physio_tuning_section_curve_shape_explainer">Кривая разгоняется от «старта» до «полной скорости», держит максимум всю «фазу», потом спадает до «хвоста». Хвост несёт ровно пятую часть дозы. Стенд на его эпизодах даёт 28 · 40 · 30 · 165.</string>
+    <string name="physio_tuning_section_curve_shape_explainer">Кривая разгоняется от «старта» до «полной скорости», держит максимум всю «фазу», потом спадает до «хвоста». Хвост несёт ровно пятую часть дозы. «Хвост», введённый здесь, применяется ровно таким, как введён, — от 120 до 600 мин.</string>
     <string name="physio_tuning_section_label_isf">ISF, ммоль/ед</string>
     <string name="physio_tuning_section_label_kcal">ккал/ч</string>
     <plurals name="physio_tuning_section_adaptive_pending">

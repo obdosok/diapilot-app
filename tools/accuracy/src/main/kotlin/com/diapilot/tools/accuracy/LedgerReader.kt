@@ -99,7 +99,10 @@ fun databaseRequirementsMessage(): String = """
 fun readRuns(conn: Connection, consumer: String): List<RunRow> {
     val out = mutableListOf<RunRow>()
     conn.prepareStatement(
-        "SELECT id, anchor_ts_ms, consumer, algo_version FROM forecast_runs " +
+        // `applied` is nullable in the DDL and absent on rows written before
+        // the column existed, so it is read as a nullable string rather than
+        // required — see RunRow.applied.
+        "SELECT id, anchor_ts_ms, consumer, algo_version, applied FROM forecast_runs " +
             "WHERE consumer = ? AND algo_version != ? ORDER BY anchor_ts_ms",
     ).use { ps ->
         ps.setString(1, consumer)
@@ -109,6 +112,7 @@ fun readRuns(conn: Connection, consumer: String): List<RunRow> {
                 out += RunRow(
                     id = rs.getLong(1), anchorTsMs = rs.getLong(2),
                     consumer = rs.getString(3), algoVersion = rs.getString(4),
+                    applied = rs.getString(5),
                 )
             }
         }

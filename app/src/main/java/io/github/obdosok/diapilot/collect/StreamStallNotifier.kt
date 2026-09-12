@@ -21,9 +21,12 @@ import io.github.obdosok.diapilot.i18n.localized
  *  - LibreBleClient: the nonce probe walked the full circle without a single
  *    accepted login — reconnecting harder won't help, only an NFC rescan
  *    re-keys the sensor;
- *  - TreatmentsPollWorker: no fresh reading for [STALL_MIN] minutes in
- *    own-BLE mode (catches every other silent failure: BT off, sensor out
- *    of range, dead sensor).
+ *  - [AlertTick]: no fresh reading for [STALL_MIN] minutes, on whatever the
+ *    phone's sources are (catches every other silent failure: xDrip stopped,
+ *    BT off, sensor out of range, dead sensor). It used to be the own-BLE
+ *    watchdog inside `TreatmentsPollWorker` and therefore fired for one
+ *    sensor-direct mode only — on every other phone the app went blind in
+ *    silence, which is the half of `docs/audit.md` P7 this notifier owns.
  *
  * Not a glucose alert — an equipment alert. Default-importance channel,
  * 45-min cooldown, auto-noop while data is actually fresh.
@@ -66,9 +69,25 @@ object StreamStallNotifier {
     private const val PREF_LAST = "stream_stall_last_ms"
     const val STALL_MIN = 25L
 
-    /** Fire (cooldown-guarded) unless data is actually fresh. [reason] is one
-     *  of the `stream_stall_notifier_reason_*` strings. */
-    fun maybeNotify(context: Context, @androidx.annotation.StringRes reason: Int) {
+    /**
+     * Fire (cooldown-guarded) unless data is actually fresh. [reason] is one of
+     * the `stream_stall_notifier_reason_*` strings, [body] one of the
+     * `stream_stall_notifier_body*` templates, which takes the reason as its
+     * only argument.
+     *
+     * THE ADVICE IS THE CALLER'S; THE DECISION IS NOT. "Bring the phone to the
+     * sensor" is an instruction only where this app owns the sensor link. On a
+     * phone fed by another app the stream that stopped is not one an NFC scan
+     * can restart, and sending its owner there is sending them to the one
+     * place that cannot help. The default is the NFC sentence this notifier
+     * was born with, so both of its original call sites — the BLE client's
+     * nonce desync and the own-BLE watchdog — read exactly as before.
+     */
+    fun maybeNotify(
+        context: Context,
+        @androidx.annotation.StringRes reason: Int,
+        @androidx.annotation.StringRes body: Int = R.string.stream_stall_notifier_body,
+    ) {
         try {
             val store = Stores.get(context)
             val now = System.currentTimeMillis()
@@ -109,7 +128,7 @@ object StreamStallNotifier {
                             text.getString(R.string.stream_stall_notifier_title_no_age)
                         },
                     )
-                    .setContentText(text.getString(R.string.stream_stall_notifier_body, text.getString(reason)))
+                    .setContentText(text.getString(body, text.getString(reason)))
                     .setStyle(NotificationCompat.BigTextStyle())
                     .setContentIntent(
                         PendingIntent.getActivity(

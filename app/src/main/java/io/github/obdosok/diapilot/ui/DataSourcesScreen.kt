@@ -203,8 +203,12 @@ private fun levelColor(level: DataSourceLevel): Color = when (level) {
  * the rest are process-local fields and system-service calls.
  */
 private suspend fun readDataSources(context: Context, store: CollectorStore): List<DataSourceRow> {
-    val (lastMinuteMs, healthConnect) = withContext(Dispatchers.IO) {
+    val (readings, healthConnect) = withContext(Dispatchers.IO) {
         val minute = store.lastMinuteReading()?.tsMs ?: 0L
+        // The newest of the two streams, which is what "the app still has
+        // something to judge" means — the same pair [AlertTick] and the stall
+        // notification ask about, so the three cannot disagree.
+        val freshest = maxOf(minute, store.lastSensorReading()?.tsMs ?: 0L)
         val access = when {
             HealthConnectClient.getSdkStatus(context) != HealthConnectClient.SDK_AVAILABLE ->
                 HealthConnectAccess.UNAVAILABLE
@@ -212,7 +216,7 @@ private suspend fun readDataSources(context: Context, store: CollectorStore): Li
             !HealthConnectSync.hasStepsPermission(context) -> HealthConnectAccess.STEPS_MISSING
             else -> HealthConnectAccess.GRANTED
         }
-        minute to access
+        (minute to freshest) to access
     }
     val nfc = NfcAdapter.getDefaultAdapter(context)
     val alarms = context.getSystemService(AlarmManager::class.java)
@@ -230,7 +234,7 @@ private suspend fun readDataSources(context: Context, store: CollectorStore): Li
             // configured", which is the truth about this build, and wiring it
             // up is this one argument.
             nightscoutUrl = null,
-            lastMinuteReadingMs = lastMinuteMs,
+            lastMinuteReadingMs = readings.first,
             ownBleEnabled = Settings.ownBleEnabled(context),
             lastBlePacketMs = DiagState.bleLastPacketMs,
             batteryUnrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) ?: true,
@@ -245,6 +249,12 @@ private suspend fun readDataSources(context: Context, store: CollectorStore): Li
             overlayGranted = LockScreenOverlay.canDraw(context),
             nfcPresent = nfc != null,
             nfcEnabled = nfc?.isEnabled == true,
+            // THE TWO SWITCHES, NOT THE EDITION. Both alerts ship on in both
+            // editions; what the store edition loses is the predicted crossing
+            // inside the low and high sides, not the sides themselves.
+            alertsEnabled = Settings.hypoAlertEnabled(context) ||
+                Settings.hyperAlertEnabled(context),
+            freshestReadingMs = readings.second,
         ),
     )
 }

@@ -11,6 +11,7 @@
     <string name="stream_stall_notifier_title_no_age">📡 No data from the sensor</string>
     <string name="stream_stall_notifier_title_with_age">📡 No data from the sensor for %1$d min</string>
     <string name="stream_stall_notifier_body">%1$s. Bring the phone close to the sensor (NFC) — a scan will restore the connection and recover the gap from the sensor\'s memory.</string>
+    <string name="stream_stall_notifier_body_sources">%1$s. While nothing arrives no alert can fire. Open Data sources in the app to see which link stopped.</string>
 
     <!-- BackupRestore.kt -->
     <string name="backup_restore_file_unavailable">file not readable</string>
@@ -83,7 +84,7 @@
     <string name="physio_tuning_section_label_full_speed">full speed</string>
     <string name="physio_tuning_section_label_phase">phase, min</string>
     <string name="physio_tuning_section_label_tail">tail, min</string>
-    <string name="physio_tuning_section_curve_shape_explainer">The curve ramps up from “onset” to “full speed”, holds the maximum for the whole “phase”, then decays to “tail”. The tail carries exactly a fifth of the dose. On the bench\'s own episodes it comes out 28 · 40 · 30 · 165.</string>
+    <string name="physio_tuning_section_curve_shape_explainer">The curve ramps up from “onset” to “full speed”, holds the maximum for the whole “phase”, then decays to “tail”. The tail carries exactly a fifth of the dose. A “tail” you enter here is applied exactly as entered, from 120 to 600 min.</string>
     <string name="physio_tuning_section_label_isf">ISF, mmol/L per U</string>
     <string name="physio_tuning_section_label_kcal">kcal/h</string>
     <plurals name="physio_tuning_section_adaptive_pending">

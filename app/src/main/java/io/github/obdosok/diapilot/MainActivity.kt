@@ -65,6 +65,7 @@ import com.diapilot.core.collector.LabeledMeal
 import com.diapilot.core.collector.MealEvent
 import com.diapilot.core.collector.Reading
 import com.diapilot.core.collector.relabelMeal
+import io.github.obdosok.diapilot.collect.AlertTick
 import io.github.obdosok.diapilot.collect.CollectorService
 import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
@@ -254,6 +255,10 @@ class MainActivity : AppCompatActivity() {
                 // New history landed in the main trace — rebuild the twin
                 // instead of riding the cached kernel/corridor for up to 6h.
                 if (mainFilled > 0) TwinCache.invalidate()
+                // A scan can close a stream gap that ended a minute ago, so
+                // the alert set is judged against what just landed — the same
+                // entry point every other source calls (docs/audit.md, P7).
+                AlertTick.fire(this, AlertTick.Source.SENSOR_SCAN)
 
                 // Sensor registry: a serial change starts a new calibration
                 // era (meter checks from the old sensor stop applying).
@@ -1118,6 +1123,12 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             // a new check must rebuild it, or the header shifts to the new
             // lens while the model keeps the old one for up to 6h.
             TwinCache.invalidate()
+            // A FINGERSTICK IS AN ALERT INPUT IN BOTH DIRECTIONS: an in-range
+            // one newer than the sensor anchor silences the low side, a low one
+            // confirms it, and the new lens moves every judged value. It is the
+            // one source that must never be de-duplicated — it does not advance
+            // the sensor clock the tick's key is built from.
+            AlertTick.fire(context, AlertTick.Source.MANUAL)
             state = loadState(store, context)
         }
     }
@@ -1134,6 +1145,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             )
             MeterCalCache.invalidate()
             TwinCache.invalidate()
+            AlertTick.fire(context, AlertTick.Source.MANUAL)
             state = loadState(store, context)
         }
     }

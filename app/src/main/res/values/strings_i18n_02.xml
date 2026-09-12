@@ -35,7 +35,7 @@
 
     <!-- Insulin · measured curve card -->
     <string name="settings_screen_insulin_curve_title">Insulin · measured curve</string>
-    <string name="settings_screen_insulin_engine_note">One engine for everything: the line, What-if, the watch and the hypo alert all run on the measured curve — onset 11 · peak ~60 · tail 120, ISF from your corrections. No more diverging hands.</string>
+    <string name="settings_screen_insulin_engine_note">One engine for everything: the line, What-if, the watch and the hypo alert all run on the same curve. An end of action you enter by hand is applied exactly as entered, from 120 to 600 min. A measured one is not believed below 240 min: a dose’s measurement window cannot see further.</string>
     <string name="settings_screen_isf_line">ISF %1$.1f %2$s · onset %3$.0f min · rate peak %4$.0f min</string>
     <string name="settings_screen_isf_explain">This is the SAME curve measured below, read with a different ruler: “rate peak” is the top of the hump, the measured “peak” is the minute the curve reaches full speed. They differ by about 15 minutes by construction, not by error.</string>
     <string name="settings_screen_main_curve_line">Main curve %1$.0f min · dose-dependent tail to %2$.0f min</string>

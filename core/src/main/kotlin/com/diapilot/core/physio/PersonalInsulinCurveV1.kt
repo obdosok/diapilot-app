@@ -26,8 +26,26 @@ data class PersonalInsulinCurveV1(
      * The landmarks this curve was built on — measured, then coerced into the
      * artifact's domain.  Carried on the curve so every consumer reads ONE
      * onset/peak/tail instead of re-deriving its own from the knots.
+     *
+     * This is the APPLIED set: what the model runs, and what the Auto-fit
+     * corridor is centred on. For what the doses actually showed, read
+     * [measuredLandmarks] — the two differ by exactly [coerced].
      */
     val landmarks:InsulinShapeLandmarksV1,
+    /**
+     * The same landmarks BEFORE the domain was applied — as measured.
+     *
+     * Added because the card read [landmarks] and so printed the artifact's own
+     * floor under the words "measured from N doses": a user whose doses said
+     * the action ends at 180 min was shown 240, and had to infer the
+     * substitution from a separate clause further along the line. A measurement
+     * may be corrected on its way into the model; the number attributed to the
+     * measurement must stay the measurement (audit M1).
+     *
+     * Defaults to [landmarks] so a caller with nothing to distinguish reads the
+     * same value twice rather than a null.
+     */
+    val measuredLandmarks:InsulinShapeLandmarksV1 = landmarks,
     /** The raw aggregate before smoothing, for display and audit. */
     val measuredKnots:List<HybridCdfKnot> = knots,
     /**

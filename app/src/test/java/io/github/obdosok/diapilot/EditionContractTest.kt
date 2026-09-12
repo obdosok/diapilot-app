@@ -276,6 +276,8 @@ class EditionContractTest {
         overlayGranted = false,
         nfcPresent = false,
         nfcEnabled = false,
+        alertsEnabled = true,
+        freshestReadingMs = 0,
     )
 
     // --- the manifest -------------------------------------------------------

@@ -30,9 +30,12 @@ class ManualInsulinRuntimeTest {
     /**
      * A synthetic hand-entered shape, distinct from the shipped prior.
      *
-     * The end of action is 300, not 145: `insulinTailMinRange` now floors it at
-     * 240 (audit M1), so a hand entry of 145 is refused as out of domain and
-     * this fixture would be testing the refusal rather than the shape.
+     * The end of action is 300 because this fixture is about the OTHER
+     * landmarks — the assertions below probe the curve out to five hours and a
+     * shorter tail would leave them nothing to read. A short hand entry is a
+     * case of its own and has its own test
+     * ([aHandEnteredEndOfActionOf130ReachesTheKernelUnchanged]); it is no
+     * longer a refusal, and `insulinTailMinManualRange` is why.
      */
     private val entered = ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 300.0, isfMmolPerU = 2.5)
 
@@ -131,6 +134,67 @@ class ManualInsulinRuntimeTest {
             base, ManualInsulinRuntime.resolve(base, ManualInsulinParamsV1.EMPTY, null),
         )
         assertEquals(base, after)
+    }
+
+    /**
+     * THE OWNER'S OWN NUMBER, END TO END: 130 minutes.
+     *
+     * The app's owner measures roughly 130 min and sees no insulin effect after
+     * two hours. Entering that used to produce 240 in the model: the resolver
+     * checked the entry against `insulinTailMinRange`, which is the measuring
+     * WINDOW'S reach, so the shape was refused as out of domain and the
+     * previous curve silently stayed in force while the card kept showing 130.
+     *
+     * This walks the whole chain the WP named — the stored setting, the
+     * resolver, what `apply` writes, and the kernel the forecast integrates —
+     * because a value that survives three of the four is still not applied.
+     */
+    @Test fun aHandEnteredEndOfActionOf130ReachesTheKernelUnchanged() {
+        val short = ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 130.0)
+        ManualInsulinRuntime.setParams(context, short)
+        assertEquals(130.0, checkNotNull(ManualInsulinRuntime.params(context).tailMin), 1e-3)
+
+        val base = model()
+        val resolution = ManualInsulinRuntime.resolve(
+            base, ManualInsulinRuntime.params(context), measuredCurve = null,
+        )
+        assertTrue("unexpected refusal: ${resolution.rejected}", resolution.rejected.isEmpty())
+        assertEquals(InsulinParamTierV1.MANUAL, resolution.shapeTier)
+        assertEquals(130.0, checkNotNull(resolution.landmarks).tailMin, 1e-9)
+
+        val applied = ManualInsulinRuntime.apply(base, resolution)
+        assertEquals(130.0, applied.insulin.tailDurationMin, 1e-9)
+        assertEquals(130.0, applied.insulin.shortDurationMin, 1e-9)
+
+        // The kernel, which is what the forecast subtracts, IOB reports and
+        // What-if scales. Its length IS the applied end of action.
+        val engine = HybridForecastEngine(applied)
+        assertEquals(130.0, engine.insulinKernelPoints(1.0).last().tauMin, 1e-9)
+        assertEquals(1.0, engine.insulinCdf(130.0), 1e-6)
+        assertTrue(
+            "insulin must still be acting at 100 min: ${engine.insulinCdf(100.0)}",
+            engine.insulinCdf(100.0) < .999,
+        )
+    }
+
+    /**
+     * And the ARTIFACT the app actually serves carries it too — the layer that
+     * used to throw on it, taking the whole PHYSIO arm down rather than one
+     * number with it.
+     */
+    @Test fun theArtifactServesAShortHandEnteredEndOfAction() {
+        val name = "manual-short-tail-${System.nanoTime()}.sqlite"
+        SqliteCollectorStore(context, name).use { store ->
+            HybridShadowRegistry.install(model(), "manual-short-tail-test")
+            ManualInsulinRuntime.setParams(
+                context, ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 130.0),
+            )
+            val served = PhysioRuntime.artifact(store, System.currentTimeMillis())
+                ?.personModelAt(12.0)
+            assertNotNull("the artifact must be built, not refused", served)
+            assertEquals(130.0, served!!.insulin.tailDurationMin, 1e-9)
+        }
+        context.deleteDatabase(name)
     }
 
     /**

@@ -235,6 +235,20 @@ object PhysioAutoFitV1 {
      *    computed value has already shown a glucose improvement. It stays wide.
      *
      * Pass `bounds` to override any axis; anything absent keeps [RANGES].
+     *
+     * ⚠ THE TAIL BAND IS HELD INSIDE [RANGES]' OWN `tail` ENTRY, which is the
+     * one place this function does not simply trust its centre. The corridor
+     * returned here OVERRIDES the flat table in [fitOne] (`bounds[axis] ?:
+     * RANGES`), so a centre below the instrument's floor used to hand the
+     * search a legal region entirely under it — a ±20% band around a measured
+     * 240 already opens at 192. Every such candidate was then thrown away by
+     * [tuned]'s own domain check, silently, one candidate at a time, while the
+     * corridor the card printed claimed the fit was free down there. Clamping
+     * the band instead means the fit REFUSES to go under the floor instead of
+     * proposing and discarding, and the printed corridor is the region actually
+     * searched. It does not lift the user's own number: a hand-entered end of
+     * action is locked out of the fit entirely (`PhysioAutoFitRuntime`), so
+     * this floor only ever binds an instrument feeding the model on its own.
      */
     fun boundsAround(
         measured: InsulinShapeLandmarksV1,
@@ -246,11 +260,20 @@ object PhysioAutoFitV1 {
             return (v - half) to (v + half)
         }
         val phase = (measured.plateauEndMin ?: (measured.peakMin + 30.0)) - measured.peakMin
+        val (tailFloor, tailCeiling) = rangeOf("tail")
+        val (tailLow, tailHigh) = band(measured.tailMin)
         return mapOf(
             "onset" to band(measured.onsetMin),
             "fullSpeed" to band(measured.peakMin),
             "phase" to band(phase.coerceAtLeast(1.0)),
-            "tail" to band(measured.tailMin),
+            // A band entirely below the floor collapses ONTO the floor rather
+            // than inverting: low == high == 240 is a corridor of one value,
+            // which is the honest reading of "the ruler cannot support anything
+            // shorter, and nobody has stated otherwise".
+            "tail" to (
+                tailLow.coerceIn(tailFloor, tailCeiling) to
+                    tailHigh.coerceIn(tailFloor, tailCeiling)
+                ),
         )
     }
 

@@ -81,6 +81,7 @@ object DiagnosticsBundle {
         )
         appendLine("last minute reading: ${Redact.minutesAgo(now, st.lastMinuteReadingMs)}")
         appendLine("minute calibration:  ${st.minuteCalibrationN?.let { "$it pairs" } ?: "none"}")
+        appendLine("alerts evaluated:    ${Redact.minutesAgo(now, st.lastAlertTickMs)}")
         appendLine("sensor serial:       ${Redact.identifier(st.sensorSerial)}")
         appendLine("sensor started:      ${Redact.daysAgo(now, st.sensorStartMs)}")
 

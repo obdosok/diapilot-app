@@ -228,6 +228,7 @@ short insulin tail produces the same sign of error.
 | companion server | `collect/CompanionSync.kt` | `Forecaster` |
 | settings | `ui/SettingsScreen.kt` | `data/Settings.kt` |
 | data sources | `ui/DataSourcesScreen.kt` | `collect/DiagState` + the system services |
+| alerts | `collect/AlertTick.kt` | every source, plus the 15-minute poll |
 | diagnostics export | `diag/DiagnosticsReport.kt` → `diag/DiagnosticsBundle.kt` | `collect/DiagState`, the store, `TwinCache.peek()`, `diag/DiagLog` |
 
 Which of these a build actually reaches is the edition's business, not the
@@ -236,9 +237,40 @@ surface's — see [`editions.md`](editions.md).
 | alert | file | input |
 |---|---|---|
 | hypo (predictive) | `collect/HypoAlertNotifier.kt` + `core/twin/HypoAlert.kt` | `Forecaster(recordAs="hypo_alert")` |
-| rapid fall | `collect/RapidFallNotifier.kt` + `core/analysis/RapidFall.kt` | the per-minute stream |
+| hypo (observed), sustained low, sensor artifact | `collect/HypoAlertNotifier.kt` + `core/twin/HypoAlertLogic.kt` | the readings alone |
+| sustained high | `collect/HypoAlertNotifier.kt` + `core/twin/SustainedHigh.kt` | `trustedHistory` |
+| high (predicted) | `collect/HypoAlertNotifier.kt` + `core/twin/HypoAlert.kt` | `Forecaster` |
+| rapid fall | `collect/RapidFallNotifier.kt` + `core/analysis/RapidFall.kt` | the per-minute stream, or the 5-minute grid |
 | stream stalled | `collect/StreamStallNotifier.kt` | observation |
 | "looks like you ate" | `collect/MealNotifier.kt` | `core/collector/MealDetect.kt` |
+
+**Every one of them is evaluated from `collect/AlertTick.kt`, and from nowhere
+else.** Until phase B they were evaluated from the tail of `CollectorService`'s
+OOPAlgorithm2 minute receiver, which had one caller each — so a phone without
+that third-party app collected, drew and answered the watch while no alarm could
+fire (audit P7). The tick is called after the reading is stored by the xDrip
+broadcast receiver, the OOP2 minute stream, the web-service poll, the Libre NFC
+scan and a hand-entered fingerstick; `TreatmentsPollWorker` also calls it at the
+end of every run whether or not anything arrived, which is the 15-minute
+backstop for a phone whose only source is that poll and the only thing that
+notices a stream that has gone quiet. It runs on one serial executor and
+de-duplicates on the freshest reading's timestamp for five minutes, because two
+sources delivering the same reading is the normal case — every accepted
+broadcast triggers a catch-up poll whose `/sgv.json` answer contains it.
+
+The tick decides nothing about an alert; every threshold, cooldown, snooze and
+refire rule stays in the notifiers and the pure `:core` machines they call. It
+owns two choices the caller has always owned. **Which series the rapid-fall
+slope is fitted over**: the per-minute stream while it is live, otherwise a
+thirty-minute window on the five-minute grid, because `detectRapidFall`'s
+ten-minute default can never hold the five points it asks for at that cadence —
+the slope threshold and the twenty-minute projection are the defaults either
+way. And **which sentence the stall notification carries**: "bring the phone to
+the sensor" only where the app owns the sensor link. A backfill fires nothing
+because the notifiers refuse a stale anchor, not because the tick filters
+anything — `HypoAlertNotifier` returns on an anchor older than ten minutes
+before it writes any state, so a 14-day `/sgv.json` backfill opens no episode
+and spends no dextrose snooze.
 
 **Where a screen gets its store: `AppGraph.kt`.** `MainActivity` builds one
 `AppGraph` and publishes it through `LocalAppGraph`, so no composable calls
@@ -262,7 +294,15 @@ not the maintainer's — xDrip and its glucose broadcast, its web service,
 Nightscout, OOPAlgorithm2, the own-BLE link, the battery policy, the
 notification permission, exact alarms, the collector service, Health Connect,
 the overlay grant, NFC (audit P6); eleven of them in the store edition, which
-has no path to the two sensor-direct ones. `dataSourceRows` turns what
+has no path to the two sensor-direct ones. A fourteenth row leads the screen and
+is not a link: **Alerts** states whether an alarm can fire right now and, when
+it cannot, which of four reasons it is — notifications blocked, both alerts
+switched off, no reading yet, or a stalled stream (audit P7). It asks
+`glucoseStalled`, the same threshold as the banner and the notification, and it
+deliberately does not report whether a tick recently ran: every source drives
+one and the periodic poll drives one regardless, so that is a property of the
+build, and a stamp reset by a process restart would paint the row red on a
+healthy phone. `dataSourceRows` turns what
 `DiagState`, the preferences and the system services already know into one
 status per link, plus the system screen that fixes it; it reads no clock, no
 database and no Android API, so each row's state machine is pinned on the JVM.

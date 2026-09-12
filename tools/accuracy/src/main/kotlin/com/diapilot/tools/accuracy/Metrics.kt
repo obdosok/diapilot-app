@@ -182,3 +182,73 @@ private fun readingsInWindow(
     }
     return out
 }
+
+// ---------------------------------------------------------------------------
+// Comparing two end-of-action values against each other (WP-B10).
+//
+// WHAT THIS CANNOT DO, said plainly. It does NOT replay the forecast under a
+// counterfactual tail. A replay would need the engine itself (`:core`), the
+// full event history as known at each run's own moment, the drift state the
+// twin held in memory, and the meter-calibration era in force — none of which
+// this module can reach, and the first of them is a dependency this module
+// deliberately does not have (see build.gradle.kts). Recomputing the model
+// would also answer a different question from the one the ledger exists for:
+// "was the app right", not "would another model have been" (see
+// docs/architecture.md, "What the ledger does now").
+//
+// WHAT IT DOES INSTEAD. `forecast_runs.applied` records the insulin block the
+// phone was actually running when it drew each forecast — `onset/peak/tail
+// isf=...`, see `ForecastLedger.appliedSummary`. So a database that carried one
+// tail for a while and another tail afterwards already contains both arms,
+// measured on the real person by the shipped code (discipline #7). This splits
+// the ledger by that recorded tail and scores each side with the same metric
+// functions the single-arm report uses.
+//
+// The arms are therefore NOT paired run-for-run: they are different stretches
+// of the same person's life, and nothing here pretends otherwise. Read them as
+// two samples, check the n column, and read the caveats in docs/accuracy.md.
+// ---------------------------------------------------------------------------
+
+/**
+ * The end-of-action minute recorded in `forecast_runs.applied`, or null when
+ * the column is absent, empty or not in the format this reads.
+ *
+ * The format's head is `onset/peak/tail`, and it has been that since the column
+ * existed — the later `ramp=`/`kcal=`/`sieve=` terms were appended after it, so
+ * old rows parse the same way. Returning null rather than guessing is the
+ * point: a run whose applied model is unknown must be excluded from an arm, not
+ * assigned to one.
+ */
+fun parseAppliedTailMin(applied: String?): Double? {
+    val head = applied?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() } ?: return null
+    val parts = head.split('/')
+    if (parts.size < 3) return null
+    return parts[2].toDoubleOrNull()?.takeIf { it.isFinite() && it > 0.0 }
+}
+
+/**
+ * Every distinct applied end of action in [runs], with how many runs carried
+ * it, longest-tail first.
+ *
+ * Printed before the comparison so a reader can see which arms a database
+ * actually holds instead of asking for two values and getting "no data" twice.
+ */
+fun appliedTailsPresent(runs: List<RunRow>): List<Pair<Double, Int>> =
+    runs.mapNotNull { parseAppliedTailMin(it.applied) }
+        .groupingBy { it }.eachCount().toList()
+        .sortedByDescending { it.first }
+
+/**
+ * The runs whose recorded end of action is within [toleranceMin] of [tailMin].
+ *
+ * A tolerance rather than equality because the column stores the tail rounded
+ * to whole minutes and a curve can be re-derived a minute off; 1.0 keeps
+ * neighbouring arms apart while absorbing that.
+ */
+fun runsWithAppliedTail(
+    runs: List<RunRow>,
+    tailMin: Double,
+    toleranceMin: Double = 1.0,
+): List<RunRow> = runs.filter { r ->
+    parseAppliedTailMin(r.applied)?.let { abs(it - tailMin) <= toleranceMin } == true
+}

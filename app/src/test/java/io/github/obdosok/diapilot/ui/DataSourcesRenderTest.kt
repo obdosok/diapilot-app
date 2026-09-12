@@ -74,6 +74,8 @@ class DataSourcesRenderTest {
         overlayGranted = false,
         nfcPresent = true,
         nfcEnabled = false,
+        alertsEnabled = true,
+        freshestReadingMs = 0,
     )
 
     @Test fun everyRowIsComposedWithItsStatusAndExplanation() {
@@ -106,6 +108,26 @@ class DataSourcesRenderTest {
         // without mentioning a sensor scan this edition cannot perform.
         assertShown(context.getString(R.string.data_sources_row_nfc_why))
         assertNotShown(context.getString(R.string.data_sources_row_nfc_why_sensor_direct))
+    }
+
+    /**
+     * The armed Alerts row. Its own status string is the one the broken-phone
+     * test above can never reach, and it is the sentence a user opens this
+     * screen to read.
+     */
+    @Test fun theArmedAlertsRowStatesThatAlarmsCanFire() {
+        val rows = dataSourceRows(
+            brokenInputs(sensorDirect = false).copy(
+                notificationsEnabled = true,
+                freshestReadingMs = 1_700_000_000_000L - 60_000,
+            ),
+        )
+        compose.setContent { DataSourcesContent(rows = rows, sensorDirect = false) }
+        assertShown(context.getString(R.string.data_sources_row_alerts_title))
+        assertShown(context.getString(R.string.data_sources_status_armed))
+        assertShown(context.getString(R.string.data_sources_row_alerts_why))
+        // Nothing to advise while alarms can fire.
+        assertNotShown(context.getString(R.string.data_sources_advice_alerts))
     }
 
     /** A working row shows no Fix control: there is nothing to fix. */

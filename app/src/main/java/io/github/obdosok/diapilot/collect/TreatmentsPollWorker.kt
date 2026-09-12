@@ -12,7 +12,6 @@ import com.diapilot.core.collector.parsePebbleBg
 import com.diapilot.core.collector.parseSgvEntries
 import com.diapilot.core.collector.parseTreatments
 import com.diapilot.core.collector.scanMeals
-import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.HealthConnectSync
 import io.github.obdosok.diapilot.data.LedgerRetention
@@ -66,12 +65,11 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         // scale must not leak into the store (5-minute sawtooth otherwise).
         val ownBle = Settings.ownBleEnabled(applicationContext)
 
-        // Equipment watchdog: in own-BLE mode a silent stall (nonce desync,
-        // BT off, sensor gone) must become a notification, not an empty
-        // chart discovered an hour later. The notifier no-ops on fresh data.
-        if (ownBle) {
-            StreamStallNotifier.maybeNotify(applicationContext, R.string.stream_stall_notifier_reason_stopped)
-        }
+        // The equipment watchdog used to be raised HERE, and only in own-BLE
+        // mode. It has moved to [AlertTick] at the end of this run, together
+        // with every other alert: a stall is a stall on whatever the phone's
+        // source is, and hanging it off one sensor-direct switch left every
+        // other phone to go blind in silence (docs/audit.md, P7).
 
         // 1. Glucose backfill from sgv.json (confirmed reachable in the phone browser).
         try {
@@ -172,6 +170,19 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         } catch (e: Exception) {
             DiagLog.w(TAG, "HC sync failed: ${e.message}")
         }
+
+        // THE PERIODIC BACKSTOP, and the only line of it.
+        //
+        // OUTSIDE the `anySuccess` branch on purpose: a phone whose web
+        // service never answers is exactly the phone whose alerts nothing else
+        // evaluates, and the stall notification matters most when the poll
+        // itself is failing. This worker is the app's existing 15-minute
+        // periodic work (see [schedule]) and runs in both editions, so it
+        // covers a phone whose only source is this poll, a phone whose stream
+        // has gone quiet, and a confirmed low that must keep re-firing while
+        // no new reading arrives. The tick de-duplicates, so the one-shot
+        // [pollNow] each accepted broadcast triggers costs nothing.
+        AlertTick.fire(applicationContext, AlertTick.Source.WEB_POLL)
 
         if (anySuccess) {
             val now = System.currentTimeMillis()

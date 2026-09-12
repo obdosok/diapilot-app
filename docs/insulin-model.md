@@ -157,16 +157,66 @@ that has already caused confusion.
 Then `coerceIntoDomain` clamps to population bounds and **names what moved**.
 The bound is `insulinTailMinRange` = 240…600 min.
 
-⚠ **The floor now clamps, and that is deliberate.** It was 120, which no bolus
-analogue reaches, so it accepted every reading the instrument could produce.
-The instrument cannot see past four hours — `CAP_MS` = 240, `TAIL_HORIZON_MIN` =
-200 clean minutes inside it, and "end" is the rate returning to the pre-dose
-slope, which a rising background meets early — so every measured end lands in
-roughly 150…230 and nothing was ever clamped. The floor is the instrument's own
-reach: a measurement under it is a window limit, the settings screen marks it as
-one, and the installed curve carries 240 rather than the short reading. This
-does not lengthen the measurement; the plateau end landmark that would is
-deferred (audit M1, roadmap O-D).
+⚠ **The floor now clamps, and that is deliberate — on the AUTOMATIC door.** It
+was 120, which no bolus analogue reaches, so it accepted every reading the
+instrument could produce. The instrument cannot see past four hours — `CAP_MS` =
+240, `TAIL_HORIZON_MIN` = 200 clean minutes inside it, and "end" is the rate
+returning to the pre-dose slope, which a rising background meets early — so
+every measured end lands in roughly 150…230 and nothing was ever clamped. The
+floor is the instrument's own reach: a measurement under it is a window limit,
+the settings screen marks it as one, and the installed curve carries 240 rather
+than the short reading. This does not lengthen the measurement; the plateau end
+landmark that would is deferred (audit M1, roadmap O-D).
+
+**What the measurement itself reports is NOT clamped.** `coerceIntoDomain`
+produces the APPLIED landmarks; the curve carries the measured ones beside them
+(`PersonalInsulinCurveV1.measuredLandmarks`), and that is what the "measured
+from N doses" line prints. It used to print the applied set, so a corpus whose
+end of action came out at 180 min was reported as 240 — the floor wearing the
+word "measured". Three clauses now sit next to each other on the card and each
+says one thing: the measurement, the lift (`coerced to the model bounds:
+TAIL_END 180→240`) and the window limit (`the measurement window cannot see
+further`).
+
+### 2.5.1 Two domains, because a ruler and a person make different claims
+
+| door | range | what happens below the floor |
+|---|---|---|
+| measured curve → model (`coerceIntoDomain`) | `insulinTailMinRange` = 240…600 | lifted to 240, named as moved, marked on the card |
+| Auto-fit corridor (`boundsAround`, `RANGES["tail"]`) | 240…480 | the band is held at 240; the fit refuses to search lower |
+| bundled example person (asset coercion) | 240…600 | lifted; the asset itself ships 300 and stays there |
+| **hand entry (P1)** | **`insulinTailMinManualRange` = 120…600** | **refused and said so — never lifted** |
+
+The hand tier had been documented as accepting 120…600 (audit M1's cold-start
+table) while the resolver actually checked `insulinTailMinRange`, so a user who
+measured their own action ending at 130 min got the whole shape refused as out
+of domain and the previous curve silently stayed in force — with the card still
+showing 130. The floor is a statement about the **measuring window**, and a
+person watching their own sensor is not reporting a truncated measurement.
+
+So P1 is applied exactly as entered, end to end: `resolve` validates against the
+hand range, `PhysioArtifactV1`'s own invariant is the hand range (it is the
+layer a hand value reaches last, and checking the narrow one there made the
+artifact throw and take the whole PHYSIO arm down), and the kernel, IOB, the
+forecast, What-if and the alert read it through `person.insulin` like everything
+else. Below 120 the entry is **refused**, not moved: that floor is numerical —
+`coerceIntoDomain` holds the peak three 5-minute steps inside the end of action
+and `insulinPeakMinRange` opens at 20, so under about 55 minutes there is no
+ordered quadruple left to synthesize.
+
+Two more consequences worth knowing:
+
+- **Auto-fit does not argue with a hand entry.** With a tail set by hand the
+  `tail` axis is LOCKED for the fit (`PhysioAutoFitRuntime.handHeldAxes`) and
+  the corridor line says so. Without the lock the clamped corridor would open at
+  240 and the first pass would "improve" a stated 130 upward.
+- **`EpisodeKernelV1` line 312 does coerce a DIA into `insulinTailMinRange`, and
+  that one is correct**: its `base` is the frozen prior
+  (`EpisodeKernelPriorsV1.PHYSIOLOGICAL_V1`, DIA 240) times a promoted timing
+  multiplier — a number no person typed. A hand value reaches an episode kernel
+  through `hybridEpisodeKernelV1`, which reads `person.insulin.tailDurationMin`
+  and passes it through unclamped. Audit M1 named this line as a place that
+  clamps a manual DIA; it never saw one.
 
 ### 2.6 Expected result on this baseline
 

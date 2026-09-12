@@ -16,7 +16,8 @@ data class PhysioBoundsV1(
     val insulinOnsetMinRange: ClosedFloatingPointRange<Double> = 0.0..60.0,
     val insulinPeakMinRange: ClosedFloatingPointRange<Double> = 20.0..180.0,
     /**
-     * END OF INSULIN ACTION, and the FLOOR is the part worth explaining.
+     * END OF INSULIN ACTION AN INSTRUMENT MAY INSTALL ON ITS OWN, and the
+     * FLOOR is the part worth explaining.
      *
      * It was 120, which no bolus analogue reaches: the shortest labelled
      * action time in the profile table is several hours. A floor that low
@@ -33,8 +34,42 @@ data class PhysioBoundsV1(
      * (audit M1). It does not lengthen the measurement — that is the plateau
      * end landmark, deferred to O-D — it stops the short reading from being
      * installed as a fact.
+     *
+     * ⚠ This range governs the AUTOMATIC doors only: the measured-curve clamp
+     * ([InsulinShapeV1.coerceIntoDomain]), the Auto-fit corridor
+     * ([PhysioAutoFitV1.boundsAround] and its own `tail` range) and the
+     * coercion of the bundled asset. What a person states by hand is governed
+     * by [insulinTailMinManualRange] and is never lifted to this floor — see
+     * the reasoning there.
      */
     val insulinTailMinRange: ClosedFloatingPointRange<Double> = 240.0..600.0,
+    /**
+     * END OF INSULIN ACTION A PERSON MAY STATE BY HAND (tier P1).
+     *
+     * WHY IT IS NOT [insulinTailMinRange]. That floor is a statement about a
+     * RULER — the per-dose window cannot see past four hours, so a measured
+     * end below it describes the window rather than the insulin, and an
+     * instrument that installed such a number on its own would be installing
+     * its own blind spot. None of that applies to a person who watched their
+     * own sensor and says "there is nothing left after two hours": their
+     * number is not a truncated measurement, it is testimony. Lifting it
+     * silently to 240 was the defect — the app applied a curve nobody entered
+     * while the card showed the entered one, and a too-LONG tail over-reads
+     * insulin on board, which is the direction that suppresses a real alert.
+     *
+     * WHY THERE IS A FLOOR AT ALL, i.e. what 120 is buying. It is numerical,
+     * not physiological: [InsulinShapeV1.coerceIntoDomain] holds the peak at
+     * least three 5-minute steps inside the end of action and
+     * [insulinPeakMinRange] opens at 20, so under about 55 minutes there is no
+     * ordered quadruple left to synthesize; the engine's own kernel is sampled
+     * on a 5-minute grid and needs enough steps to integrate. 120 keeps a
+     * comfortable margin above that and is the value the manual tier was
+     * documented as accepting all along (audit M1's cold-start table).
+     *
+     * The ceiling is shared with the automatic range: past ten hours nothing
+     * distinguishes a bolus analogue from a basal one, whoever typed it.
+     */
+    val insulinTailMinManualRange: ClosedFloatingPointRange<Double> = 120.0..600.0,
     val absorptionOnsetMinRange: ClosedFloatingPointRange<Double> = 0.0..120.0,
     val absorptionPeakMinRange: ClosedFloatingPointRange<Double> = 10.0..240.0,
     val absorptionTailMinRange: ClosedFloatingPointRange<Double> = 30.0..720.0,
@@ -45,6 +80,18 @@ data class PhysioBoundsV1(
         require(isfMmolPerLUmin > 0 && isfMmolPerLUmax > isfMmolPerLUmin)
         require(globalCsMaxRelativeChangePerDay in 0.0..0.20)
         require(isfMaxRelativeChangePerIdentifyingDay in 0.0..0.30)
+        // The hand tier is the WIDER of the two on both ends, and it must stay
+        // so by construction rather than by the two default literals happening
+        // to line up. A manual floor above the automatic one would mean a
+        // person could not state what the instrument is allowed to measure; a
+        // manual ceiling below it would mean the model can install an end of
+        // action the user is forbidden to type.
+        require(insulinTailMinManualRange.start <= insulinTailMinRange.start) {
+            "the hand-entered end of action may not have a higher floor than the measured one"
+        }
+        require(insulinTailMinManualRange.endInclusive >= insulinTailMinRange.endInclusive) {
+            "the hand-entered end of action may not have a lower ceiling than the measured one"
+        }
     }
 
     fun boundedIsf(previous: Double, proposed: Double, identifyingDaysElapsed: Int): Double {

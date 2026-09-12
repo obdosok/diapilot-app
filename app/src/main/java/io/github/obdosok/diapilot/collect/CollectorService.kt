@@ -22,7 +22,6 @@ import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
-import io.github.obdosok.diapilot.data.CalibratedGlucose
 import io.github.obdosok.diapilot.data.MeterCalCache
 import io.github.obdosok.diapilot.data.MinuteCalCache
 import io.github.obdosok.diapilot.data.Settings
@@ -32,7 +31,6 @@ import io.github.obdosok.diapilot.data.Units
 import io.github.obdosok.diapilot.diag.DiagLog
 import io.github.obdosok.diapilot.diag.Redact
 import io.github.obdosok.diapilot.i18n.localized
-import io.github.obdosok.diapilot.widget.BgWidget
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -150,18 +148,13 @@ class CollectorService : Service() {
                     // [Edition.sensorDirect] names. The store edition parses
                     // nothing out of the payload and writes no minute reading.
                     //
-                    // WHAT IT STILL USES THE BROADCAST FOR, and this is a
-                    // finding rather than a design: the tail of this block —
-                    // the hypo alert, the widget, the companion push, the watch
-                    // long-poll release — is the app's ONLY collection
-                    // heartbeat. Nothing else drives it: the xDrip receiver
-                    // stores a reading and returns, and the periodic worker
-                    // polls but never alerts. Gating the receiver off would
-                    // therefore have taken the threshold hypo alarm and the
-                    // widget with it, in the edition whose whole job is
-                    // collection. Separating the heartbeat from this source is
-                    // its own work package; until then both editions register
-                    // the receiver and only the ingestion is gated.
+                    // WHY THE RECEIVER IS STILL REGISTERED IN BOTH EDITIONS.
+                    // The tail of this block used to be the app's ONLY alert
+                    // driver, which made OOPAlgorithm2 a silent prerequisite
+                    // for every alarm (docs/audit.md, P7). It is not any more:
+                    // [AlertTick] is the one entry point and every source
+                    // calls it. What is left here is one more caller of it,
+                    // and the minute cadence is simply the fastest of them.
                     val readings = if (Edition.sensorDirect) {
                         com.diapilot.core.collector.parseOop2Trend(fields)
                     } else emptyList()
@@ -213,45 +206,14 @@ class CollectorService : Service() {
                             }
                         }
 
-                        // Early hypo warning: slope from the minute stream,
-                        // absolute level from the calibrated reading when fresh.
-                        val now = System.currentTimeMillis()
-                        // BOTH INPUTS ON THE USER'S BLOOD SCALE.
-                        //
-                        // The level was `lastSensorReading().mmol` and the slope
-                        // came from RAW minute points — neither had been through
-                        // the meter lens, which lives only in `MainState`. Against
-                        // fingersticks the sensor reads a median 1.33 mmol LOW
-                        // (up to 1.9 in the range where this alarm fires), so the
-                        // notification both triggered early and printed a number
-                        // the app's own screen disagreed with.
-                        val calibrated = CalibratedGlucose
-                            .lastReading(store, this@CollectorService)
-                            ?.takeIf { now - it.tsMs < 10 * 60_000 }?.mmol
-                        com.diapilot.core.analysis.detectRapidFall(
-                            minuteReadings = CalibratedGlucose
-                                .minutePoints(store, this@CollectorService, now - 15 * 60_000, now),
-                            calibratedMmol = calibrated,
-                            nowMs = now,
-                        )?.let { fall ->
-                            // The decision and its shape. The slope and the
-                            // projection are both glucose on the user's scale.
-                            DiagLog.i(
-                                OOP2_TAG,
-                                "rapid fall detected: slope ${Redact.perUnit("mmol/min")}, " +
-                                    "projected ${Redact.glucose(mgdl = false)}",
-                            )
-                            RapidFallNotifier.maybeNotify(this@CollectorService, fall)
-                        }
-
-                        // Predictive hypo alert: the twin looks 45 min ahead
-                        // on every fresh minute of data.
-                        HypoAlertNotifier.maybeNotify(this@CollectorService, store)
-
-                        // Home-screen widget follows the same heartbeat.
-                        BgWidget.updateAll(this@CollectorService)
-                        // …and so does the companion dashboard (throttled inside).
-                        CompanionSync.pushIfDue(this@CollectorService)
+                        // The alert set — low, high, rapid fall, stall — plus
+                        // the widget and the companion push, on the fastest
+                        // cadence the phone has. Every other source calls the
+                        // same entry point after storing its reading, which is
+                        // what stopped this branch from being the only one
+                        // (docs/audit.md, P7). The tick runs on its own serial
+                        // thread, so this receiver returns at once.
+                        AlertTick.fire(this@CollectorService, AlertTick.Source.MINUTE_STREAM)
                         // Release any watch long-poll waiting on fresh data.
                         DataPulse.pulse()
 

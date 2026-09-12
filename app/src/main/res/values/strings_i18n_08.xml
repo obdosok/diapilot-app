@@ -54,11 +54,12 @@
     <!-- %1$s: current glucose; %2$s: slope (with unit); %3$s: projected glucose in ~20 min. -->
     <string name="rapid_fall_notifier_text">Now %1$s · %2$s per minute · in ~20 min could be %3$s</string>
     <string name="rapid_fall_notifier_channel_name">Fast glucose drop</string>
-    <string name="rapid_fall_notifier_channel_desc">Early warning from the per-minute stream — 3–4 minutes ahead of the usual alarms</string>
+    <string name="rapid_fall_notifier_channel_desc">Early warning from the trend of the last readings — ahead of the usual alarms</string>
 
     <!-- PhysioAutoFitRuntime.kt -->
     <!-- %1$.0f..%4$.0f: measured onset/peak/phase/tail minutes. -->
     <string name="physio_auto_fit_runtime_safety_label">corridor ±20%% around the measured %1$.0f · %2$.0f · %3$.0f · %4$.0f</string>
+    <string name="physio_auto_fit_runtime_tail_held_by_hand"> · end of action stays at your own value — the fit does not touch it</string>
 
     <!-- AnalysisOverviewScreen.kt -->
     <string name="analysis_overview_screen_title">Analysis</string>

@@ -4,6 +4,7 @@
 
     <string name="stream_stall_notifier_reason_stopped">Поток с сенсора остановился</string>
     <string name="stream_stall_notifier_reason_login_rejected">BLE-логин отвергнут на всех соседних индексах</string>
+    <string name="stream_stall_notifier_reason_no_glucose">Новые значения глюкозы не приходят</string>
 
     <string name="physio_tuning_as_shipped">как отгружено</string>
     <string name="physio_tuning_trust">доверие %1$s</string>

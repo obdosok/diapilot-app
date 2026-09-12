@@ -37,6 +37,15 @@ object InsulinCurveRuntime {
         val bounds=PhysioBoundsV1()
         // Still a defensive boundary for persisted/old receipts: fail closed
         // rather than throw and collapse the selected PHYSIO arm — but say so.
+        //
+        // The tail is checked against `insulinTailMinRange`, the INSTRUMENT's
+        // domain, and that is correct here: the only curve that reaches this
+        // function is a measured one (`InsulinProfileRuntime`), which has
+        // already been through `coerceIntoDomain`. A hand entry never arrives
+        // here — it is applied afterwards, in `ManualInsulinRuntime.apply`,
+        // against its own wider domain. And this check REFUSES with a named
+        // reason rather than clamping, which is what the measured-to-applied
+        // promotion owes the user either way.
         val broken=when{
             knots.size<4->"knots ${knots.size}, need ≥4"
             knots.firstOrNull()?.let{it.minute==0.0&&it.fraction==0.0}!=true->"curve does not start at zero"

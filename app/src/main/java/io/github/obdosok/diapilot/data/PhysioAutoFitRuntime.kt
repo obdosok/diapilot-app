@@ -200,8 +200,41 @@ object PhysioAutoFitRuntime {
         return (
             timing + PhysioAutoFitV1.PLAUSIBLE_PHYSIOLOGY +
                 mapOf("isf" to (isf * 0.8 to isf * 1.2))
-            ) to (label + " · ISF %.2f..%.2f".format(isf * 0.8, isf * 1.2))
+            ) to (
+            label + " · ISF %.2f..%.2f".format(isf * 0.8, isf * 1.2) +
+                // The lock has to be VISIBLE. A knob the fit silently declined
+                // to touch reads on the card as a knob the fit agreed with.
+                (
+                    if (handHeldAxes(context).isEmpty()) ""
+                    else context.localized()
+                        .getString(R.string.physio_auto_fit_runtime_tail_held_by_hand)
+                    )
+            )
     }
+
+    /**
+     * THE AXIS A HAND-ENTERED END OF ACTION TAKES OFF THE TABLE.
+     *
+     * The tail corridor is held inside the instrument's own floor
+     * ([PhysioAutoFitV1.boundsAround]) — 240 min, because a per-dose window
+     * cannot see past four hours and a fit reaching under that would be fitting
+     * the ruler. But a person who states 130 is not reporting a truncated
+     * measurement, and a corridor that starts at 240 would propose raising
+     * their number on the very first pass. So when the hand tier carries an end
+     * of action, this axis is LOCKED rather than clamped: the fit keeps the
+     * user's value and says so on the card.
+     *
+     * Only the tail. The onset and peak corridors are centred on the
+     * measurement with no floor that can conflict with a hand entry, and ISF is
+     * the axis the fit exists to move.
+     */
+    private val HAND_HELD_TAIL_AXIS = setOf("tail")
+
+    /** Axes the user has already answered by hand, which the fit must not
+     *  argue with. Empty when nothing is entered. */
+    fun handHeldAxes(context: Context): Set<String> =
+        if (ManualInsulinRuntime.params(context).tailMin != null) HAND_HELD_TAIL_AXIS
+        else emptySet()
 
     /** Spread of one knob across the per-episode fits — the evidence that must
      *  travel with the median, because the user's episodes do not agree. */
