@@ -2,7 +2,6 @@ package io.github.obdosok.diapilot.data
 
 import com.diapilot.core.physio.*
 import com.diapilot.core.hybrid.MacroTimingParamsV1
-import com.diapilot.core.twin.PredictedPoint
 import java.security.MessageDigest
 
 object PhysioRuntime {
@@ -111,7 +110,7 @@ object PhysioRuntime {
         } ?: ""
 
     private fun artifactId(stateIdentity: String): String {
-        val base = HybridShadowRegistry.modelSha256()?.take(16) ?: "unhashed"
+        val base = PhysioForecastRegistry.modelSha256()?.take(16) ?: "unhashed"
         val stateHash = MessageDigest.getInstance("SHA-256")
             .digest(stateIdentity.toByteArray()).take(8).joinToString("") { "%02x".format(it) }
         // THE FOOD SHAPE'S GENERATION IS PART OF THE IDENTITY. `base` is the
@@ -189,7 +188,7 @@ object PhysioRuntime {
                 ArtifactCacheKey(
                     System.identityHashCode(db),
                     db.path,
-                    HybridShadowRegistry.modelSha256(),
+                    PhysioForecastRegistry.modelSha256(),
                     maintenance,
                     closed,
                     checkpoint,
@@ -203,7 +202,7 @@ object PhysioRuntime {
                 ?: ArtifactCacheKey(
                     null,
                     null,
-                    HybridShadowRegistry.modelSha256(),
+                    PhysioForecastRegistry.modelSha256(),
                     null,
                     "0:0",
                     0L,
@@ -250,7 +249,7 @@ object PhysioRuntime {
         store: com.diapilot.core.collector.CollectorStore? = null,
         asOfMs: Long = Long.MAX_VALUE
     ): PhysioArtifactV1? =
-        HybridShadowRegistry.model()?.let { base ->
+        PhysioForecastRegistry.model()?.let { base ->
             // READ HERE TOO, not borrowed from the caller. `artifact()` computes the
             // same string for its CACHE key; this one goes into the artifact's own
             // id, and the two are different jobs — a cache that misses is slow, an
@@ -850,10 +849,6 @@ object PhysioRuntime {
 
 }
 
-object ForecastComparisonRegistry {
-    data class PairResult(val anchorMs: Long, val legacy: List<PredictedPoint>, val physio: List<PredictedPoint>, val inputHash: String)
-    @Volatile private var latest: PairResult? = null
-    fun update(value: PairResult) { latest = value }
-    fun at(anchorMs: Long): PairResult? = latest?.takeIf { it.anchorMs == anchorMs }
-    fun current(): PairResult? = latest
-}
+// `ForecastComparisonRegistry` used to live here: the legacy-vs-physio pair
+// slot of the research bench. Nothing wrote to it after the legacy arm was
+// removed and nothing ever read it back — a tombstone, removed with audit A3.

@@ -3,7 +3,9 @@ package io.github.obdosok.diapilot.collect
 import android.content.Context
 import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.R
+import io.github.obdosok.diapilot.data.BackupRestore
 import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
 import io.github.obdosok.diapilot.data.MeterCalCache
 import io.github.obdosok.diapilot.data.MinuteCalCache
@@ -89,10 +91,14 @@ object CompanionSync {
                 as? SqliteCollectorStore ?: return
             val spool = java.io.File.createTempFile("dpbackup", ".sqlite", context.cacheDir)
             try {
-                spool.outputStream().use { store.exportSnapshot(it) }
+                spool.outputStream().use { BackupRestore.writeSnapshot(context, store, it) }
+                // The server keeps the suffix, so an encrypted upload is stored
+                // as `.sqlite.enc` and nobody mistakes it for a plain database.
+                val fileName = "diapilot.sqlite" +
+                    if (BackupRestore.encryptsBackups(context)) com.diapilot.core.backup.BackupCrypto.FILE_SUFFIX else ""
                 val boundary = "----diapilot${System.currentTimeMillis()}"
                 val head = ("--$boundary\r\n" +
-                    "Content-Disposition: form-data; name=\"file\"; filename=\"diapilot.sqlite\"\r\n" +
+                    "Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n" +
                     "Content-Type: application/octet-stream\r\n\r\n").toByteArray()
                 val tail = "\r\n--$boundary--\r\n".toByteArray()
                 postStreaming(
@@ -211,7 +217,14 @@ object CompanionSync {
         // the settle headline are left out of the payload entirely (the
         // dashboard reads both as `|| []` / `|| ''`), and the periodic push
         // stops triggering a background model build.
-        val model = if (Edition.prospective) TwinCache.getForForecast(store, context) else null
+        //
+        // An oss install whose first-run pages are still owed asks for no model
+        // either (`ModelCalibration.forecastAllowed`); its `forecast` key is
+        // still WRITTEN, empty — the edition decides the field set, the
+        // calibration decides only whether there is a line to put in it.
+        val model = if (ModelCalibration.forecastAllowed(context, store)) {
+            TwinCache.getForForecast(store, context)
+        } else null
         val forecast = if (model != null) {
             try {
                 Forecaster.forecast(

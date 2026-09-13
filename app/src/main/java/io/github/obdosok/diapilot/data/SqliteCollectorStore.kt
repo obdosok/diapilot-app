@@ -110,6 +110,39 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
     companion object {
         const val DB_VERSION = 50
 
+        /**
+         * Schema v8: adopt the legacy purpose NOTES (the pre-attribute
+         * mechanism — a note reading "коррекция" or "на еду" at the bolus's own
+         * timestamp) into `insulin_events.purpose`, then drop them: one entity,
+         * one row.
+         *
+         * THE RUSSIAN LITERALS ARE CORRECT HERE, AND STALE ANYWHERE ELSE. A
+         * database at v7 holds exactly these tokens — that is what the app
+         * wrote then — and every upgrade step runs in ascending order, so this
+         * one always sees the data BEFORE v50 (`LabelMigrationV1`) converts
+         * tokens to keys. Rewriting them to `BolusPurpose.CORRECTION.key` would
+         * make the step match nothing on the databases it exists for. Live
+         * readers go through `BolusPurpose.of` / `PRIME_PURPOSES_SQL`, which
+         * accept every stored form. Extracted from `onUpgrade` only so the
+         * ordering argument can be shown by a test rather than asserted in a
+         * comment; the SQL is byte-identical to the v8 step.
+         */
+        internal fun adoptLegacyPurposeNotesV8(db: SQLiteDatabase) {
+            db.execSQL(
+                """UPDATE insulin_events SET purpose = (
+                    SELECT a.content FROM annotations a
+                    WHERE a.ts_ms = insulin_events.ts_ms
+                      AND a.content IN ('коррекция','на еду') LIMIT 1
+                ) WHERE purpose IS NULL AND EXISTS (
+                    SELECT 1 FROM annotations a WHERE a.ts_ms = insulin_events.ts_ms
+                      AND a.content IN ('коррекция','на еду'))""",
+            )
+            db.execSQL(
+                "DELETE FROM annotations WHERE content IN ('коррекция','на еду') " +
+                    "AND ts_ms IN (SELECT ts_ms FROM insulin_events)",
+            )
+        }
+
         /** The activity note words as of schema v18 (data, for that historical step only). */
         private val LEGACY_V18_ACTIVITY_TAGS =
             listOf("прогулка", "тренировка", "спорт", "зал", "бег", "велосипед", "walk", "workout")
@@ -429,23 +462,7 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
         if (oldVersion < 7) {
             db.execSQL("ALTER TABLE insulin_events ADD COLUMN purpose TEXT")
         }
-        if (oldVersion < 8) {
-            // Adopt legacy purpose annotations (pre-attribute mechanism) into
-            // the bolus itself, then drop them — one entity, one row.
-            db.execSQL(
-                """UPDATE insulin_events SET purpose = (
-                    SELECT a.content FROM annotations a
-                    WHERE a.ts_ms = insulin_events.ts_ms
-                      AND a.content IN ('коррекция','на еду') LIMIT 1
-                ) WHERE purpose IS NULL AND EXISTS (
-                    SELECT 1 FROM annotations a WHERE a.ts_ms = insulin_events.ts_ms
-                      AND a.content IN ('коррекция','на еду'))""",
-            )
-            db.execSQL(
-                "DELETE FROM annotations WHERE content IN ('коррекция','на еду') " +
-                    "AND ts_ms IN (SELECT ts_ms FROM insulin_events)",
-            )
-        }
+        if (oldVersion < 8) adoptLegacyPurposeNotesV8(db)
         if (oldVersion < 9) {
             // Food notes get their own kind so they stop polluting the
             // context-note suggestions. Existing ones identified by matching
@@ -613,6 +630,12 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
             // belongs only to the NEAREST onset whose window (-45..+20 min)
             // covers it; kind follows. Detector fixed the same way for new
             // scans; this heals history (7 doubles + missed shots).
+            // 'воздух' IS THE TOKEN A v18 DATABASE HOLDS. This step runs on
+            // the data as it was before v50 converted purposes to keys (the
+            // v50 step is kept last for exactly that reason), so the literal
+            // is the correct one here and must not be "fixed" to the key —
+            // `HistoricalMigrationLiteralsTest` shows what the wrong order
+            // does. Live reads use `PRIME_PURPOSES_SQL` instead.
             db.execSQL(
                 """UPDATE meal_events SET bolus_units = (
                     SELECT SUM(units) FROM insulin_events b
@@ -1141,9 +1164,33 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
             buildSet { while (c.moveToNext()) add(c.getLong(0)) }
         }
 
+    /**
+     * One dose per timestamp, and the slot belongs to whoever wrote it first.
+     *
+     * The same rule [upsertReading] applies to glucose: a re-sync from the
+     * SAME source revises its own row (xDrip corrects a treatment, the poll
+     * fetches it again), a write from a DIFFERENT source at an occupied
+     * timestamp is dropped, and units the user edited by hand
+     * ([setBolusUnits]) survive both. Without the source clause a bolus was
+     * rewritable by anything that knew its timestamp — the watch socket, the
+     * loopback poll, an import — and a dose the forecast and the hypo alert
+     * are computed from is not a value one source may overwrite for another
+     * (`SECURITY.md`, "one source cannot silently rewrite another's history").
+     *
+     * First writer wins, on purpose. The one legitimate collision is a
+     * NovoPen dose seen twice, by DiaPilot's own NFC scan (`pen_nfc`) and by
+     * the pen history xDrip scanned (`xdrip_treatments`), and both paths
+     * already de-duplicate across sources by units within a few minutes
+     * (`PenDoseSaver`, [dedupeSyncedBoluses]); an exact same-millisecond twin
+     * would now be dropped here instead of counted once — never twice.
+     *
+     * The sources in play: `xdrip_treatments` (the poll), `watch`
+     * (`POST /add_treatments`), `pen_nfc`, `manual` (typed and the confirmed
+     * command), and `xdrip_import` (a historical one-shot import). Tombstoned
+     * shots stay dead for every source: the poll re-fetches deleted
+     * treatments forever, and the user's delete must win.
+     */
     override fun upsertInsulin(event: InsulinEvent) {
-        // Tombstoned shots stay dead: the poll re-fetches deleted treatments
-        // forever, the user's delete must win.
         val db = writableDatabase
         db.execSQL(
             // Named columns: purpose and user-edited units are user-owned and
@@ -1153,7 +1200,8 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
                 "(SELECT 1 FROM deleted_boluses WHERE ts_ms = ?1) " +
                 "ON CONFLICT(ts_ms) DO UPDATE SET units = CASE " +
                 "WHEN insulin_events.user_edited = 1 THEN insulin_events.units " +
-                "ELSE excluded.units END",
+                "ELSE excluded.units END " +
+                "WHERE insulin_events.source IS excluded.source",
             arrayOf<Any?>(event.tsMs, event.units, event.insulinType, event.source),
         )
         val observedAtMs = System.currentTimeMillis()
@@ -1538,6 +1586,9 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
                 val content = cursor.getString(contentIndex).orEmpty()
                 val analysis = cursor.getString(analysisIndex)
                 val searchable = "$content\n${analysis.orEmpty()}".lowercase()
+                // Historical note tokens, matched as the diary held them at
+                // v30 — data for this one-time step, not UI text and not a
+                // reader anything live goes through.
                 if (
                     "пив" in searchable || "паулан" in searchable ||
                     "paulan" in searchable || "beer" in searchable
@@ -2243,6 +2294,20 @@ class SqliteCollectorStore(context: Context, dbName: String = "diapilot.sqlite")
             "UNION ALL SELECT MIN(ts_ms) FROM basal_events)",
         null,
     ).use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null }
+
+    /**
+     * How long a stretch of SENSOR readings this file holds (newest minus
+     * oldest), or null with none. Meter readings are left out: a fingerstick
+     * entered on the day of the install is not a day of collection.
+     *
+     * `Onboarding.adoptExistingInstall` reads it to tell a phone that was
+     * already in use before the first-run flow existed from a fresh one.
+     */
+    fun sensorReadingSpanMs(): Long? = readableDatabase.rawQuery(
+        "SELECT MIN(ts_ms), MAX(ts_ms) FROM glucose_readings " +
+            "WHERE (source IS NULL OR source != 'meter')",
+        null,
+    ).use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(1) - it.getLong(0) else null }
 
     override fun count(table: String): Long {
         require(table.matches(Regex("[a-z_]+"))) { "bad table name" }

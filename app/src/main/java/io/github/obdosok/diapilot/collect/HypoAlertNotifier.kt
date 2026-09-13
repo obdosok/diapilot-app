@@ -8,10 +8,10 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
-import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.MainActivity
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.MeterCalCache
 import io.github.obdosok.diapilot.data.MinuteCalCache
 import io.github.obdosok.diapilot.data.Settings
@@ -181,7 +181,16 @@ object HypoAlertNotifier {
             // them the model build this call would have triggered in the
             // background (this is the collector's heartbeat, so that build was
             // the app's main off-screen one).
-            val model = if (Edition.prospective) TwinCache.getForForecast(store, context) else null
+            //
+            // AND THE UNCALIBRATED INSTALL SITS BEHIND THE SAME DOOR. Until the
+            // first-run pages are completed the only model on the phone is the
+            // bundled example person, and `Forecaster` would refuse the pass
+            // anyway; `ModelCalibration.forecastAllowed` is the edition gate
+            // with that fact folded in, so the reading-driven alarms below are
+            // exactly as untouched as they are in the store edition.
+            val model = if (ModelCalibration.forecastAllowed(context, store)) {
+                TwinCache.getForForecast(store, context)
+            } else null
             val result = if (model != null) {
                 try {
                     Forecaster.forecast(

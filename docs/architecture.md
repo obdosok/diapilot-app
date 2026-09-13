@@ -11,8 +11,8 @@ the output. It is deliberately short. The long-form material lives elsewhere:
 | what was removed and why, dated audit logs | [`history.md`](history.md) |
 | the plan, two tracks | [`roadmap.md`](roadmap.md) |
 
-Size (`src/main` only, no tests): `core` about 24.7k lines across 107 files,
-`app` about 36.1k across 95.
+Size (`src/main` only, no tests, `wc -l` over `*.kt`): `core` about 25.4k lines
+across 108 files, `app` about 43.2k across 123; `tools/accuracy` under 1k across 5.
 
 ---
 
@@ -48,9 +48,10 @@ flowchart TB
     FC --> OUT
 ```
 
-**`:core` has zero `android` imports across all 107 files.** Every number in
+**`:core` has zero `android` imports across all 108 files.** Every number in
 the forecast is computed there and is testable on the JVM without a phone
-(about 830 unit tests in `:core`, about 210 in `:app`). The package graph is
+(909 unit tests in `:core`, 362 in `:app`, 38 in `:tools:accuracy` — counted
+from the JUnit reports of one full run). The package graph is
 almost a DAG — `collector ← analysis ← twin/hybrid ← physio ← api`, with one
 `analysis ↔ hybrid` cycle left.
 
@@ -73,6 +74,17 @@ zero is [`editions.md`](editions.md). `:core` knows nothing about editions.
 The forecast engine is `core/hybrid/HybridForecastEngine.kt`. It reads no
 database, no clock, no preferences, and no glucose after the anchor it is
 handed, which is what makes blind replay and Python/Kotlin parity testable.
+The `:app` side that assembles its inputs from the store as they were known at
+the anchor and hands the result to the ledger is `data/PhysioForecastBridge.kt`
+(`PhysioForecastBridge.forecast`, called from `Forecaster`; the installed model
+sits in `PhysioForecastRegistry`). Both used to be called `HybridShadow*`, a
+name from the bench era when this arm ran beside a legacy engine; the ledger
+tag it writes, `forecast-v11-kotlin-shadow-13-…`, keeps the word because rows
+already stored are addressed by it. Every `:app` engine is built through
+`core/hybrid/PhysioEngineFactory.kt` (`physioForecastEngine`), which resolves
+the model's own `*Override` knobs — the one deliberate exception is the
+`physio = false` What-if arm inside the bridge, kept so `WhatIfArmTest` can show
+the arms differ.
 
 **One engine, no fallback.** The legacy twin engine was removed. When physio is
 unavailable, `Forecaster` returns null and logs an error rather than drawing a
@@ -102,7 +114,7 @@ TwinCache                               ← corpus assembly, deconvolution
         ↓
 PhysioRuntime → PhysioArtifactV1        ← the applied model for a given minute
         ↓
-Forecaster → HybridForecastEngine
+Forecaster → PhysioForecastBridge → HybridForecastEngine
         ↓
 screen · What-if · hypo alert · watch · widget · ledger
 ```
@@ -134,11 +146,31 @@ against fixed insulin.**
 |---|---|---|
 | per-segment timings | `core/physio/SegmentLandmarksV1.kt` | start / peak / end from every injection; `SegmentLandmarkReaderV1` is an object inside that file |
 | profile assembly | `data/InsulinProfileRuntime.kt` | dose funnel → shape |
-| one curve for everything | `core/physio/PersonalInsulinCurveV1.kt` | the only path to `person.insulin` |
+| the measured curve | `core/physio/PersonalInsulinCurveV1.kt` | the only path from landmarks to `person.insulin.actionCdfKnots` — one of four constructions, see below |
 | ISF, a single door | `core/physio/ManualInsulinParamsV1.kt` + `data/ManualInsulinRuntime.kt` | hand-pinned, tier P1 |
 | adaptive ISF | `core/physio/DailyBalanceIsfV1.kt` + `data/AdaptiveIsfRuntime.kt` | a daily balance, recomputed once a day |
 | switch | `data/IsfSource.kt` | manual ⇄ adaptive, default MANUAL |
 | episodes for fitting | `core/physio/FitEpisodeBuilderV1.kt` | one episode definition, shared by the bench and the device |
+
+**Four constructions of the insulin curve coexist, and the forecast reads
+one.** `HybridForecastEngine.insulinCdf` is the only function on the forecast
+path, and it has two branches. With `actionCdfKnots` set on the person model —
+which is where `PersonalInsulinCurveV1` (measured, through
+`InsulinProfileRuntime` / `InsulinCurveRuntime`), `ManualInsulinRuntime`
+(hand-entered) and `PhysioAutoFitV1` (fitted) all land — the stored knots are
+interpolated as they are, for every dose size alike. Without knots the engine
+falls back to the parametric two-triangle mixture from the artifact's
+`onset / peak / short / tail` fields, and that fallback is the ONLY branch that
+reads the dose (`tailWeightPerUnit`, audit M10; pinned by
+`InsulinKnotsDoseIndependenceTest`). The bundled example person ships without
+knots, so a fresh install runs the parametric branch until a curve is measured
+or entered. The fourth construction never reaches the forecast: the OpenAPS
+exponential in `core/analysis/Iob.kt` (`iobFraction`) is the kernel family
+`ParametricKernel.kt` and `EpisodeKernelV1.kt` fit on the correction corpus,
+and `iobUnits` in the same file — the population IOB — has no caller left in
+`src/main`. "One curve for everything" was the intent behind
+`PersonalInsulinCurveV1`; it is true of what reaches `person.insulin`, not of
+the tree.
 
 **The shape is measured; the amplitude is not.** Timings come from the user's
 own doses, landmark by landmark. The ISF measurement pipeline was removed; the
@@ -416,12 +448,18 @@ them. The reasoning for each removal is in [`history.md`](history.md).
 | `IsfDeviationRuntime`, `core/twin/Autosens.kt`, `core/twin/Deviation.kt` + `DeviationNotifier` | the off-model alert and its inputs |
 | `forecast_scores`, `physio_parallel_runs` / `_scores`, `physio_shadow_candidates` | ledger tables; scores are recomputed on the spot, through the same calibration lens |
 | `hypoAlertBacktest`, `HypoAlertReport` | replayed the alert rule through the removed engine |
-| `core/analysis/SensorPreference.kt`, `core/analysis/iobUnits` | a sensor chooser, and a population IOB curve — `iobFraction` with a fitted shape replaced the latter |
+| `core/analysis/SensorPreference.kt` | a sensor chooser |
+| every CALLER of `core/analysis/iobUnits` | the population IOB on the shipped defaults; the function itself is still in `Iob.kt` (this table once listed it as removed — it was not), and `iobFraction` beside it is live as the fitting kernels' shape, see §4 |
+| `ForecastComparisonRegistry` | the legacy-vs-physio pair slot of the bench; nothing wrote to it after the legacy arm went, nothing ever read it |
 | the dish dictionary and learned per-dish curves | per-group and per-dish amplitude factors |
 | `AnomalyDialog`, `ConceptsDialog`, `CardTitleWithHelp`, `FoodMemoryCard`, `KernelChart`, `LabeledMealRow` | about 1250 lines of composables nothing rendered |
 | the research-era correction advisor | existed in the Python reference stage; the Android app never had one |
 
-The research bench still ships inside the APK — `HybridShadow`,
-`HybridShadowRegistry`, `ForecastComparisonRegistry`,
-`PhysioExperimentalLedger`, the `Stage7–10` naming — and that is audit finding
-A3, not a removal.
+Parts of the research bench still ship inside the APK —
+`PhysioExperimentalLedger`, the sweep knobs on `HybridRuntimeMetrics`, the
+`Stage7–10` naming — and that is audit finding A3, not a removal. `HybridShadow`
+and `HybridShadowRegistry` were not bench: they were the production forecast
+path under a bench-era name, and are `PhysioForecastBridge` and
+`PhysioForecastRegistry` now (§2); the ledger tag
+`forecast-v11-kotlin-shadow-13-macro-queue-single-arm` is a stored identifier
+and keeps the word.

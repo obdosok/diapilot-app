@@ -125,4 +125,26 @@ class ArtifactHonestyTest {
             )
         }
     }
+
+    @Test
+    fun `the example person has no built-in basal deficit`() {
+        // `joint.coefficients.intercept` is a constant drift per 30-minute step
+        // that the state reversion pulls back toward `target_glucose`; the
+        // event-free equilibrium is target + intercept / state_reversion. The
+        // asset used to ship 0.09 with reversion 0.034 and target 6.9, an
+        // equilibrium near 9.5 mmol/L — so a fresh install drifted every user
+        // upward and drew fewer predicted lows before a single dose was
+        // entered. The synthetic person's equilibrium is now its own target.
+        // This is the EXAMPLE asset, not the engine: no model mathematics
+        // changed, and the parity fixtures under core/src/test/resources are
+        // separate files.
+        val intercept = number(listOf("joint", "coefficients", "intercept"))
+        val reversion = number(listOf("joint", "coefficients", "state_reversion"))
+        val target = number(listOf("joint", "target_glucose"))
+        assertEquals(0.0, intercept, 1e-12)
+        assertEquals(
+            "the event-free equilibrium of the bundled person must be its target",
+            target, target + intercept / reversion, 1e-9,
+        )
+    }
 }

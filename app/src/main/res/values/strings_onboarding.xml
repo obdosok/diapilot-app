@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-run set-up (disclaimer, language, weight, ISF, insulin preset, carb
+     sensitivity, summary), the "whose numbers" calibration card on Today and
+     under More, and the carb-override field of the Body card.
+
+     TENSE: the store edition shows the disclaimer, language, weight and summary
+     pages and the Body card, so every string those use is written in the
+     present tense — nothing about what the app "will" do. The model pages and
+     the calibration card are composed only where the forecast runs. -->
+<resources>
+    <string name="onboarding_title">Set-up</string>
+    <string name="onboarding_step">Step %1$d of %2$d</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_finish">Finish</string>
+
+    <!-- Disclaimer page -->
+    <string name="onboarding_disclaimer_title">Before you start</string>
+    <string name="onboarding_disclaimer_body_1">DiaPilot is not a medical device. It is a personal logbook and research tool that shows your own data.</string>
+    <string name="onboarding_disclaimer_body_2">It never suggests or calculates an insulin dose. Every decision about insulin, food and treatment is yours and your care team\'s.</string>
+    <string name="onboarding_disclaimer_body_3">Alerts are hints, not a guarantee: they depend on a sensor, a phone and a data chain that can all stop. Confirm a low or a high with a meter before acting.</string>
+    <string name="onboarding_disclaimer_body_4">Your data stays on this phone unless you export it yourself.</string>
+    <string name="onboarding_disclaimer_accept">I have read this and I understand that the app gives no medical advice.</string>
+    <string name="onboarding_disclaimer_button">Accept</string>
+    <string name="onboarding_disclaimer_accepted_on">Accepted on %1$s.</string>
+
+    <!-- Language page (the card itself is the Settings one) -->
+    <string name="onboarding_language_intro">You can change this later under More.</string>
+
+    <!-- Weight page -->
+    <string name="onboarding_weight_title">Body weight</string>
+    <string name="onboarding_weight_body">Optional. Used for the starting estimate of how much 10 g of carbohydrate raises your glucose; the estimate is inverse to weight. Empty means the 70 kg reference.</string>
+    <string name="onboarding_weight_invalid">Enter a weight between 20 and 300 kg, or leave the field empty.</string>
+
+    <!-- ISF page -->
+    <string name="onboarding_isf_title">Insulin sensitivity (ISF)</string>
+    <string name="onboarding_isf_body">How far ONE unit of rapid insulin lowers your glucose when nothing else is acting — the number your care team may call the correction factor. Most adults are between %1$s and %2$s per unit; children and very insulin-sensitive people are higher.</string>
+    <string name="onboarding_isf_units">Units for this field and for the whole app</string>
+    <string name="onboarding_isf_label">ISF, %1$s per unit</string>
+    <string name="onboarding_isf_required">Enter your ISF between %1$s and %2$s per unit. Without it the forecast stays off.</string>
+
+    <!-- Insulin preset page -->
+    <string name="onboarding_preset_title">How fast does your insulin act?</string>
+    <string name="onboarding_preset_body">A starting shape for the action curve, in minutes after the injection: when it starts, when it is strongest, when it is over. It only has to be roughly right — your own doses refine it later.</string>
+    <string name="onboarding_preset_typical">Rapid analog, typical (NovoRapid, Humalog, Apidra). Not sure? Use this.</string>
+    <string name="onboarding_preset_slower">Slower than typical</string>
+    <string name="onboarding_preset_ultra">Ultra-rapid (Fiasp, Lyumjev)</string>
+    <string name="onboarding_preset_landmarks">starts %1$d · strongest %2$d · over by %3$d min</string>
+
+    <!-- Carb sensitivity page -->
+    <string name="onboarding_carb_title">Carbohydrate sensitivity</string>
+    <string name="onboarding_carb_body">Optional. How much 10 g of carbohydrate raises your glucose with no insulin acting. Empty means the estimate from your weight: %1$s per 10 g.</string>
+    <string name="onboarding_carb_label">Rise per 10 g, %1$s</string>
+    <string name="onboarding_carb_invalid">Enter a rise between %1$s and %2$s per 10 g, or leave the field empty.</string>
+
+    <!-- Summary page -->
+    <string name="onboarding_summary_title">What the app knows now</string>
+    <string name="onboarding_summary_hand_entered">Entered by hand, not measured:</string>
+    <string name="onboarding_summary_weight">Weight: %1$s kg</string>
+    <string name="onboarding_summary_weight_none">Weight: not entered (70 kg reference)</string>
+    <string name="onboarding_summary_isf">ISF: %1$s per unit</string>
+    <string name="onboarding_summary_preset">Insulin action: %1$s</string>
+    <string name="onboarding_summary_carb">Carb rise: %1$s per 10 g</string>
+    <string name="onboarding_summary_carb_from_weight">Carb rise: from weight, %1$s per 10 g</string>
+    <string name="onboarding_summary_measured_note">The insulin action shape is measured from your own doses over time and shown next to these values under More → Personal model. The forecast, What-if and the predictive alerts start from these numbers.</string>
+    <string name="onboarding_summary_change_note">Everything here can be changed under More.</string>
+
+    <!-- More -> Personal model -->
+    <string name="onboarding_settings_rerun">Set up model again</string>
+
+    <!-- Calibration card: Today and More -> Personal model -->
+    <string name="calibration_example_title">Model not set up</string>
+    <string name="calibration_example_body">No forecast, What-if or predictive alert runs until you enter your ISF and insulin timing. Alerts on the readings themselves — low, high, rapid fall, no data — keep working.</string>
+    <string name="calibration_example_action">Set up</string>
+    <string name="calibration_hand_title">Model on hand-entered values</string>
+    <string name="calibration_hand_body">ISF %1$s per unit · insulin starts %2$d, strongest %3$d, over by %4$d min. The action shape is measured from your own doses over time.</string>
+    <string name="calibration_hand_body_isf_only">ISF %1$s per unit, entered by hand. The action shape is measured from your own doses over time.</string>
+    <string name="calibration_measured_title">Insulin action measured from your doses</string>
+    <string name="calibration_measured_body">%1$d doses on %2$d days. ISF %3$s per unit is still your hand-entered value.</string>
+    <string name="calibration_change">Change</string>
+
+    <!-- More -> Body -->
+    <string name="settings_screen_carb_override_label">Carb rise per 10 g, %1$s (optional)</string>
+    <string name="settings_screen_carb_override_hint">Empty: the estimate from weight above applies.</string>
+</resources>

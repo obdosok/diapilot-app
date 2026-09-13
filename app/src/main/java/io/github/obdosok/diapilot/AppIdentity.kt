@@ -1,5 +1,7 @@
 package io.github.obdosok.diapilot
 
+import com.diapilot.core.backup.BackupCrypto
+
 /**
  * Every name the app shares with the rest of the phone, derived from the
  * applicationId instead of written as a literal.
@@ -37,11 +39,16 @@ object AppIdentity {
     fun autoBackupPrefix(applicationId: String = APPLICATION_ID): String =
         "$applicationId-auto-backup-"
 
-    /** One rotating file per weekday: [dayOfWeek] is `Calendar.DAY_OF_WEEK`. */
-    fun autoBackupName(dayOfWeek: Int, applicationId: String = APPLICATION_ID): String =
-        "${autoBackupPrefix(applicationId)}$dayOfWeek.sqlite"
+    /**
+     * One rotating file per weekday: [dayOfWeek] is `Calendar.DAY_OF_WEEK`.
+     * An [encrypted] file carries `.enc` after `.sqlite`, so a plain SQLite
+     * tool does not try to open ciphertext and the restore path can tell the
+     * two apart by name as well as by header.
+     */
+    fun autoBackupName(dayOfWeek: Int, applicationId: String = APPLICATION_ID, encrypted: Boolean = false): String =
+        "${autoBackupPrefix(applicationId)}$dayOfWeek.sqlite" + if (encrypted) BackupCrypto.FILE_SUFFIX else ""
 
     /** The Settings "Export database" file; [stamp] is `yyyyMMdd-HHmm`. */
-    fun manualExportName(stamp: String, applicationId: String = APPLICATION_ID): String =
-        "$applicationId-backup-$stamp.sqlite"
+    fun manualExportName(stamp: String, applicationId: String = APPLICATION_ID, encrypted: Boolean = false): String =
+        "$applicationId-backup-$stamp.sqlite" + if (encrypted) BackupCrypto.FILE_SUFFIX else ""
 }

@@ -50,7 +50,10 @@ object DailyDiscrepancyRuntime {
                 contamination = buildSet { if (boluses.any { abs(it.tsMs - food.tsMs) <= 45 * 60_000 }) add("meal_bolus_overlap") },
             )
         }
-        for (bolus in boluses.filter { it.purpose?.lowercase()?.contains("корр") == true }) for (h in listOf(60, 120, 180)) {
+        // Used to be `purpose.contains("корр")` — a reader that went stale the
+        // day schema v50 turned the stored token into the key "correction", so
+        // no bolus qualified as a correction observation on a migrated phone.
+        for (bolus in boluses.filter { com.diapilot.core.analysis.BolusPurpose.of(it.purpose) == com.diapilot.core.analysis.BolusPurpose.CORRECTION }) for (h in listOf(60, 120, 180)) {
             val target = bolus.tsMs + h * 60_000L
             val activityContaminated = store.steps(bolus.tsMs, target).sumOf { it.count } > 500
             val anotherBolus = boluses.any { it.tsMs > bolus.tsMs && it.tsMs <= target }
@@ -258,7 +261,7 @@ object DailyDiscrepancyRuntime {
             "$coverage Unsupported hypotheses contribute 0 to median and remain visible in the registry.",
             mixedDataLine,
             PhysioRuntime.artifact()?.baseMechanics?.let { person ->
-                com.diapilot.core.hybrid.HybridForecastEngine(person).insulinLandmarks().let{
+                com.diapilot.core.hybrid.physioForecastEngine(person).insulinLandmarks().let{
                     "Insulin kinetics prior: onset %.0f, rate peak %.0f, tail %.0f min; exact selected-engine CDF; identifying n=0, current state carried from prior.".format(it.onsetMin,it.ratePeakMin,it.effectEndMin)
                 }
             } ?: "Insulin kinetics source missing",

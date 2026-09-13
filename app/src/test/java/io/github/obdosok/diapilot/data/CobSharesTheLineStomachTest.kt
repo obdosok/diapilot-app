@@ -53,7 +53,7 @@ class CobSharesTheLineStomachTest {
     private fun install() {
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "cob-shares-stomach")
+        PhysioForecastRegistry.install(model, "cob-shares-stomach")
     }
 
     @Test

@@ -41,7 +41,7 @@ class ClusterCardCurveTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "cluster-card-curve")
+        PhysioForecastRegistry.install(model, "cluster-card-curve")
         val artifact = requireNotNull(PhysioRuntime.artifact())
         return HybridRuntimeMetrics.foodReadoutsForModel(
             artifact.personModelAt(19.0), notes, macroTiming = artifact.macroTiming, physioArtifact = artifact,

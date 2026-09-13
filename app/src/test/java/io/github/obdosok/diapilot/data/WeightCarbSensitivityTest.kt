@@ -123,7 +123,7 @@ class WeightCarbSensitivityTest {
     @Test fun `the artifact cache does not outlive a weight change`() {
         val name = "weight-cs-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context, name).use { store ->
-            HybridShadowRegistry.install(model(), "weight-cs-test")
+            PhysioForecastRegistry.install(model(), "weight-cs-test")
             val now = System.currentTimeMillis()
 
             val before = PhysioRuntime.artifact(store, now)

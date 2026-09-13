@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings for the backup hardening: restore validation, the rollback copy. -->
+<resources>
+    <!-- BackupRestore.kt: why a candidate file was refused. -->
+    <string name="backup_restore_not_sqlite">файл не является базой SQLite</string>
+    <string name="backup_restore_corrupt">файл не проходит проверку целостности SQLite (%1$s) — он повреждён</string>
+    <string name="backup_restore_unversioned">у базы нет версии схемы — это не копия DiaPilot</string>
+    <string name="backup_restore_newer_version">файл записан более новой версией DiaPilot (версия базы %1$d, эта сборка читает до %2$d) — сначала обновите приложение</string>
+    <string name="backup_restore_missing_table">это не база DiaPilot: нет таблицы %1$s</string>
+    <plurals name="backup_restore_dose_fuse">
+        <item quantity="one">отказано: %1$d запись об инсулине в файле превышает предохранитель дозы (%2$.0f ед. болюс, %3$.0f ед. базал)</item>
+        <item quantity="few">отказано: %1$d записи об инсулине в файле превышают предохранитель дозы (%2$.0f ед. болюс, %3$.0f ед. базал)</item>
+        <item quantity="many">отказано: %1$d записей об инсулине в файле превышают предохранитель дозы (%2$.0f ед. болюс, %3$.0f ед. базал)</item>
+        <item quantity="other">отказано: %1$d записи об инсулине в файле превышают предохранитель дозы (%2$.0f ед. болюс, %3$.0f ед. базал)</item>
+    </plurals>
+
+    <!-- BackupRestore.kt: an encrypted (.sqlite.enc) file. -->
+    <string name="backup_restore_encrypted_needs_password">эта копия зашифрована — введите её пароль</string>
+    <string name="backup_restore_wrong_password">неверный пароль, или файл был изменён</string>
+    <string name="backup_restore_corrupt_encrypted">зашифрованный файл неполный или повреждён (%1$s)</string>
+
+    <!-- SettingsScreen: the backup password. -->
+    <string name="settings_screen_backup_password_label">Пароль резервной копии (необязательно)</string>
+    <string name="settings_screen_backup_password_hint">Когда он задан, каждый файл резервной копии — ежедневные копии и экспорт — шифруется (.sqlite.enc). Без этого пароля копию открыть невозможно; DiaPilot не сможет его восстановить.</string>
+    <string name="settings_screen_backup_password_unavailable">Пароль не удалось сохранить защищённо на этом телефоне; копии остаются незашифрованными.</string>
+    <string name="settings_screen_restore_password_label">Пароль этой копии</string>
+
+    <!-- BackupRestore.kt: the rollback copy. -->
+    <string name="backup_restore_undo_done">Прежняя база восстановлена. Перезапускаю…</string>
+    <string name="backup_restore_undo_unavailable">копии для отката нет — отменять нечего</string>
+
+    <!-- SettingsScreen: undo the last restore. -->
+    <string name="settings_screen_undo_restore">Отменить последнее восстановление</string>
+    <string name="settings_screen_undo_restore_hint">База в том виде, какой была до последнего восстановления, хранится 7 дней.</string>
+</resources>

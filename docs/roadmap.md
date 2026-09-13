@@ -137,22 +137,26 @@ consumer app.
 | **O-D Model on n>1** | M1 end landmark by plateau; M5 ramp policy bench; cold-start calibration on several people; M6 protein/fat amplitude only after a bench | every number change ships with a multi-person walk-forward |
 | **O-E Distribution** | F-Droid — needs a flavor without ML Kit (ZXing); reproducible build | accepted |
 
-**What O-B still owes `v1.4.0`.** Seven of its ten items are in `public`: the
+**What O-B still owes `v1.4.0`.** Nine of its ten items are in `public`: the
 edition scaffold, the data-sources screen, the alert path off OOPAlgorithm2,
 weight → CS, the tail domain (both halves of it — the automatic floor and the
-hand tier's own range), the English food parser and the value-free diagnostics
-export. Three are not, and none of them is optional for the gate —
-**onboarding** with the disclaimer, manual ISF / ICR / weight and insulin
-presets (audit M2, P2; a preset is written into the hand tier, whose domain is
-120..600, so the presets themselves decide what they offer — they are not
-forced to ≥ 240 by a bound any more, and the shipped example person stays at
-300), **release signing** with a real upload key (S8), and the **Nightscout
-source** (P6), whose row already exists on the data-sources screen and needs
-one argument wired — plus, now, one `AlertTick.fire` call and one `Source`
-entry, which is all a new source needs to get the whole alert set. Phase B
-also planned to move the research bench behind a build of its own (A3); that
-did not run either, so the bench still ships in both editions. There is no
-`v1.4.0` tag until the three land.
+hand tier's own range), the English food parser, the value-free diagnostics
+export, and — from the September second read — **onboarding** with the
+disclaimer, manual ISF / weight, insulin presets and an uncalibrated mode
+behind it (audit M2, P2; a preset is written into the hand tier, whose domain
+is 120..600, so the presets themselves decide what they offer, and the shipped
+example person stays at 300), and **release signing** in the build and the
+release workflow (S8 — the upload key itself still has to be created; until
+then the build falls back to the debug key and says so). One item is not:
+the **Nightscout source** (P6), whose row already exists on the data-sources
+screen and needs one argument wired — plus one `AlertTick.fire` call and one
+`Source` entry, which is all a new source needs to get the whole alert set.
+Phase B also planned to move the research bench behind a build of its own
+(A3); that did not run, so the bench still ships in both editions. The same
+second read pulled two O-C items forward — restore validation with an undo
+(S7) and the optional backup password (S6) — and the accuracy tool's naive
+baselines (M13). There is no `v1.4.0` tag until Nightscout lands and the
+keystore exists.
 
 **One bug the gate inherited rather than fixed, and re-derived — now closed by
 `phaseB/b9`.** On a phone without OOPAlgorithm2 installed — which is every

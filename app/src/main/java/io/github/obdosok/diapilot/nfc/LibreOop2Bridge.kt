@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.util.Base64
+import io.github.obdosok.diapilot.collect.Oop2App
 import io.github.obdosok.diapilot.diag.DiagLog
 import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
@@ -17,11 +18,18 @@ import java.util.concurrent.TimeUnit
  * pid echo in ROW_ID). We already depend on OOP2 for the per-minute BLE
  * stream; this reuses it for NFC reads. Constants from xDrip Intents.java —
  * ported from xDrip+ (https://github.com/NightscoutFoundation/xDrip), GPL-3.0.
+ *
+ * Both round trips register an EXPORTED reply receiver for their few seconds,
+ * because the reply comes from another app. The pid echo in ROW_ID is a
+ * correlation id, not a credential, so each round trip first asks whether
+ * OOPAlgorithm2 is installed at all ([Oop2App]) and answers null at once when
+ * it is not: nothing legitimate could reply, and a twelve-second wait for a
+ * forged one is not a wait worth having.
  */
 object LibreOop2Bridge {
 
     private const val TAG = "LibreOop2"
-    private const val OOP2_PACKAGE = "com.hg4.oopalgorithm.oopalgorithm2"
+    private const val OOP2_PACKAGE = Oop2App.PACKAGE
 
     private const val ACTION_LIBRE_DATA = "com.eveningoutpost.dexdrip.LIBRE_DATA"
     private const val ACTION_FARM_RESULT = "com.eveningoutpost.dexdrip.OOP2_DECODE_FARM_RESULT"
@@ -65,11 +73,16 @@ object LibreOop2Bridge {
         count: Int = 2000,
         timeoutS: Long = 12,
     ): UnlockData? {
+        if (!Oop2App.installed(context)) {
+            DiagLog.w(TAG, "enableStreaming: OOPAlgorithm2 is not installed — no request sent")
+            return null
+        }
         val latch = CountDownLatch(1)
         var result: UnlockData? = null
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
+                if (!Oop2App.installed(c)) return
                 try {
                     val json = intent.extras?.getString("json") ?: return
                     val o = JSONObject(json)
@@ -131,11 +144,16 @@ object LibreOop2Bridge {
         captureMs: Long,
         timeoutS: Long = 12,
     ): Decoded? {
+        if (!Oop2App.installed(context)) {
+            DiagLog.w(TAG, "decode: OOPAlgorithm2 is not installed — no request sent")
+            return null
+        }
         val latch = CountDownLatch(1)
         var result: Decoded? = null
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
+                if (!Oop2App.installed(c)) return
                 try {
                     val json = intent.extras?.getString("json") ?: return
                     val o = JSONObject(json)

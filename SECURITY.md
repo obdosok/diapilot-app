@@ -12,9 +12,10 @@ in the README's "Privacy by construction". The surfaces that matter are
 therefore the local ones:
 
 1. **Other apps on the same phone.** Any app holding `INTERNET` can reach a
-   loopback port; any app can send a broadcast that looks like a glucose
-   reading. The app that spoofs a value does not need any permission the user
-   would notice granting.
+   loopback port, or bind a loopback port another app is expected to serve;
+   any app can send a broadcast that looks like a glucose reading. The app
+   that spoofs a value does not need any permission the user would notice
+   granting.
 2. **The media a backup lands on.** A database copy in public Downloads, in a
    third-party cloud folder, or on a self-hosted companion server is readable by
    whatever else has access to that place.
@@ -48,27 +49,36 @@ around one is a vulnerability worth reporting.
 - **Every value that enters is bounded before it is stored.** A glucose reading
   must be physiologically possible and must be timestamped inside a window
   around now; an insulin amount must be a plausible dose. This holds for every
-  input path — broadcast, polled web service, NFC, and a command parsed from
-  language — and not just for the one that happened to be reviewed last.
-- **One source cannot silently rewrite another's history.** Stored readings are
-  attributed, and a late arrival from a different source does not overwrite
-  what was recorded.
+  input path — the xDrip broadcast, the polled web service, the OOPAlgorithm2
+  minute stream, a NovoPen scan, a hand-typed entry, a command parsed from
+  language, and a restored backup file — and not just for the one that
+  happened to be reviewed last. The web-service poll and the minute-stream
+  receiver are also skipped altogether while the app that is supposed to be
+  behind them is not installed.
+- **One source cannot silently rewrite another's history.** Stored readings
+  and stored doses are attributed, and a late arrival from a different source
+  does not overwrite what was recorded. A dose the user edited by hand is not
+  overwritten by any re-sync.
 - **The forecast anchor is checked for plausibility by default.** The check is
   on unless the user turns it off, not the other way round.
 - **A dose is never given automatically, and never suggested.** The app
   suggests carbohydrates, never insulin; a voice or typed command can only
   *record* a dose the user already took, and only after a hard validator and an
   explicit confirmation tap.
-- **Secrets stay in the platform keystore.** The Anthropic API key and any
-  companion-server token are encrypted with a key held by the Android keystore,
-  bound to the secret's own name, and never logged.
+- **Secrets stay in the platform keystore.** The Anthropic API key, any
+  companion-server token, the optional backup password and the Libre 2
+  pairing state are encrypted with a key held by the Android keystore, bound
+  to the secret's own name, and never logged.
 - **Everything the app shares with the rest of the phone is off until the user
   switches it on**, and the defaults are listed in the README's setup table.
 
 Known gaps are not hidden: [`docs/audit.md`](docs/audit.md) lists them by
 number with file references, and [`CHANGELOG.md`](CHANGELOG.md) records which
-release closed which. Backups are still written unencrypted, and the release
-build is still signed with the debug keystore — both are tracked there.
+release closed which. Two are worth naming here: a backup is encrypted only
+when the user has set a backup password in Settings, the default is still a
+plain SQLite file (S6); and the release build is signed with a real key only
+once the maintainer has created one — until then the build falls back to the
+debug key and says so (S8).
 
 ## Not a medical device
 

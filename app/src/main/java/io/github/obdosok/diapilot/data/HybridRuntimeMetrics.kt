@@ -4,6 +4,7 @@ import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.analysis.mealConceptComponents
 import com.diapilot.core.hybrid.HybridFoodEvent
 import com.diapilot.core.hybrid.HybridForecastEngine
+import com.diapilot.core.hybrid.physioForecastEngine
 import io.github.obdosok.diapilot.Edition
 import org.json.JSONObject
 import java.io.InputStream
@@ -225,14 +226,23 @@ object HybridRuntimeMetrics {
         )
     }
 
-    fun model() = HybridShadowRegistry.model()
+    fun model() = PhysioForecastRegistry.model()
+
+    // ONE CONSTRUCTOR. Every engine in this file used to be a bare
+    // `HybridForecastEngine(person)`, which builds with the ENGINE's defaults —
+    // `MacroTimingParamsV1()` unpromoted, and none of the model's own
+    // `*Override` knobs — while the line on screen is built by
+    // `physioForecastEngine`, which resolves both. On the shipped model the two
+    // agree to the last digit (every macro shift is zero, no override is set),
+    // so nothing here changed numerically; the point is that the next knob
+    // added to the factory reaches the IOB/COB readouts without a second edit.
 
     fun iobUnits(
         store: CollectorStore,
         tsMs: Long,
     ): Double? {
         val person = model() ?: return null
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
         return store.boluses(tsMs - lookbackMs, tsMs)
             .asSequence()
@@ -261,7 +271,7 @@ object HybridRuntimeMetrics {
         tsMs: Long,
         person: com.diapilot.core.hybrid.HybridPersonModel
     ): Double {
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
         return store
             .boluses(tsMs - lookbackMs, tsMs)
@@ -288,7 +298,7 @@ object HybridRuntimeMetrics {
         stepMs: Long = 5L * 60_000L,
     ): List<Pair<Long, Double>> {
         val person = model() ?: return emptyList()
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
         val boluses = store.boluses(fromMs - lookbackMs, toMs)
             .filter {
@@ -321,7 +331,7 @@ object HybridRuntimeMetrics {
                 "ForecastPerf",
                 "iob: artifact ${tArt1 - tArt} ms",
             )
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         val lookbackMs = (person.insulin.tailDurationMin * 60_000.0).toLong()
         val boluses =
             store.boluses(fromMs - lookbackMs, toMs).filter {
@@ -376,7 +386,7 @@ object HybridRuntimeMetrics {
      * The model, engine and CLUSTER exactly as `Forecaster` builds them.
      *
      * `knownAtMs` cuts off notes the device did not yet know about at [tsMs] —
-     * the same causal question as `HybridShadow.causalFoodNotes`, and without
+     * the same causal question as `PhysioForecastBridge.causalFoodNotes`, and without
      * it the history ribbon would score the past with today's knowledge.
      */
     internal fun cobLens(store: CollectorStore, tsMs: Long): CobLens? {
@@ -388,7 +398,7 @@ object HybridRuntimeMetrics {
         val cluster = cobEvents(store, tsMs - FOOD_LOOKBACK_MS, tsMs)
             .filter { (event, knownAt) -> event.tsMs <= tsMs && knownAt <= tsMs }
             // Contexts are taken FROM THE EVENT, not the current ones: the
-            // forecast does the same (`HybridShadow` line 492). The meal
+            // forecast does the same (`PhysioForecastBridge` line 492). The meal
             // remembers what context it happened in.
             .map { (event, _) -> artifact.decorateFood(event, event.contextIds) }
             .sortedBy { it.tsMs }
@@ -548,15 +558,15 @@ object HybridRuntimeMetrics {
         asOfMs: Long
     ): com.diapilot.core.hybrid.HybridInsulinLandmarks? =
         PhysioRuntime.artifact(store, asOfMs)?.personModelAt(12.0, emptySet())?.let {
-            HybridForecastEngine(it).insulinLandmarks()
+            physioForecastEngine(it).insulinLandmarks()
         }
 
     fun carbSensitivityMmolPerGram(): Double? =
         model()?.food?.let { it.globalFactor * it.calibration }
 
-    fun insulinPeakMin(): Double? = model()?.let{HybridForecastEngine(it).insulinLandmarks().ratePeakMin}
+    fun insulinPeakMin(): Double? = model()?.let{physioForecastEngine(it).insulinLandmarks().ratePeakMin}
 
-    fun insulinDurationMin(): Double? = model()?.let{HybridForecastEngine(it).insulinLandmarks().effectEndMin}
+    fun insulinDurationMin(): Double? = model()?.let{physioForecastEngine(it).insulinLandmarks().effectEndMin}
 
     /**
      * Last modeled action point of insulin that is still on board at [nowMs].
@@ -606,7 +616,7 @@ object HybridRuntimeMetrics {
      * `carbsKnownAtMs` is not accepted here at all, whereas the old function
      * returned it with `knownAtMs = Long.MAX_VALUE`. The latter represents
      * "known never"; the former is a refusal — the device in
-     * `HybridShadow.causalFoodNotes` does the same.
+     * `PhysioForecastBridge.causalFoodNotes` does the same.
      */
     internal fun cobEvents(
         store: CollectorStore,
@@ -630,7 +640,7 @@ object HybridRuntimeMetrics {
      */
     fun activeFoodEndMs(store: CollectorStore, nowMs: Long): Long? {
         val person = model() ?: return null
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         return cobEvents(store, nowMs - FOOD_LOOKBACK_MS, nowMs)
             .asSequence()
             .filter { (event, knownAt) -> event.tsMs <= nowMs && knownAt <= nowMs }
@@ -675,7 +685,7 @@ object HybridRuntimeMetrics {
         tsMs: Long? = null,
     ): HybridFoodReadout? {
         val person = model() ?: return null
-        val engine = HybridForecastEngine(person)
+        val engine = physioForecastEngine(person)
         return foodReadout(engine, text, carbsG, analysis, tsMs)
     }
 

@@ -161,6 +161,156 @@ fun evaluateHypoAlert(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Naive baselines — what "the glucose stays where it is" and "the last quarter
+// hour continues" would have scored on the SAME matched points.
+//
+// WHY. A MAE of 1.2 mmol/L at 60 minutes is unreadable on its own: glucose is
+// autocorrelated, so a forecast that never moves is already hard to beat at
+// short horizons, and a report with no reference lets the reader pick whichever
+// story they arrived with. Two baselines computed from `glucose_readings`
+// alone, at each run's own anchor, give the number a floor to stand on; the
+// skill score `1 − MAE_model / MAE_baseline` says by how much (positive = the
+// model beat it, 0 = no better, negative = worse). Neither baseline knows about
+// insulin or food — that is the point, they are the cost of doing nothing.
+//
+// The baseline is computed on the reading the phone HAD at the anchor: the last
+// `glucose_readings` row at or before `anchor_ts_ms` within the ledger's own
+// six-minute tolerance. A run with no such reading contributes no sample to the
+// comparison, so the model and both baselines are always scored on one common
+// set — the n printed beside them is that set, and it can be smaller than the
+// n of the model-only table above it.
+// ---------------------------------------------------------------------------
+
+/** The linear baseline is clamped to what the store itself allows a glucose
+ *  value to be — a straight line through a falling quarter hour reaches
+ *  negative glucose at 180 minutes, and "0.0 mmol/L" is not a forecast anyone
+ *  would have drawn. 2.0 is `HYBRID_FLOOR_MMOL`, the engine's own floor. */
+const val BASELINE_MIN_MMOL = 2.0
+const val BASELINE_MAX_MMOL = 30.0
+
+/** The window the linear baseline is fitted over. Fifteen minutes is three
+ *  five-minute readings — the shortest span with a slope that is a slope and
+ *  not sensor jitter, and the same window a person reads off the arrow. */
+const val LINEAR_BASELINE_WINDOW_MIN = 15.0
+
+/**
+ * The reading the phone had in hand at [anchorTsMs]: the LAST row at or
+ * before the anchor, no older than [toleranceMs]. Never a later one — a
+ * baseline that peeks past the anchor is not a baseline.
+ */
+fun anchorReading(
+    readingsAsc: List<GlucoseReadingRow>,
+    anchorTsMs: Long,
+    toleranceMs: Long = 6L * 60_000,
+): GlucoseReadingRow? {
+    var lo = 0
+    var hi = readingsAsc.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (readingsAsc[mid].tsMs <= anchorTsMs) lo = mid + 1 else hi = mid
+    }
+    return readingsAsc.getOrNull(lo - 1)?.takeIf { anchorTsMs - it.tsMs <= toleranceMs }
+}
+
+/** Baseline (a): the glucose stays where it is. Null without an anchor reading. */
+fun lastValueBaseline(
+    readingsAsc: List<GlucoseReadingRow>,
+    anchorTsMs: Long,
+    toleranceMs: Long = 6L * 60_000,
+): Double? = anchorReading(readingsAsc, anchorTsMs, toleranceMs)?.mmol
+
+/**
+ * Baseline (b): the slope of the last [windowMin] minutes continues for
+ * [horizonMin] more, from the anchor reading, clamped to
+ * [[BASELINE_MIN_MMOL], [BASELINE_MAX_MMOL]]. The slope is ordinary least
+ * squares over every reading in `[anchor − window, anchor]`; with fewer than
+ * two readings there is no slope and the result is null rather than a
+ * disguised last-value baseline.
+ */
+fun linearBaseline(
+    readingsAsc: List<GlucoseReadingRow>,
+    anchorTsMs: Long,
+    horizonMin: Int,
+    windowMin: Double = LINEAR_BASELINE_WINDOW_MIN,
+    toleranceMs: Long = 6L * 60_000,
+): Double? {
+    val anchor = anchorReading(readingsAsc, anchorTsMs, toleranceMs) ?: return null
+    val window = readingsInWindow(readingsAsc, anchor.tsMs - (windowMin * 60_000).toLong(), anchor.tsMs)
+    if (window.size < 2) return null
+    val xs = window.map { (it.tsMs - anchor.tsMs) / 60_000.0 }
+    val ys = window.map { it.mmol }
+    val xMean = xs.average()
+    val yMean = ys.average()
+    val sxx = xs.sumOf { (it - xMean) * (it - xMean) }
+    if (sxx == 0.0) return null
+    val slopePerMin = xs.indices.sumOf { (xs[it] - xMean) * (ys[it] - yMean) } / sxx
+    return (anchor.mmol + slopePerMin * horizonMin).coerceIn(BASELINE_MIN_MMOL, BASELINE_MAX_MMOL)
+}
+
+/** One matched point with the model's prediction and both baselines, all
+ *  against the same actual reading. */
+data class BaselineSample(
+    val model: ErrorSample,
+    val lastValue: ErrorSample,
+    val linear: ErrorSample,
+)
+
+/**
+ * Like [matchHorizon], but keeps only the points where BOTH baselines could be
+ * computed at the run's anchor, and carries them beside the model's own
+ * prediction. [runsById] supplies each point's anchor.
+ */
+fun matchHorizonWithBaselines(
+    points: List<ForecastPointRow>,
+    runsById: Map<Long, RunRow>,
+    readingsAsc: List<GlucoseReadingRow>,
+    horizonMin: Int,
+    toleranceMs: Long = 6L * 60_000,
+): List<BaselineSample> =
+    points.filter { it.horizonMin == horizonMin }
+        .mapNotNull { p ->
+            val run = runsById[p.runId] ?: return@mapNotNull null
+            val actual = nearestReading(readingsAsc, p.targetTsMs, toleranceMs)?.mmol ?: return@mapNotNull null
+            val last = lastValueBaseline(readingsAsc, run.anchorTsMs, toleranceMs) ?: return@mapNotNull null
+            val line = linearBaseline(readingsAsc, run.anchorTsMs, horizonMin, toleranceMs = toleranceMs)
+                ?: return@mapNotNull null
+            BaselineSample(
+                model = ErrorSample(p.mmol, actual),
+                lastValue = ErrorSample(last, actual),
+                linear = ErrorSample(line, actual),
+            )
+        }
+
+/** The model and both baselines scored on one common set of points. */
+data class HorizonBaselines(
+    val n: Int,
+    val model: ErrorStats,
+    val lastValue: ErrorStats,
+    val linear: ErrorStats,
+) {
+    /** `1 − MAE_model / MAE_last-value`; null when the baseline's MAE is zero
+     *  (a ratio against a perfect baseline is not a skill, it is a division). */
+    val skillVsLastValue: Double? get() = skillScore(model.maeMmol, lastValue.maeMmol)
+    val skillVsLinear: Double? get() = skillScore(model.maeMmol, linear.maeMmol)
+}
+
+/** Positive = the model beat the baseline by that fraction of the baseline's
+ *  MAE; 0 = no better; negative = worse. Null against a zero-MAE baseline. */
+fun skillScore(modelMae: Double, baselineMae: Double): Double? =
+    if (baselineMae > 0.0) 1.0 - modelMae / baselineMae else null
+
+/** Null (not zero) when nothing was matched — same rule as [errorStats]. */
+fun baselineStats(samples: List<BaselineSample>): HorizonBaselines? {
+    if (samples.isEmpty()) return null
+    return HorizonBaselines(
+        n = samples.size,
+        model = errorStats(samples.map { it.model })!!,
+        lastValue = errorStats(samples.map { it.lastValue })!!,
+        linear = errorStats(samples.map { it.linear })!!,
+    )
+}
+
 /** Readings with `tsMs` in `[fromTsMs, toTsMs]`, located by binary search on
  *  the ascending list rather than a linear scan. */
 private fun readingsInWindow(

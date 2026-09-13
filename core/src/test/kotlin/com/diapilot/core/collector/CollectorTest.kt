@@ -131,7 +131,7 @@ class BroadcastParserTest {
             "HistoricBg" to listOf(154, 163, 177),
             "com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to 1_737_713_152_636L,
         )
-        val rs = parseOop2Trend(fields)
+        val rs = parseOop2Trend(fields, nowMs = 1_737_713_152_636L)
         assertEquals(7, rs.size)
         val quantized = Math.round(1_737_713_152_636L / 60_000.0) * 60_000L
         // First element (215) is newest — lands on the quantized broadcast minute.
@@ -142,19 +142,50 @@ class BroadcastParserTest {
         assertEquals(173.0, rs.last().mgdl, 1e-9)
         assertEquals("oop2_ble", rs.first().source)
         // Quantization: a broadcast 4 seconds later maps to the same slots.
-        val again = parseOop2Trend(fields + ("com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to 1_737_713_156_700L))
+        val again = parseOop2Trend(
+            fields + ("com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to 1_737_713_156_700L),
+            nowMs = 1_737_713_156_700L,
+        )
         assertEquals(rs.first().tsMs, again.first().tsMs)
     }
 
     @Test
     fun `parse oop2 trend garbled yields empty`() {
-        assertEquals(0, parseOop2Trend(null).size)
-        assertEquals(0, parseOop2Trend(emptyMap()).size)
-        assertEquals(0, parseOop2Trend(mapOf("TrendBg" to listOf(150))).size) // no ts
+        assertEquals(0, parseOop2Trend(null, BASE).size)
+        assertEquals(0, parseOop2Trend(emptyMap(), BASE).size)
+        assertEquals(0, parseOop2Trend(mapOf("TrendBg" to listOf(150)), BASE).size) // no ts
         assertEquals(
             0,
-            parseOop2Trend(mapOf("com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to 1L)).size, // no trend
+            parseOop2Trend(mapOf("com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to 1L), BASE).size, // no trend
         )
+    }
+
+    private fun oop2(ts: Long, vararg trend: Any) = mapOf(
+        "TrendBg" to trend.toList(),
+        "com.eveningoutpost.dexdrip.Extras.TIMESTAMP" to ts,
+    )
+
+    @Test
+    fun `an oop2 payload timestamped outside the live window is dropped whole`() {
+        // The minute stream is live data and it anchors the forecast when it
+        // is fresher than the main reading: parking a payload in the future
+        // would keep it the freshest value for as long as the clock lags it.
+        assertEquals(3, parseOop2Trend(oop2(BASE, 150, 148, 146), BASE).size)
+        assertEquals(3, parseOop2Trend(oop2(BASE - BG_BROADCAST_MAX_AGE_MS, 150, 148, 146), BASE).size)
+        assertEquals(3, parseOop2Trend(oop2(BASE + BG_BROADCAST_MAX_AHEAD_MS, 150, 148, 146), BASE).size)
+        assertEquals(0, parseOop2Trend(oop2(BASE - BG_BROADCAST_MAX_AGE_MS - 1, 150, 148, 146), BASE).size)
+        assertEquals(0, parseOop2Trend(oop2(BASE + BG_BROADCAST_MAX_AHEAD_MS + 1, 150, 148, 146), BASE).size)
+        assertEquals(0, parseOop2Trend(oop2(BASE + 365L * 24 * 3_600_000, 150), BASE).size)
+        assertEquals(0, parseOop2Trend(oop2(0L, 150), BASE).size)
+    }
+
+    @Test
+    fun `an oop2 trend value outside the CGM range is skipped, the rest kept`() {
+        val rs = parseOop2Trend(oop2(BASE, 150, 2000, 19.9, -5, 600, 20, Double.NaN, 0), BASE)
+        assertEquals(listOf(150.0, 600.0, 20.0), rs.map { it.mgdl })
+        // Skipped elements keep their minute slot: the survivors do not slide.
+        val slot0 = Math.round(BASE / 60_000.0) * 60_000L
+        assertEquals(listOf(slot0, slot0 - 4 * 60_000, slot0 - 5 * 60_000), rs.map { it.tsMs })
     }
 
     @Test
@@ -166,13 +197,51 @@ class BroadcastParserTest {
             mapOf("sgv" to 120.5, "date" to null),              // no ts -> skipped
             mapOf("sgv" to 99, "date" to BASE + 300_000),
         )
-        val rs = parseSgvEntries(items)
+        val rs = parseSgvEntries(items, nowMs = BASE + 300_000)
         assertEquals(2, rs.size)
         assertEquals(180.0, rs[0].mgdl, 1e-9)
         assertEquals(180.0 / 18.0182, rs[0].mmol, 1e-6)
         assertEquals("Flat", rs[0].trend)
         assertEquals("xdrip_sgv", rs[0].source)
         assertEquals(BASE + 300_000, rs[1].tsMs)
+    }
+
+    @Test
+    fun `an sgv value outside the CGM range is skipped, not the whole backfill`() {
+        fun at(sgv: Any) = parseSgvEntries(listOf(mapOf("sgv" to sgv, "date" to BASE)), BASE)
+        assertEquals(1, at(20).size)
+        assertEquals(1, at(600).size)
+        assertEquals(0, at(19.9).size)
+        assertEquals(0, at(600.1).size)
+        assertEquals(0, at(-100).size)
+        assertEquals(0, at(Double.NaN).size)
+        assertEquals(0, at(Double.POSITIVE_INFINITY).size)
+        // One forged row in a real backfill costs that row only.
+        val mixed = parseSgvEntries(
+            listOf(
+                mapOf("sgv" to 120, "date" to BASE - 600_000),
+                mapOf("sgv" to 5000, "date" to BASE - 300_000),
+                mapOf("sgv" to 118, "date" to BASE),
+            ),
+            BASE,
+        )
+        assertEquals(listOf(BASE - 600_000, BASE), mixed.map { it.tsMs })
+    }
+
+    @Test
+    fun `sgv backfill accepts two weeks of history but nothing from the future`() {
+        fun at(ts: Long) = parseSgvEntries(listOf(mapOf("sgv" to 120, "date" to ts)), BASE)
+        // The whole backfill depth is legitimate — the broadcast's 20-minute
+        // window must NOT apply here, or the once-per-install pull is refused.
+        assertEquals(1, at(BASE - 7L * 24 * 3_600_000).size)
+        assertEquals(1, at(BASE - BG_BACKFILL_MAX_AGE_MS).size)
+        assertEquals(0, at(BASE - BG_BACKFILL_MAX_AGE_MS - 1).size)
+        // The future is bounded exactly as tightly as for the broadcast.
+        assertEquals(1, at(BASE + BG_BROADCAST_MAX_AHEAD_MS).size)
+        assertEquals(0, at(BASE + BG_BROADCAST_MAX_AHEAD_MS + 1).size)
+        assertEquals(0, at(BASE + 365L * 24 * 3_600_000).size)
+        assertEquals(0, at(0L).size)
+        assertEquals(0, at(-BASE).size)
     }
 }
 

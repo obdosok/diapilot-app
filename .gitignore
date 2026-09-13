@@ -29,3 +29,10 @@ local/
 .env
 .env.*
 *.csv
+
+# Release signing (audit S8). The keystore and its passwords are read from
+# DIAPILOT_KEYSTORE_* environment variables or from keystore.properties at
+# the repo root (see keystore.properties.example); neither may be committed.
+keystore.properties
+*.jks
+*.keystore

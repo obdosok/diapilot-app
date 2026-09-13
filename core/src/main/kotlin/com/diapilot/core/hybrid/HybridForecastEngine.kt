@@ -135,6 +135,21 @@ class HybridForecastEngine(
         tsMs: Long,
     ): Double? = history.lastOrNull { it.tsMs <= tsMs }?.mmol
 
+    /**
+     * Cumulative insulin action at [ageMin] minutes after a dose of [units].
+     *
+     * TWO CONSTRUCTIONS, AND ONLY ONE OF THEM READS THE DOSE. With
+     * `actionCdfKnots` present — a measured curve (`PersonalInsulinCurveV1`,
+     * `InsulinCurveRuntime`), a hand-entered one (`ManualInsulinRuntime`) or a
+     * fitted one (`PhysioAutoFitV1`) — the curve is interpolated as stored and
+     * [units] is never consulted: a 1 U and a 10 U dose act over the same
+     * duration. The `tailWeightPerUnit` / `tailReferenceUnits` dose dependence
+     * that the audit lists as sound lives ONLY in the parametric fallback
+     * below, which runs when the model carries no knots. This is a recorded
+     * limitation, not a decision (audit M10); it is pinned by
+     * `InsulinKnotsDoseIndependenceTest` so that a change is deliberate and
+     * ships with a bench, and it is stated on the field in `HybridDomain.kt`.
+     */
     fun insulinCdf(ageMin: Double, units: Double = 1.0): Double {
         val p = model.insulin
         if (p.actionCdfKnots.isNotEmpty()) {

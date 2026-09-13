@@ -49,9 +49,13 @@
          DECLARED here or Health Connect never offers the toggle. -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
 
-    <!-- Android 11+ package visibility: we receive broadcasts from xDrip. -->
+    <!-- Android 11+ package visibility: we receive broadcasts from xDrip and
+         from OOPAlgorithm2, and refuse them when the sender is not installed
+         (collect/PackagePresence.kt) — a package the app cannot see reads as
+         "not installed", so both ids must be listed here. -->
     <queries>
         <package android:name="com.eveningoutpost.dexdrip" />
+        <package android:name="com.hg4.oopalgorithm.oopalgorithm2" />
     </queries>
 
     <!-- No system backup or device transfer: the preferences hold credentials

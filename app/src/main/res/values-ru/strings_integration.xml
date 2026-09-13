@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ask_claude_error">Ошибка: %1$s</string>
+    <string name="ask_claude_empty_response">Пустой ответ (stop_reason: %1$s)</string>
 
     <string name="stream_stall_notifier_reason_stopped">Поток с сенсора остановился</string>
     <string name="stream_stall_notifier_reason_login_rejected">BLE-логин отвергнут на всех соседних индексах</string>

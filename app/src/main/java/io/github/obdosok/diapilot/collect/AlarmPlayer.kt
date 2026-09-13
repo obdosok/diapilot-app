@@ -98,7 +98,11 @@ object AlarmPlayer {
                 try {
                     if (mp.isPlaying) mp.stop()
                     mp.release()
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // The alarm already rang; a player that refuses to stop
+                    // is a leak, not a missed alert — say so, do not rethrow.
+                    Log.w(TAG, "alarm stop/release failed: ${e.javaClass.simpleName}")
+                }
             }, seconds * 1000L)
         } catch (e: Exception) {
             Log.w(TAG, "alarm sound failed: ${e.message}")

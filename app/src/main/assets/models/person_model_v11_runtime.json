@@ -50,7 +50,7 @@
   },
   "joint": {
     "coefficients": {
-      "intercept": 0.09,
+      "intercept": 0.0,
       "sin24": 0.0,
       "cos24": 0.0,
       "sin12": 0.0,

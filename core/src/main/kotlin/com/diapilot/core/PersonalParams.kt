@@ -19,6 +19,8 @@
  */
 package com.diapilot.core
 
+import com.diapilot.core.collector.MGDL_PER_MMOL
+
 data class PersonalParams(
     // ---- predictive hypo alert (shipping gate: its own backtest) ----
     /** [n=1] How far ahead the alert looks for a predicted crossing. */
@@ -132,7 +134,7 @@ fun trendName(
     deltaMmol: Double?,
     p: PersonalParams = PersonalParams.DEFAULT,
 ): String {
-    val d = (deltaMmol ?: return "Flat") * 18.016
+    val d = (deltaMmol ?: return "Flat") * MGDL_PER_MMOL
     return when {
         d >= p.trendDoubleMgdl -> "DoubleUp"
         d >= p.trendSingleMgdl -> "SingleUp"

@@ -1,5 +1,6 @@
 package io.github.obdosok.diapilot.nfc
 
+import com.diapilot.core.analysis.validateCommandValues
 import com.diapilot.core.collector.CollectorStore
 import com.diapilot.core.collector.InsulinEvent
 import com.diapilot.core.pen.InsulinDose
@@ -13,6 +14,14 @@ import io.github.obdosok.diapilot.diag.DiagLog
  *     treatments sync (same units within ±3 min);
  *  3. priming — a small dose immediately followed by a bigger one is the
  *     air shot, not insulin in the body.
+ *
+ * And ONE FUSE, the same one every other insulin input passes
+ * ([validateCommandValues], `bolus`): the pen's log is parsed from an NFC
+ * frame, and a dose above the personal ceiling reaches IOB, the forecast and
+ * the hypo alert exactly as a mistyped one would. A refused dose is counted in
+ * [Result.refused] so the scan's toast can say so — silently dropping a shot
+ * the user actually took is the worse outcome — and it is NOT marked seen: a
+ * later scan reports it again rather than forgetting it forever.
  */
 object PenDoseSaver {
 
@@ -25,6 +34,8 @@ object PenDoseSaver {
         val newDoses: Int,
         val priming: Int,
         val duplicates: Int,
+        /** Doses the fuse refused — reported to the user, never written. */
+        val refused: Int,
         val serial: String?,
     )
 
@@ -33,11 +44,21 @@ object PenDoseSaver {
         var new = 0
         var priming = 0
         var duplicates = 0
+        var refused = 0
 
         for (dose in valid) {
             val uuid = "${scan.serial}:${dose.hash}"
             if (store.penDoseSeen(uuid)) {
                 duplicates++
+                continue
+            }
+            // Before the ledger: a refused dose stays unseen, so it is
+            // reported on the next scan too instead of vanishing.
+            val block = validateCommandValues("bolus", units = dose.units)
+            if (block != null) {
+                refused++
+                // The reason's CLASS only: the dose is medical payload.
+                DiagLog.w(TAG, "dose guard refused a pen dose: ${block.javaClass.simpleName}")
                 continue
             }
             store.markPenDose(uuid, dose.absoluteTime)
@@ -61,8 +82,8 @@ object PenDoseSaver {
             )
             new++
         }
-        DiagLog.i(TAG, "saved: new=$new priming=$priming dup=$duplicates of ${valid.size} valid")
-        return Result(new, priming, duplicates, scan.serial)
+        DiagLog.i(TAG, "saved: new=$new priming=$priming dup=$duplicates refused=$refused of ${valid.size} valid")
+        return Result(new, priming, duplicates, refused, scan.serial)
     }
 
     private fun isPriming(dose: InsulinDose, all: List<InsulinDose>): Boolean =

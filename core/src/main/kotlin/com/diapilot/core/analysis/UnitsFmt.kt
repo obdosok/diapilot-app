@@ -9,7 +9,10 @@
  */
 package com.diapilot.core.analysis
 
-const val MGDL_PER_MMOL_F = 18.0182
+/** The one conversion factor, `collector.MGDL_PER_MMOL`, under the name the
+ *  presentation code has always imported. Kept as an alias rather than a second
+ *  literal so the two can never drift. */
+const val MGDL_PER_MMOL_F = com.diapilot.core.collector.MGDL_PER_MMOL
 
 /**
  * The decimal separator of every formatted number, set by the app to follow

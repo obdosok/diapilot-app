@@ -71,9 +71,11 @@ import io.github.obdosok.diapilot.collect.MealNotifier
 import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 import io.github.obdosok.diapilot.data.AskClaude
 import io.github.obdosok.diapilot.data.BackupRestore
+import io.github.obdosok.diapilot.data.Onboarding
+import io.github.obdosok.diapilot.ui.OnboardingScreen
 import io.github.obdosok.diapilot.data.ForecastLedger
 import io.github.obdosok.diapilot.data.Forecaster
-import io.github.obdosok.diapilot.data.HYBRID_V11_SHADOW_ALGO_VERSION
+import io.github.obdosok.diapilot.data.PHYSIO_FORECAST_ALGO_VERSION
 import io.github.obdosok.diapilot.data.HealthConnectSync
 import io.github.obdosok.diapilot.data.Libre2State
 import io.github.obdosok.diapilot.data.MeterCalCache
@@ -191,6 +193,12 @@ class MainActivity : AppCompatActivity() {
                     return@Thread
                 }
                 val serial = com.diapilot.core.libre.decodeLibreSerial(raw.uid)
+                if (serial == null) {
+                    // The scanner already refuses a wrong-sized id; this is
+                    // the same answer for the same reason, one layer up.
+                    toast(getString(R.string.main_activity_libre_scan_failed))
+                    return@Thread
+                }
                 val decoded = LibreOop2Bridge.decode(this, raw, serial, now)
                 if (decoded == null) {
                     toast(getString(R.string.main_activity_libre_oop2_no_response, serial))
@@ -371,6 +379,14 @@ class MainActivity : AppCompatActivity() {
                     val suffix = if (!result.completed) {
                         " · " + getString(R.string.main_activity_pen_scan_incomplete)
                     } else ""
+                    // A dose the fuse refused is said out loud: the user took
+                    // it, and a toast that only counts what was stored would
+                    // read as if the pen had never logged it.
+                    val refused = if (saved.refused > 0) {
+                        resources.getQuantityString(
+                            R.plurals.main_activity_pen_refused, saved.refused, saved.refused,
+                        )
+                    } else null
                     val serial = saved.serial ?: ""
                     when {
                         saved.newDoses > 0 -> {
@@ -382,8 +398,10 @@ class MainActivity : AppCompatActivity() {
                                     R.plurals.main_activity_pen_primes, saved.priming, saved.priming,
                                 )
                             } else ""
-                            getString(R.string.main_activity_pen_result, serial, doses + priming) + suffix
+                            val refusedPart = refused?.let { ", $it" } ?: ""
+                            getString(R.string.main_activity_pen_result, serial, doses + priming + refusedPart) + suffix
                         }
+                        refused != null -> getString(R.string.main_activity_pen_result, serial, refused) + suffix
                         else -> getString(R.string.main_activity_pen_no_new_doses, serial) + suffix
                     }
                 }
@@ -442,6 +460,10 @@ class MainActivity : AppCompatActivity() {
             Thread {
                 runCatching {
                     val store = graph.store
+                    // Nor does an install whose first-run pages are still owed:
+                    // there is no forecast model to report on, only the example
+                    // person, and `Forecaster` refuses the pass anyway.
+                    if (!Onboarding.forecastPermitted(this, store)) return@runCatching
                     val artifact = PhysioRuntime.artifact(
                         store, System.currentTimeMillis(),
                     ) ?: return@runCatching
@@ -485,7 +507,7 @@ class MainActivity : AppCompatActivity() {
                             } else {
                                 val tag = c.getString(0)
                                 val ageMin = (System.currentTimeMillis() - c.getLong(1)) / 60_000
-                                val live = HYBRID_V11_SHADOW_ALGO_VERSION
+                                val live = PHYSIO_FORECAST_ALGO_VERSION
                                 android.util.Log.i(
                                     "PhysioTuning",
                                     "ledger: last screen run $tag, anchor $ageMin min ago" +
@@ -655,6 +677,42 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     // nav slot, which is also the one thing the nav bar has no room for.
     var showDataSources by rememberSaveable { mutableStateOf(false) }
     var state by remember { mutableStateOf(UiState()) }
+
+    // FIRST RUN COMES BEFORE THE APP, not over it. Until the first-run pages
+    // are completed nothing below is composed — no refresh loop, no model
+    // build, no chart — because every one of those would run the bundled
+    // example person and draw its line for the seconds the pages take to
+    // appear. The gate is read off the main thread (it runs a query for
+    // installs that pre-date the flow, see `Onboarding.adoptExistingInstall`),
+    // and the first frame is blank rather than the app: a screen the user has
+    // not been allowed to use yet must not flash past.
+    //
+    // `remember`, not `rememberSaveable`: a language change on the second page
+    // recreates the activity, and re-reading the gate from the preferences is
+    // exactly right there — the pages keep their own position.
+    var onboardingGate by remember { mutableStateOf<Onboarding.Gate?>(null) }
+    LaunchedEffect(Unit) {
+        if (onboardingGate == null) {
+            onboardingGate = withContext(Dispatchers.IO) { Onboarding.gate(context, graph.store) }
+        }
+    }
+    val gate = onboardingGate
+    if (gate == null) {
+        Column(Modifier.fillMaxSize()) {}
+        return
+    }
+    if (gate != Onboarding.Gate.NONE) {
+        OnboardingScreen(
+            gate = gate,
+            onDone = {
+                // The refresh loop below composes fresh once this flips, and
+                // its first pass already runs on the numbers just entered.
+                onboardingGate = Onboarding.Gate.NONE
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
 
     // Refresh while the app is open: broadcasts land every ~5 min, the
     // one-shot poll within seconds of launch.
@@ -1062,7 +1120,29 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
         }
     }
 
+    /**
+     * The dose fuse, AT THE WRITER. The composer shows the same reason inline
+     * before it ever calls here, but the guard that matters is the one no UI
+     * path can step around: a hand-typed dose reaches IOB, the forecast and
+     * the hypo alert exactly as a socket-fed one does, and it passes the same
+     * [com.diapilot.core.analysis.validateCommandValues] the LLM and watch
+     * paths pass. False when the dose may be written; otherwise the refusal
+     * has been shown and the caller returns. Called from a click, so the
+     * toast goes straight out on the UI thread.
+     */
+    fun refuseDose(action: String, units: Double): Boolean {
+        val block = com.diapilot.core.analysis.validateCommandValues(action, units = units)
+            ?: return false
+        android.widget.Toast.makeText(
+            context,
+            io.github.obdosok.diapilot.i18n.CommandText.block(context, block),
+            android.widget.Toast.LENGTH_LONG,
+        ).show()
+        return true
+    }
+
     fun addBasal(tsMs: Long, units: Double) {
+        if (refuseDose("basal", units)) return
         scope.launch(Dispatchers.IO) {
             val store = graph.store
             timedWrite("basal") { store.upsertBasal(tsMs, units) }
@@ -1071,6 +1151,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
     }
 
     fun addManualBolus(tsMs: Long, units: Double) {
+        if (refuseDose("bolus", units)) return
         scope.launch(Dispatchers.IO) {
             val store = graph.store
             timedWrite("bolus") {
@@ -1604,6 +1685,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
                     onConnectHc = onConnectHc,
                     onOpenLabel = { tab = Tab.LABEL.ordinal },
                     onOpenDataSources = { showDataSources = true },
+                    onSetUpModel = { onboardingGate = Onboarding.Gate.FULL },
                     onAddBasal = ::addBasal,
                     onTagBolus = ::tagBolus,
                     onEditBolusUnits = ::editBolusUnits,
@@ -1771,6 +1853,7 @@ private fun MainApp(onConnectHc: () -> Unit = {}) {
             Tab.SETTINGS -> SettingsScreen(
                 modifier = mod,
                 onOpenDataSources = { showDataSources = true },
+                onSetUpModel = { onboardingGate = Onboarding.Gate.FULL },
                 // The auto-fit lists the episodes it used; each is tappable and
                 // lands on the chart at that moment. Same path History already
                 // takes, and for the same reason — an episode months back is

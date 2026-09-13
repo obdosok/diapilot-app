@@ -3,6 +3,7 @@ package io.github.obdosok.diapilot.nfc
 import android.nfc.Tag
 import android.nfc.tech.NfcV
 import com.diapilot.core.libre.FRAM_SIZE
+import com.diapilot.core.libre.LIBRE_UID_BYTES
 import io.github.obdosok.diapilot.diag.DiagLog
 
 /**
@@ -24,11 +25,25 @@ class LibreNfcScanner {
         val fram: ByteArray,       // 344 bytes, encrypted for Libre 2
     )
 
+    /**
+     * The tag's id, or null with a log line when it is not an ISO-15693 UID.
+     * Reader mode is enabled for NFC-A and NFC-B too, and the manufacturer
+     * byte is read at index 6: a 4-byte id threw out of the scan thread.
+     */
+    private fun libreUid(tag: Tag): ByteArray? {
+        val uid = tag.id
+        if (uid == null || uid.size != LIBRE_UID_BYTES) {
+            DiagLog.w(TAG, "tag id is ${uid?.size ?: 0} bytes, not a Libre UID — ignored")
+            return null
+        }
+        return uid
+    }
+
     fun scan(tag: Tag): RawScan? {
+        val uid = libreUid(tag) ?: return null
         val nfcv = NfcV.get(tag) ?: return null
         return try {
             nfcv.connect()
-            val uid = tag.id
             val mfr = uid[6]
 
             // patchInfo: custom command 0xA1; first reply byte is a status
@@ -52,10 +67,11 @@ class LibreNfcScanner {
      * reverse the remaining six). Null on failure.
      */
     fun enableStreaming(tag: Tag, nfcUnlock: ByteArray): String? {
+        val uid = libreUid(tag) ?: return null
         val nfcv = NfcV.get(tag) ?: return null
         return try {
             nfcv.connect()
-            val mfr = tag.id[6]
+            val mfr = uid[6]
             val cmd = byteArrayOf(0x02, 0xA1.toByte(), mfr) + nfcUnlock
             val res = nfcv.transceive(cmd)
             if (res.size != 7) {

@@ -138,6 +138,13 @@ interface CollectorStore {
      */
     fun lastSensorReading(): Reading? = lastReading()
 
+    /**
+     * Store a dose at its timestamp. The timestamp is the identity, and the
+     * slot belongs to the source that wrote it first: a repeat from the same
+     * source revises it, a write from another source at an occupied slot is
+     * dropped, and units the user edited by hand are kept through both. The
+     * SQLite implementation states the reasoning.
+     */
     fun upsertInsulin(event: InsulinEvent)
 
     /** Remove an insulin event (deleted at the source, e.g. in xDrip). */

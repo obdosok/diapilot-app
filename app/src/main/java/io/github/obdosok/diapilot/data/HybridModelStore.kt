@@ -70,7 +70,7 @@ object HybridModelStore {
         // let a settings change take effect mid-flight so two passes minutes
         // apart could run different models under the same artifact id. Here it
         // happens once, and `retune` re-enters this path explicitly.
-        HybridShadowRegistry.install(
+        PhysioForecastRegistry.install(
             PhysioTuning.apply(context, artifact.model),
             selected.activeSha256,
         )
@@ -95,7 +95,7 @@ object HybridModelStore {
         }
         val previous = current?.activeSha256
         val selected = installBytes(context, bytes, source, previous)
-        HybridShadowRegistry.install(
+        PhysioForecastRegistry.install(
             PhysioTuning.apply(context, incoming.model),
             selected.activeSha256,
         )
@@ -119,7 +119,7 @@ object HybridModelStore {
             installedAt = Instant.now().toString(),
         )
         writeState(context, status)
-        HybridShadowRegistry.install(
+        PhysioForecastRegistry.install(
             PhysioTuning.apply(context, target.model),
             status.activeSha256,
         )

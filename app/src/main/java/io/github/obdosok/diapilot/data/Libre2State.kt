@@ -2,18 +2,32 @@ package io.github.obdosok.diapilot.data
 
 import android.content.Context
 import android.util.Base64
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
-import io.github.obdosok.diapilot.collect.TreatmentsPollWorker
 
 /**
  * Persisted Libre 2 BLE streaming context — the DiaPilot analog of xDrip's
  * Libre2SensorData: patch identity, the advertised MAC (returned by the
  * NFC enable-streaming command), the connection counter (the crypto nonce —
  * one unlock buffer per connection) and the OOP2-precomputed unlock array.
+ *
+ * STORED THROUGH [SecretStore], NOT IN PLAIN PREFERENCES. The unlock array is
+ * what lets a BLE client talk to this sensor, and the UID and patch info are
+ * the sensor's identity; SECURITY.md says secrets stay in the keystore, and
+ * these were the exception. The whole state is one blob under
+ * [SecretStore.Secret.LIBRE2_BLE_STATE]: the fields are only meaningful
+ * together, and one encrypted entry cannot be left half-migrated. The
+ * plaintext entry an earlier build wrote is moved on the first read and
+ * removed in the same edit — the store's ordinary migration.
+ *
+ * [save] cannot fail loudly without changing the callers, so when the
+ * keystore is unavailable it logs the fact and stores nothing: a new secret
+ * is never written in plaintext (the store's rule), and the cost is one NFC
+ * re-scan after the next restart, not a credential on disk.
  */
 object Libre2State {
-    private const val KEY = "libre2_ble_state"
+    private const val TAG = "Libre2State"
 
     data class State(
         val uid: ByteArray,
@@ -26,10 +40,7 @@ object Libre2State {
         val unlockStartIndex: Int,
     )
 
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(
-            TreatmentsPollWorker.PREFS, Context.MODE_PRIVATE,
-        )
+    private fun secrets(context: Context) = Secrets.store(context)
 
     fun save(context: Context, s: State) {
         val o = JSONObject()
@@ -46,11 +57,13 @@ object Libre2State {
                     s.unlockArray.forEach { put(Base64.encodeToString(it, Base64.NO_WRAP)) }
                 },
             )
-        prefs(context).edit().putString(KEY, o.toString()).apply()
+        if (!secrets(context).set(SecretStore.Secret.LIBRE2_BLE_STATE, o.toString())) {
+            Log.w(TAG, "streaming state not saved: secure storage unavailable")
+        }
     }
 
     fun load(context: Context): State? = try {
-        val raw = prefs(context).getString(KEY, null) ?: return null
+        val raw = secrets(context).get(SecretStore.Secret.LIBRE2_BLE_STATE) ?: return null
         val o = JSONObject(raw)
         val arr = o.getJSONArray("unlockArray")
         State(
@@ -69,7 +82,7 @@ object Libre2State {
         null
     }
 
-
-
-    fun clear(context: Context) = prefs(context).edit().remove(KEY).apply()
+    fun clear(context: Context) {
+        secrets(context).set(SecretStore.Secret.LIBRE2_BLE_STATE, null)
+    }
 }

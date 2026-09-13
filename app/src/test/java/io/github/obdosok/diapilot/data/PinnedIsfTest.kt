@@ -33,7 +33,7 @@ class PinnedIsfTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "0123456789abcdef0123456789abcdef")
+        PhysioForecastRegistry.install(model, "0123456789abcdef0123456789abcdef")
     }
 
     @Test

@@ -102,9 +102,20 @@ class LibreFramTest {
             0xd6.toByte(), 0xf1.toByte(), 0x0f, 0x01, 0x00, 0xa4.toByte(), 0x07, 0xe0.toByte(),
         )
         val serial = decodeLibreSerial(uid)
-        assertEquals(11, serial.length)
+        org.junit.Assert.assertNotNull(serial)
+        assertEquals(11, serial!!.length)
         assertTrue(serial.startsWith("0"))
         // Deterministic: same UID, same serial.
         assertEquals(serial, decodeLibreSerial(uid.copyOf()))
+    }
+
+    @Test
+    fun serialDecodeRefusesAnIdThatIsNotEightBytes() {
+        // Reader mode dispatches NFC-A/B tags too: 4-, 7- and 10-byte ids,
+        // none of them a Libre. Used to throw out of the scan thread.
+        for (n in listOf(0, 1, 4, 7, 9, 10)) {
+            org.junit.Assert.assertNull("$n bytes", decodeLibreSerial(ByteArray(n) { 0x5A }))
+        }
+        org.junit.Assert.assertNotNull(decodeLibreSerial(ByteArray(LIBRE_UID_BYTES) { 0x5A }))
     }
 }

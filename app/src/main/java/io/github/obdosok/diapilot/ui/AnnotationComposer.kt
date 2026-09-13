@@ -89,11 +89,17 @@ private val STARTER_TAGS = listOf(
  *  come from `R.array.annotation_composer_offset_labels` (same order). */
 private val OFFSET_MS = listOf(0L, 30L * 60_000, 60L * 60_000, 120L * 60_000, 240L * 60_000)
 
+// PARSER DATA, NOT UI TEXT: the words a comma-separated meal note can open a
+// clause with in either input language. The English half was missing while the
+// UI was already English (audit P1 fixed the concept aliases the same way), so
+// "porridge, and tea" split into a dish called "and tea".
 private val COMMA_CONJUNCTIONS = setOf(
     "и", "а", "но", "или", "с", "со", "на", "от", "до", "без",
+    "and", "or", "but", "with", "without", "plus",
     // Quantifier prose: "each 75g", "both weigh 12 grams", "150g total"
     // describe portions, they are not dishes.
     "каждый", "каждая", "каждое", "оба", "обе", "всего", "примерно", "около", "по",
+    "each", "every", "both", "total", "about", "approx", "roughly", "per",
 )
 
 /** A comma-segment that looks like a DISH name, not a clause: short, few
@@ -105,7 +111,9 @@ private fun looksLikeDish(seg: String): Boolean {
     val words = name.split(Regex("\\s+"))
     if (words.size > 3) return false
     if (name.first().isDigit()) return false
-    if (Regex("""\d+\s*(г|гр|грамм)""").containsMatchIn(name.lowercase())) return false
+    // A lookahead rather than `\b`: since JDK 19 `\b` follows ASCII-only `\w`,
+    // so a boundary after a Cyrillic unit would never be found on the JVM tests.
+    if (Regex("""\d+\s*(г|гр|грамм|g|gr|gram|grams)(?![a-zа-яё])""").containsMatchIn(name.lowercase())) return false
     return words.first().lowercase() !in COMMA_CONJUNCTIONS
 }
 
@@ -2014,6 +2022,8 @@ fun AnnotationComposer(
                     3 -> {
                         var insKind by remember { mutableStateOf(0) }  // 0 bolus, 1 basal
                         var insUnits by remember { mutableStateOf("") }
+                        // Why the last ✓ wrote nothing, in the guard's own words.
+                        var insBlock by remember { mutableStateOf<String?>(null) }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2039,14 +2049,33 @@ fun AnnotationComposer(
                                 ),
                             )
                             androidx.compose.material3.FilledTonalIconButton(onClick = {
-                                insUnits.replace(',', '.').toDoubleOrNull()
-                                    ?.takeIf { it > 0 && it < 100 }?.let { u ->
-                                        val ts = entryTs()
-                                        if (insKind == 0) onAddBolus(ts, u) else onAddBasal(ts, u)
-                                        insUnits = ""
-                                        resetAll()
-                                    }
+                                if (insUnits.isBlank()) return@FilledTonalIconButton
+                                // THE SAME GUARD AS THE COMMAND PATH, shown the
+                                // same way. `it > 0 && it < 100` was not a
+                                // fuse: it let a 40 U bolus through in silence,
+                                // and refused a typo in silence too.
+                                val u = insUnits.replace(',', '.').toDoubleOrNull()
+                                val block = com.diapilot.core.analysis.validateCommandValues(
+                                    if (insKind == 0) "bolus" else "basal",
+                                    units = u ?: Double.NaN,
+                                )
+                                if (block != null) {
+                                    insBlock = CommandText.block(context, block)
+                                } else {
+                                    insBlock = null
+                                    val ts = entryTs()
+                                    if (insKind == 0) onAddBolus(ts, u!!) else onAddBasal(ts, u!!)
+                                    insUnits = ""
+                                    resetAll()
+                                }
                             }) { Text("✓") }
+                        }
+                        insBlock?.let { reason ->
+                            Text(
+                                reason,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
                         Text(
                             stringResource(R.string.annotation_composer_manual_entry_hint),

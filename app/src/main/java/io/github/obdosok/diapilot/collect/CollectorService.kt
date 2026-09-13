@@ -48,6 +48,8 @@ class CollectorService : Service() {
 
     private var receiver: XdripBgReceiver? = null
     private var oop2Receiver: android.content.BroadcastReceiver? = null
+    /** The "dropped, OOP2 absent" line has been written this process. */
+    @Volatile private var oop2AbsentLogged = false
     private var screenReceiver: android.content.BroadcastReceiver? = null
     private var watchServer: WatchServer? = null
     private var libreBle: LibreBleClient? = null
@@ -123,6 +125,21 @@ class CollectorService : Service() {
                 if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) check(Looper.myLooper()!=Looper.getMainLooper()) {
                     "OOP2 minute pipeline must not run on the main thread"
                 }
+                // NO OOP2, NO MINUTE STREAM. The receiver is exported because
+                // the sender is another app, and a package check is all it
+                // can do — but it can do that: with OOPAlgorithm2 absent,
+                // every intent on these actions comes from something else,
+                // and the newest minute value anchors the forecast whenever
+                // it is fresher than the main reading (`forecastAnchor`).
+                // Once per process on `Log`, not `DiagLog`: this fires per
+                // forged minute, and the ring must keep its room.
+                if (!Oop2App.installed(context)) {
+                    if (!oop2AbsentLogged) {
+                        oop2AbsentLogged = true
+                        DiagLog.w(OOP2_TAG, "OOP2 broadcast received while OOPAlgorithm2 is not installed — dropped")
+                    }
+                    return
+                }
                 val json = intent.getStringExtra("json") ?: return
                 try {
                     val obj = org.json.JSONObject(json)
@@ -156,7 +173,7 @@ class CollectorService : Service() {
                     // calls it. What is left here is one more caller of it,
                     // and the minute cadence is simply the fastest of them.
                     val readings = if (Edition.sensorDirect) {
-                        com.diapilot.core.collector.parseOop2Trend(fields)
+                        com.diapilot.core.collector.parseOop2Trend(fields, System.currentTimeMillis())
                     } else emptyList()
                     if (readings.isNotEmpty() || !Edition.sensorDirect) {
                         val store = Stores.get(this@CollectorService)
@@ -381,6 +398,8 @@ class CollectorService : Service() {
     private fun ensureChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         // Retire the old LOW channel so its locked importance doesn't win.
+        // Silence is correct here: the channel is absent on every install
+        // that never had the LOW one, and "nothing to delete" is not an event.
         try { nm.deleteNotificationChannel("collector") } catch (_: Exception) {}
         val text = localized()
         nm.createNotificationChannel(

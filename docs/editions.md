@@ -83,6 +83,12 @@ or `Edition.sensorDirect`.
 
 ### `Edition.prospective`
 
+Since the September second read the prospective surfaces read
+`ModelCalibration.forecastAllowed(context, store)`, which is
+`Edition.prospective && Onboarding.forecastPermitted(...)`: the store edition
+never forecasts, and the OSS edition forecasts only once the first-run flow has
+been finished (audit M2). Every row below is gated by that one predicate.
+
 | capability | gate |
 |---|---|
 | 3 h forecast line, uncertainty band | `MainState.kt` — `forecastResult` is not computed, so `prediction` is empty and the chart's line and band are not drawn |

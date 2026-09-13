@@ -28,6 +28,9 @@ object Forecaster {
     private val PROCESS_START_MS = android.os.SystemClock.elapsedRealtime()
     private const val LEARN_QUIET_AFTER_START_MS = 30_000L
 
+    /** The ledger reason written while the first-run pages are still owed. */
+    const val UNCALIBRATED_REFUSAL = "model uncalibrated: first-run setup not completed"
+
     /**
      * Forecast from [anchorTsMs]/[anchorMmol] with everything knowable now.
      * [minutePoints] already calibrated; empty disables momentum.
@@ -54,6 +57,39 @@ object Forecaster {
          *  the consumer's job — HypoAlertNotifier already does this and falls
          *  back to the raw reading. */
     ): ForecastResult? {
+        // NO PASS ON AN UNCALIBRATED INSTALL — the "uncalibrated mode" of audit
+        // M2, and it lives HERE because this is the one function every consumer
+        // shares: the screen, the watch, the widget, the alert and the
+        // companion push all lose the line in the same place, and a new
+        // consumer added tomorrow inherits the gate by calling this at all.
+        //
+        // Until the first-run pages have been completed the only person model
+        // on the phone is the bundled synthetic one, and a line drawn from it
+        // looks exactly like knowledge. The reading-based alerts are not
+        // touched: `HypoAlertNotifier` already fires the observed low, the
+        // sustained low and the sustained high from readings alone when this
+        // returns null (`forecastOk` false), and `RapidFallNotifier` never read
+        // a forecast. The edition is deliberately NOT part of this test — see
+        // `Onboarding.forecastPermitted`.
+        //
+        // Recorded as a refusal like every other absent run (class A-02): a
+        // hole in `forecast_runs` reads as "the app was not working", and a
+        // fresh install that is collecting perfectly well must not look that
+        // way in its own diagnostics.
+        val appContext = (store as? SqliteCollectorStore)?.appContext
+        if (appContext != null && !Onboarding.forecastPermitted(appContext, store)) {
+            if (recordAs != null) try {
+                (store as? SqliteCollectorStore)?.writableDatabase?.let { db ->
+                    ForecastLedger.recordRefusal(
+                        db, anchorTsMs, anchorMmol, nowMs, recordAs,
+                        reason = UNCALIBRATED_REFUSAL,
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("Forecaster", "refusal record failed: ${e.message}")
+            }
+            return null
+        }
         val cal = java.util.Calendar.getInstance().apply { timeInMillis = anchorTsMs }
         val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
         // THE LEGACY FOOD LAYER IS NO LONGER COMPUTED HERE.
@@ -63,7 +99,7 @@ object Forecaster {
         // was removed, fed exactly one thing: the dedup hash in the ledger. A
         // full model computation for the sake of a hash guarding a row about
         // ANOTHER model. The hash now comes from the run that actually
-        // happened (`HybridShadowRun.dedupHash`).
+        // happened (`PhysioForecastRun.dedupHash`).
         //
         // THREE SETTINGS FELL AWAY WITH IT — `notePreferredFood`,
         // `noteAnchoredFood`, `activityModelV2`. They only reached this far,
@@ -85,7 +121,7 @@ object Forecaster {
         // A second, full forecast used to be computed here on a different
         // model — to hand the physio arm four template fields and to serve
         // as a fallback arm. Both reasons are gone: the template reason,
-        // because physio assembles the result itself (see HybridShadow); the
+        // because physio assembles the result itself (see PhysioForecastBridge); the
         // fallback-arm reason, by the user's decision: a line from a
         // different model looks normal, while silence is noticeable.
         //
@@ -177,10 +213,26 @@ object Forecaster {
                 }
             }
         }
-        val physioArtifact = try { PhysioRuntime.artifact(store, nowMs) } catch (_: Exception) { null }
+        // NO LINE WITHOUT A WORD. docs/architecture.md §2 promises that a
+        // missing forecast logs an error rather than drawing a line from
+        // another model; this catch used to be `{ null }` — silent — so the
+        // screen went empty with nothing in the diagnostics bundle to say why.
+        // The exception class is enough to tell "the artifact build threw"
+        // from "there is no model"; its message could carry a value, so it
+        // stays on logcat only.
+        val physioArtifact = try {
+            PhysioRuntime.artifact(store, nowMs)
+        } catch (e: Exception) {
+            android.util.Log.e("Forecaster", "physio artifact unavailable — no forecast this pass", e)
+            io.github.obdosok.diapilot.diag.DiagLog.e(
+                "Forecaster",
+                "physio artifact unavailable (${e.javaClass.simpleName}) — no forecast this pass",
+            )
+            null
+        }
         val tPhysio0 = android.os.SystemClock.elapsedRealtime()
         val physioShadow = try {
-            if (physioArtifact != null) HybridShadow.forecast(
+            if (physioArtifact != null) PhysioForecastBridge.forecast(
                 store, model, anchorTsMs, anchorMmol, regime, sensorSuspect,
                 knowledgeTsMs = nowMs,
                 // ONE LINE FOR THE SCREEN AND FOR THE ALERT.
@@ -246,7 +298,7 @@ object Forecaster {
         // discipline-#7 acceptance test («arm A must reproduce the STORED
         // forecast_runs») had nothing to reproduce, and
         // `ForecastLedger.recentHybridAnomalies` — which selects
-        // `algo_version = HYBRID_V11_SHADOW_ALGO_VERSION AND consumer='main'`
+        // `algo_version = PHYSIO_FORECAST_ALGO_VERSION AND consumer='main'`
         // — was empty by construction.
         //
         // The tag comes off the run itself rather than from a constant chosen

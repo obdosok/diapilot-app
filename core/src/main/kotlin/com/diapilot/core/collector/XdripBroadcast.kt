@@ -10,6 +10,13 @@
  */
 package com.diapilot.core.collector
 
+/**
+ * THE conversion factor, mg/dL per mmol/L. One constant for the whole tree:
+ * three literals used to coexist (18.0182 here and in `WatchServer`, 18.016 in
+ * the trend arrow, 18.0 in the 1800 rule), which is three places for a displayed
+ * value to disagree with a stored one. `analysis.MGDL_PER_MMOL_F` is this same
+ * value under the name the presentation code imports.
+ */
 const val MGDL_PER_MMOL = 18.0182
 
 // Verified intent extras (BgEstimateBroadcaster).
@@ -67,6 +74,26 @@ const val BG_BROADCAST_MAX_AGE_MS = 20L * 60_000
 const val BG_BROADCAST_MAX_AHEAD_MS = 5L * 60_000
 
 /**
+ * How far back a BACKFILLED reading may reach. The web service is the history
+ * channel — the once-per-install pull asks for ~14 days, and the meal scan and
+ * the analytics windows are 14 days deep — so this bound is the depth of that
+ * history, not a freshness window: applying [BG_BROADCAST_MAX_AGE_MS] here
+ * would refuse the very backfill the poll exists for. Anything older than the
+ * deepest pull is not a late entry, and rewriting last month is what this
+ * refuses.
+ */
+const val BG_BACKFILL_MAX_AGE_MS = 14L * 24 * 3_600_000
+
+/**
+ * Is [tsMs] a timestamp a glucose channel may carry, given the receiver's
+ * clock? Shared by every parser so the future bound is one number: a value
+ * parked ahead of now stays the freshest reading — and the forecast anchor —
+ * until the clock catches up with it.
+ */
+fun bgTimestampAccepted(tsMs: Long, nowMs: Long, maxAgeMs: Long): Boolean =
+    tsMs > 0 && tsMs >= nowMs - maxAgeMs && tsMs <= nowMs + BG_BROADCAST_MAX_AHEAD_MS
+
+/**
  * Normalize xDrip BgEstimate intent extras into a [Reading].
  *
  * Bounded on BOTH axes, because the sender is not authenticated: the receiver
@@ -85,8 +112,7 @@ fun parseBgBroadcast(extras: Map<String, Any?>?, nowMs: Long): Reading? {
     val mgdl = extras[EXTRA_BG].asDoubleOrNull() ?: return null
     if (!mgdl.isFinite() || mgdl !in BG_BROADCAST_MGDL_RANGE) return null
     val tsMs = extras[EXTRA_TIME].asLongOrNull() ?: return null
-    if (tsMs <= 0) return null
-    if (tsMs < nowMs - BG_BROADCAST_MAX_AGE_MS || tsMs > nowMs + BG_BROADCAST_MAX_AHEAD_MS) return null
+    if (!bgTimestampAccepted(tsMs, nowMs, BG_BROADCAST_MAX_AGE_MS)) return null
     val trend = (extras[EXTRA_SLOPE_NAME] as? String)?.takeIf { it.isNotEmpty() }
     return Reading(tsMs = tsMs, mgdl = mgdl, mmol = mgdl / MGDL_PER_MMOL, trend = trend)
 }
@@ -152,16 +178,28 @@ private fun parseIsoMs(s: String): Long? {
  * the same minute slot spawns near-duplicate rows (sawtooth on the chart).
  *
  * Raw algorithm output — a different scale from xDrip's calibrated stream, so
- * it is stored separately and never fed into analytics.
+ * it is stored separately and never fed into analytics. It is NOT inert,
+ * though: `forecastAnchor` in the app prefers the newest minute reading over
+ * the 5-minute main reading whenever the minute one is fresher (through the
+ * minute→main calibration), so a forged minute value becomes the forecast
+ * anchor exactly the way a forged broadcast would.
+ *
+ * Bounded like the broadcast, therefore. The receiver is exported — the sender
+ * is another app, and a package check is all the receiver can do — so the
+ * payload's timestamp must sit inside `now - BG_BROADCAST_MAX_AGE_MS .. now +
+ * BG_BROADCAST_MAX_AHEAD_MS` (the minute stream is LIVE data; a trend buffer
+ * is 16 minutes deep and the window covers that) or the payload is dropped
+ * whole, and a value outside [BG_BROADCAST_MGDL_RANGE] is skipped per element,
+ * as a non-positive one always was. [nowMs] is a parameter: no clock here.
  */
-fun parseOop2Trend(fields: Map<String, Any?>?): List<Reading> {
+fun parseOop2Trend(fields: Map<String, Any?>?, nowMs: Long): List<Reading> {
     if (fields.isNullOrEmpty()) return emptyList()
     val ts = fields.entries.firstOrNull { it.key.endsWith("TIMESTAMP") }?.value.asLongOrNull()
         ?: return emptyList()
-    if (ts <= 0) return emptyList()
+    if (!bgTimestampAccepted(ts, nowMs, BG_BROADCAST_MAX_AGE_MS)) return emptyList()
     val trend = (fields["TrendBg"] as? List<*>)?.mapNotNull { it.asDoubleOrNull() } ?: return emptyList()
     return trend.mapIndexedNotNull { i, mgdl ->
-        if (mgdl <= 0) return@mapIndexedNotNull null
+        if (!mgdl.isFinite() || mgdl !in BG_BROADCAST_MGDL_RANGE) return@mapIndexedNotNull null
         val tsMs = (ts - i * 60_000L).let { Math.round(it / 60_000.0) * 60_000L }
         Reading(tsMs = tsMs, mgdl = mgdl, mmol = mgdl / MGDL_PER_MMOL, trend = null, source = "oop2_ble")
     }
@@ -171,14 +209,26 @@ fun parseOop2Trend(fields: Map<String, Any?>?): List<Reading> {
  * Parse xDrip web-service `/sgv.json` entries (Nightscout `entries` shape) into readings.
  * Second glucose channel: backfills gaps when broadcasts were missed (phone asleep,
  * app killed). Fields: `date` ms epoch, `sgv` mg/dL, `direction` trend.
+ *
+ * Bounded like the broadcast, with one difference. The port this is read from
+ * is a socket, not a trusted peer — with xDrip stopped any app holding
+ * `INTERNET` can bind it and answer — so a value outside
+ * [BG_BROADCAST_MGDL_RANGE] or a timestamp ahead of `now +
+ * BG_BROADCAST_MAX_AHEAD_MS` is skipped. The past bound is
+ * [BG_BACKFILL_MAX_AGE_MS], not the broadcast's twenty minutes, because this
+ * channel legitimately returns two weeks of history. Per entry, not whole:
+ * one bad row in a 4032-row backfill must not cost the other 4031.
+ *
+ * [nowMs] is a parameter, not a clock read: this module reads no clock, so the
+ * window is reproducible in a replay and in a test.
  */
-fun parseSgvEntries(items: List<Map<String, Any?>>?): List<Reading> {
+fun parseSgvEntries(items: List<Map<String, Any?>>?, nowMs: Long): List<Reading> {
     val out = mutableListOf<Reading>()
     for (it in items.orEmpty()) {
         val mgdl = it["sgv"].asDoubleOrNull() ?: continue
-        if (mgdl <= 0) continue
+        if (!mgdl.isFinite() || mgdl !in BG_BROADCAST_MGDL_RANGE) continue
         val tsMs = it["date"].asLongOrNull() ?: continue
-        if (tsMs <= 0) continue
+        if (!bgTimestampAccepted(tsMs, nowMs, BG_BACKFILL_MAX_AGE_MS)) continue
         val trend = (it["direction"] as? String)?.takeIf { s -> s.isNotEmpty() }
         out.add(Reading(tsMs = tsMs, mgdl = mgdl, mmol = mgdl / MGDL_PER_MMOL, trend = trend, source = "xdrip_sgv"))
     }

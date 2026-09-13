@@ -107,6 +107,68 @@ class WatchServerTest {
         assertTrue(r.status, r.status.startsWith("404"))
     }
 
+    // --- the parser: what it reads before any route is looked at ---
+
+    private fun head(raw: String) = server().readHead(java.io.StringReader(raw))
+
+    @Test fun `a well-formed request head is parsed with lower-cased header names`() {
+        val h = head("POST /add_treatments?insulin=4 HTTP/1.1\r\nHost: 127.0.0.1\r\nX-DiaPilot-Token: abc\r\n\r\n")
+        assertTrue(h is WatchServer.Head.Ok)
+        h as WatchServer.Head.Ok
+        assertEquals("POST", h.method)
+        assertEquals("/add_treatments?insulin=4", h.target)
+        assertEquals("abc", h.headers["x-diapilot-token"])
+        assertEquals("127.0.0.1", h.headers["host"])
+    }
+
+    @Test fun `a closed connection with no request line is not a request`() {
+        assertEquals(WatchServer.Head.Closed, head(""))
+    }
+
+    @Test fun `a header line over the cap is refused as 431, not read to its end`() {
+        val cap = WatchServer.MAX_HEADER_LINE_CHARS
+        val ok = head("GET /info.json HTTP/1.1\r\nX-Pad: ${"a".repeat(cap - "X-Pad: ".length)}\r\n\r\n")
+        assertTrue(ok is WatchServer.Head.Ok)
+        val over = head("GET /info.json HTTP/1.1\r\nX-Pad: ${"a".repeat(cap)}\r\n\r\n")
+        assertTrue(over is WatchServer.Head.Refused)
+        assertEquals("431 Request Header Fields Too Large", (over as WatchServer.Head.Refused).status)
+    }
+
+    @Test fun `a request line over the cap is refused as 414`() {
+        val over = head("GET /${"a".repeat(WatchServer.MAX_HEADER_LINE_CHARS)} HTTP/1.1\r\n\r\n")
+        assertTrue(over is WatchServer.Head.Refused)
+        assertEquals("414 URI Too Long", (over as WatchServer.Head.Refused).status)
+    }
+
+    @Test fun `more headers than the cap are refused`() {
+        fun request(n: Int) = "GET /info.json HTTP/1.1\r\n" + (1..n).joinToString("") { "X-H$it: v\r\n" } + "\r\n"
+        assertTrue(head(request(WatchServer.MAX_HEADERS)) is WatchServer.Head.Ok)
+        val over = head(request(WatchServer.MAX_HEADERS + 1))
+        assertTrue(over is WatchServer.Head.Refused)
+    }
+
+    @Test fun `a line that never ends is refused at the cap instead of being buffered`() {
+        // A reader that hands out 'a' forever: readLine() on it never returns.
+        val endless = object : java.io.Reader() {
+            override fun read(cbuf: CharArray, off: Int, len: Int): Int {
+                java.util.Arrays.fill(cbuf, off, off + len, 'a')
+                return len
+            }
+            override fun close() {}
+        }
+        val h = server().readHead(endless)
+        assertTrue(h is WatchServer.Head.Refused)
+    }
+
+    @Test fun `the server admits a bounded number of connections at once`() {
+        val s = server()
+        repeat(WatchServer.MAX_CONNECTIONS) { assertTrue("slot $it", s.admit()) }
+        assertTrue(!s.admit())
+        s.release()
+        assertTrue(s.admit())
+        assertTrue(!s.admit())
+    }
+
     @Test fun `a form-encoded body carries the parameters too`() {
         val r = server().respond(
             "POST",

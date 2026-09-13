@@ -43,7 +43,15 @@ import io.github.obdosok.diapilot.i18n.UiText
 // starts recording the SHOWN arm again in this same change; a generation that
 // begins here is clean from its first row. The usual cost of a bump — the
 // paired A/B resets — does not apply: the prospective pairs are going away.
-const val HYBRID_V11_SHADOW_ALGO_VERSION =
+//
+// THE STRING IS A STORED IDENTIFIER, NOT THE CLASS NAME. It is written into
+// `forecast_runs.algo_version` on every phone and read back by
+// `:tools:accuracy` and `LedgerRetention`; the file that produces it was
+// renamed from `HybridShadow` to `PhysioForecastBridge` because the "shadow"
+// arm became the ONLY arm, but the rows already written cannot be renamed.
+// Changing one byte here starts a new ledger generation (see above) — do it
+// only for a model change, never to match a Kotlin identifier.
+const val PHYSIO_FORECAST_ALGO_VERSION =
     "forecast-v11-kotlin-shadow-13-macro-queue-single-arm"
 
 private fun foodDurationMin(analysis: String?): Double =
@@ -52,7 +60,16 @@ private fun foodDurationMin(analysis: String?): Double =
         ?.substringAfter(':')?.trim()?.replace(',', '.')?.toDoubleOrNull()
         ?.coerceIn(0.0, 240.0) ?: 0.0
 
-object HybridShadowRegistry {
+/**
+ * The installed person model and the latest published What-if profile — one
+ * process-wide slot, written by [HybridModelStore] and read by the forecast.
+ *
+ * Used to be `HybridShadowRegistry`: the name dated from the research bench,
+ * when this arm ran in the shadow of a legacy engine. The legacy engine is
+ * gone (docs/architecture.md §2), so the model held here is the one the
+ * screen, the alert, the watch and the widget draw from.
+ */
+object PhysioForecastRegistry {
     @Volatile
     private var installed: HybridPersonModel? = null
     @Volatile private var latestPhysioWhatIf: HybridWhatIfProfile? = null
@@ -104,6 +121,10 @@ object HybridShadowRegistry {
             // this built its own with the shipped defaults, so a fatty meal's
             // What-if line and its forecast line ran different rules.
             engine = if (physio) com.diapilot.core.hybrid.physioForecastEngine(model, macroTiming)
+            // DELIBERATELY NOT THE FACTORY: `physio = false` is the arm that
+            // ignores the model's own food overrides, kept only so
+            // `WhatIfArmTest` can show the two arms differ. Production passes
+            // `physio = true` at its single call site below.
             else HybridForecastEngine(
                 model,
                 macroTiming,
@@ -322,7 +343,7 @@ data class HybridWhatIfProfile(
     }
 }
 
-data class HybridShadowRun(
+data class PhysioForecastRun(
     val result: ForecastResult,
     val inputHash: String,
     /** Ledger dedup key: what this run KNEW, without the clock. A byproduct of
@@ -342,7 +363,7 @@ data class HybridShadowRun(
      * `FORECAST_ALGO_VERSION` while the line on screen came from here. A tag
      * that travels with the run cannot drift from what produced it.
      */
-    val algorithmVersion: String = HYBRID_V11_SHADOW_ALGO_VERSION,
+    val algorithmVersion: String = PHYSIO_FORECAST_ALGO_VERSION,
 )
 
 data class HybridProspectiveWhatIfRun(
@@ -368,13 +389,28 @@ internal fun causalFoodSnapshotSignature(events: List<HybridFoodEvent>): String 
     }
 
 /**
- * Causal app adapter for the pure v11 runtime.
+ * Causal app adapter for the pure v11 runtime — THE PRODUCTION FORECAST PATH.
  *
  * The bundled artifact was trained in the raw CGM coordinate system. We run
  * there and map every predicted bound through DiaPilot's current meter lens
- * before putting it beside the live forecast in the prospective ledger.
+ * before handing the result to the ledger.
+ * `Forecaster` calls [forecast] for the main
+ * screen and for the hypo alert; there is no other engine and no fallback.
+ *
+ * Used to be `object HybridShadow`. "Shadow" described a research arrangement —
+ * this arm computed beside a legacy twin engine and was scored against it —
+ * that ended when the legacy arm was removed; a reader who met the old name in
+ * `Forecaster.kt:183` concluded the line on screen came from an experiment.
+ * The ledger tag it writes, [PHYSIO_FORECAST_ALGO_VERSION], still carries the
+ * word because stored rows are addressed by it.
+ *
+ * What this object does: assembles the engine's inputs from the store as they
+ * were KNOWN at `knowledgeTsMs` (glucose, doses, food notes, basal, activity),
+ * runs [HybridForecastEngine] through [PhysioArtifactV1], maps the result
+ * through the meter lens, publishes the What-if profile and returns a
+ * [PhysioForecastRun] the ledger can record.
  */
-object HybridShadow {
+object PhysioForecastBridge {
     fun forecast(
         store: CollectorStore,
         diaPilotModel: TwinCache.Model,
@@ -406,8 +442,8 @@ object HybridShadow {
          * contract for pairing but must never overwrite what the user's
          * slider computes with an unpromoted model (A-03). */
         publishWhatIf: Boolean = fullCausalInsulinDisplay,
-    ): HybridShadowRun? {
-        val personModel = personModelOverride ?: HybridShadowRegistry.model() ?: return null
+    ): PhysioForecastRun? {
+        val personModel = personModelOverride ?: PhysioForecastRegistry.model() ?: return null
         // One extra observation window lets both ends of the trend use a
         // robust local estimate instead of whichever noisy packet happened to
         // land exactly 60 minutes ago.
@@ -815,7 +851,7 @@ object HybridShadow {
             //
             // Now the key is the first point of the same series the screen
             // will draw, so what gets compared is not two times but one value.
-            HybridShadowRegistry.updateWhatIf(
+            PhysioForecastRegistry.updateWhatIf(
                 points.firstOrNull()?.tsMs ?: knowledgeTsMs,
                 activityExposure,
                 displayHybridPoints,
@@ -965,11 +1001,11 @@ object HybridShadow {
             )
         }
         android.util.Log.i(
-            "HybridShadow",
+            "PhysioForecastBridge",
             "health: physio ${ownVerdict.health} (reasons ${ownVerdict.reasons.size}) · " +
                 "corridor@60 %.2f".format(java.util.Locale.ROOT, ownHalfWidth60),
         )
-        return HybridShadowRun(
+        return PhysioForecastRun(
             result = ForecastResult(
                 points = points,
                 // THIS ARM ASSEMBLES ITS RESULT ENTIRELY ITSELF.

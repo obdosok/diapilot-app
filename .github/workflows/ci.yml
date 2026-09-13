@@ -31,11 +31,20 @@ jobs:
       # No local.properties on the runner: the Android SDK is already on
       # this image and settings.gradle.kts / build.gradle.kts never read
       # sdk.dir, so nothing needs to be generated here.
-      - name: Build and test
+      - name: Build, test and lint
         # `:app:test` and `:app:assembleDebug` are the aggregates over both
         # editions (oss and store, see docs/editions.md), so the edition
         # contract is checked on each flavor.
-        run: ./gradlew :core:test :app:test :app:assembleDebug --console=plain
+        #
+        # `:app:assembleOssRelease` makes sure the release build type keeps
+        # compiling on every push. No keystore is configured here, so the
+        # build script warns and signs with the debug key — expected on CI;
+        # the APK is discarded. Signing for real happens in release.yml.
+        #
+        # `:app:lintOssDebug` is the lint gate; it aborts on errors (no
+        # `abortOnError = false`, no baseline). The two detectors disabled in
+        # app/build.gradle.kts are named there with the reason.
+        run: ./gradlew :core:test :app:test :app:assembleDebug :app:assembleOssRelease :app:lintOssDebug --console=plain
 
   secrets:
     name: Secret scan

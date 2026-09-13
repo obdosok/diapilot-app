@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings for the backup hardening: restore validation, the rollback copy. -->
+<resources>
+    <!-- BackupRestore.kt: why a candidate file was refused. -->
+    <string name="backup_restore_not_sqlite">the file is not an SQLite database</string>
+    <string name="backup_restore_corrupt">the file fails SQLite\'s integrity check (%1$s) — it is damaged</string>
+    <string name="backup_restore_unversioned">the database carries no schema version — not a DiaPilot copy</string>
+    <string name="backup_restore_newer_version">written by a newer DiaPilot (database version %1$d, this build reads up to %2$d) — update the app, then restore</string>
+    <string name="backup_restore_missing_table">not a DiaPilot database: table %1$s is missing</string>
+    <plurals name="backup_restore_dose_fuse">
+        <item quantity="one">refused: %1$d insulin row in the file exceeds the dose fuse (%2$.0f U bolus, %3$.0f U basal)</item>
+        <item quantity="other">refused: %1$d insulin rows in the file exceed the dose fuse (%2$.0f U bolus, %3$.0f U basal)</item>
+    </plurals>
+
+    <!-- BackupRestore.kt: an encrypted (.sqlite.enc) file. -->
+    <string name="backup_restore_encrypted_needs_password">this backup is encrypted — enter its password</string>
+    <string name="backup_restore_wrong_password">wrong password, or the file was modified</string>
+    <string name="backup_restore_corrupt_encrypted">the encrypted file is incomplete or damaged (%1$s)</string>
+
+    <!-- SettingsScreen: the backup password. -->
+    <string name="settings_screen_backup_password_label">Backup password (optional)</string>
+    <string name="settings_screen_backup_password_hint">When set, every backup file — the daily copies and the export — is encrypted (.sqlite.enc). Without this password the backup cannot be opened; DiaPilot cannot recover it.</string>
+    <string name="settings_screen_backup_password_unavailable">The password could not be stored securely on this phone; backups stay unencrypted.</string>
+    <string name="settings_screen_restore_password_label">Password of this backup</string>
+
+    <!-- BackupRestore.kt: the rollback copy. -->
+    <string name="backup_restore_undo_done">Previous database restored. Restarting…</string>
+    <string name="backup_restore_undo_unavailable">no rollback copy — nothing to undo</string>
+
+    <!-- SettingsScreen: undo the last restore. -->
+    <string name="settings_screen_undo_restore">Undo last restore</string>
+    <string name="settings_screen_undo_restore_hint">The database as it was before the last restore is kept for 7 days.</string>
+</resources>

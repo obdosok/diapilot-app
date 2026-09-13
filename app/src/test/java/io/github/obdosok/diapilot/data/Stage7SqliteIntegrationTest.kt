@@ -206,7 +206,7 @@ class Stage7SqliteIntegrationTest {
             // And a note with no knowledge time is not admitted AT ALL. The
             // removed `causalFoods` used to return it with
             // `knownAtMs = Long.MAX_VALUE` ("never known"); the live path
-            // refuses it, matching `HybridShadow.causalFoodNotes`. These are
+            // refuses it, matching `PhysioForecastBridge.causalFoodNotes`. These are
             // two different things, and this checks the second one.
             assertTrue(foods.none { it.first.tsMs == base+2_000L })
         }
@@ -231,7 +231,7 @@ class Stage7SqliteIntegrationTest {
     @Test fun physioRuntimeUsesGlobalAmplitudeAndProducesFiniteForecast() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json").use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "0123456789abcdef0123456789abcdef")
+        PhysioForecastRegistry.install(model, "0123456789abcdef0123456789abcdef")
         val artifact = requireNotNull(PhysioRuntime.artifact())
         val runtimeModel = artifact.personModelAt(12.0)
         // The dish dictionary these three lines compared is gone; what the
@@ -291,7 +291,7 @@ class Stage7SqliteIntegrationTest {
     @Test fun supportedEvidenceIsOfferedAsAnAlternativeAndNeverApplied() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json").use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "feedfacefeedface")
+        PhysioForecastRegistry.install(model, "feedfacefeedface")
         val name = "stage7-isf-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context, name).use { store ->
             val base=TestFoodEra.ERA.startMs
@@ -327,7 +327,7 @@ class Stage7SqliteIntegrationTest {
     @Test fun extremeSupportedCheckpointIsBoundedNotAccepted() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"extreme")
+        PhysioForecastRegistry.install(model,"extreme")
         val name="stage7-extreme-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context,name).use{store->
             val payload="""{"identified_isf":{"median":500,"p10":300,"p90":700,"n":10,"days":5},"isf_status":"SUPPORTED"}"""
@@ -343,14 +343,14 @@ class Stage7SqliteIntegrationTest {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val base=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
         val invalid=base.copy(insulin=base.insulin.copy(onsetMin=70.0,peakMin=100.0,shortDurationMin=180.0,tailDurationMin=300.0),food=base.food.copy(globalFactor=2.0))
-        HybridShadowRegistry.install(invalid,"invalid-bounds")
+        PhysioForecastRegistry.install(invalid,"invalid-bounds")
         val artifact=PhysioRuntime.artifact()!!
         // Stage 8 owns the PHYSIO food-scale anchor. Even an invalid legacy
         // value is reported as a conflict, never adopted as the live CS.
         assertEquals(PhysioRuntime.foodDynamicsGlobalPriorV1().median,artifact.globalCs.median,0.0)
         assertTrue(artifact.baseMechanics.insulin.onsetMin<=artifact.bounds.insulinOnsetMinRange.endInclusive)
         assertTrue(artifact.conflictFlags.size>=2)
-        HybridShadowRegistry.install(base,"restored")
+        PhysioForecastRegistry.install(base,"restored")
     }
 
     // sharedExposureBoundariesAndNightWindowAreExact used to stand here — it
@@ -410,7 +410,7 @@ class Stage7SqliteIntegrationTest {
     @Test fun artifactIdentityIsAsOfStateAndLateRevisionCannotRewriteEarlierRun() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"artifact-causal")
+        PhysioForecastRegistry.install(model,"artifact-causal")
         val name="stage7-artifact-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context,name).use { store ->
             val base=TestFoodEra.ERA.startMs;val prior=PhysioRuntime.artifact(store,base+1_000)!!.artifactId

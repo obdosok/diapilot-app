@@ -35,11 +35,11 @@ class WhatIfArmTest {
             .getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "0123456789abcdef0123456789abcdef")
+        PhysioForecastRegistry.install(model, "0123456789abcdef0123456789abcdef")
     }
 
     private fun publish(anchorTsMs: Long, physio: Boolean) {
-        HybridShadowRegistry.updateWhatIf(
+        PhysioForecastRegistry.updateWhatIf(
             anchorTsMs,
             activityExposure = 0.0,
             baseline = listOf(
@@ -61,7 +61,7 @@ class WhatIfArmTest {
         publish(anchor, physio = true)
         assertNotNull(
             "physio profile not published — What-if will fall back to the legacy kernel",
-            HybridShadowRegistry.physioWhatIf(anchor),
+            PhysioForecastRegistry.physioWhatIf(anchor),
         )
     }
 
@@ -74,7 +74,7 @@ class WhatIfArmTest {
         // that shifts from frame to frame. Exact equality here guaranteed a miss.
         assertNotNull(
             "profile rejected because of a one-minute shift",
-            HybridShadowRegistry.physioWhatIf(anchor + 60_000),
+            PhysioForecastRegistry.physioWhatIf(anchor + 60_000),
         )
     }
 
@@ -85,7 +85,7 @@ class WhatIfArmTest {
         publish(anchor, physio = true)
         assertNull(
             "профиль от старого прогноза принят — допуск потерял смысл",
-            HybridShadowRegistry.physioWhatIf(anchor + 3 * HybridShadowRegistry.WHAT_IF_FRESH_MS),
+            PhysioForecastRegistry.physioWhatIf(anchor + 3 * PhysioForecastRegistry.WHAT_IF_FRESH_MS),
         )
     }
 }

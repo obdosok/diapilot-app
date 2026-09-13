@@ -82,11 +82,14 @@ the list of things that must never appear in an image.
 
 ## Status
 
-**Phase A — readable by a code reviewer; not yet ready for a stranger's
-phone.** The forecast, the alerts and the collection chain run daily on one
-device. There is no onboarding and no uncalibrated mode: on a fresh install the
-bundled synthetic example person drives the forecast until the user replaces
-its numbers by hand. Do not install this expecting a finished product.
+**Phase B, second read — readable by a code reviewer; installable by a
+careful stranger who has read this section.** The forecast, the alerts and
+the collection chain run daily on one device. A fresh install now starts in an
+uncalibrated mode: a first-run screen takes the disclaimer, weight, insulin
+sensitivity and an insulin-action preset, and until it is finished the app
+draws no forecast and fires no predictive alert — only the alerts computed from
+the readings themselves. Do not install this expecting a finished product, and
+do not rely on it for a treatment decision.
 
 - **[`docs/audit.md`](docs/audit.md)** — an external read of this snapshot:
   every known defect by number, with severity and a file reference. Security,
@@ -101,20 +104,55 @@ insulin sensitivity is hand-entered rather than learned (M8, and the section
 below); the measured insulin tail is short, because the instrument that
 measures it only looks four hours ahead — the domain now refuses anything under
 240 minutes and the settings card flags a measurement that lands short, but the
-measurement itself is unchanged (M1); there is no first-run calibration screen
-(M2); and the release build is still signed with the debug keystore (S8).
+measurement itself is unchanged (M1); a measured or hand-entered insulin curve
+loses the dose-dependence of its duration (M10); the uncertainty band is
+narrower than the measured error (M12); and no APK is release-signed until the
+maintainer creates the keystore the build now expects (S8).
 
 ## Install
 
-**No signed release yet.** Signed APKs and GitHub Releases land in phase B —
-see the roadmap's O-B row. Until then the only supported way in is to build
-from source, which the [Building](#building) section below covers.
+**Releases are signed APKs on GitHub.** Each `v*` tag builds both editions
+and attaches them to a [GitHub Release](../../releases) of this repository:
+`diapilot-oss-<tag>.apk` (this edition: everything on),
+`diapilot-store-<tag>.apk` (the same code with the forecast and sensor-direct
+paths closed — see [docs/editions.md](docs/editions.md)), `SHA256SUMS` and
+`CERTIFICATE.txt`. Minimum Android 8.0 (API 26). Until the first tag exists
+the only way in is to build from source, which [Building](#building) covers.
 
-When releases start, this section will carry the download link, the signing
-fingerprint to verify against, and the minimum Android version. The app is not
-on Google Play; whether it ever is depends on the store track in the roadmap,
-and it will never ship the predictive features there — that split is the
-roadmap's whole subject.
+**Verify the download before installing.** Sideloaded APKs have no store in
+front of them, so the signature is the only proof that the file came from this
+repository. The release key's certificate SHA-256 is:
+
+```
+<fingerprint to be published with the first release>
+```
+
+Check the file and the certificate with the Android SDK's `apksigner`
+(`build-tools/<version>/apksigner`):
+
+```bash
+sha256sum -c SHA256SUMS                        # the file is the one CI built
+apksigner verify --print-certs diapilot-oss-<tag>.apk
+# Signer #1 certificate SHA-256 digest: <must equal the fingerprint above>
+```
+
+If the digest differs, do not install. A certificate whose DN reads
+`CN=Android Debug` is a local build signed with the debug key, never a
+release (audit S8).
+
+**Coming from a build you made yourself?** Android ties an installed package
+to its signing certificate, so an install signed with the debug key cannot be
+updated by a release-signed APK — the update is refused
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Uninstalling deletes the database and
+photos, so first do Settings → Data → **Export database (.sqlite)** (or take
+the latest daily backup from Downloads), note your settings (API key,
+thresholds, hand-entered ISF/ICR — they are not in the export), then
+uninstall, install the release, and Settings → Data → **Restore from a backup
+(.sqlite)**. This is a one-time step; later releases update in place.
+
+The app is not on Google Play; whether it ever is depends on the store track
+in the roadmap, and it will never ship the predictive features there — that
+split is the roadmap's whole subject.
 
 ## Personal analytics: what learns and what does not
 
@@ -168,8 +206,8 @@ server/  Optional single-user companion (FastAPI): live dashboard + backup targe
 ```
 
 The boundary between core and platform has held since the first commit: all
-the mathematics is testable on the JVM without a phone (about 830 unit tests in
-`:core`, about 210 in `:app`), and it leaves room for Kotlin Multiplatform.
+the mathematics is testable on the JVM without a phone (over 900 unit tests in
+`:core`, over 400 in `:app`), and it leaves room for Kotlin Multiplatform.
 
 A ten-minute tour with a diagram is
 [`docs/architecture.md`](docs/architecture.md); the engineering record of the
@@ -216,7 +254,10 @@ DiaPilot --> widget, lock-screen chip, notifications
   front of it (audit S9).
 - The daily automatic backup, once switched on in Settings, is written to the
   public Downloads folder, on purpose, so it survives an uninstall. Anything
-  with access to Downloads can read it.
+  with access to Downloads can read it — unless a backup password is set in
+  Settings, in which case every backup (Downloads, cloud folder, export,
+  companion upload) is an AES-256-GCM file that only that password opens, and
+  DiaPilot cannot recover it.
 - Databases, exports, device dumps, settings exports and companion-server
   state are gitignored: medical data does not reach git.
 
@@ -244,6 +285,44 @@ The Android SDK must be installed (Android Studio writes its path to
 Kotlin 2.2, minSdk 26, targetSdk 36; `:core` targets Java 11, and the foojay
 toolchain resolver can download that JDK. Instrumented tests in
 `app/src/androidTest` need a device: `./gradlew :app:connectedOssDebugAndroidTest`.
+
+### Cutting a release
+
+The release build type is non-debuggable so ART can compile the baseline
+profile, and it runs the same unoptimised code as the debug one (no
+shrinking, no obfuscation — `app/build.gradle.kts` explains). Its signing key
+is read, in order, from the environment (`DIAPILOT_KEYSTORE_FILE`,
+`DIAPILOT_KEYSTORE_PASSWORD`, `DIAPILOT_KEY_ALIAS`, `DIAPILOT_KEY_PASSWORD`),
+then from a gitignored `keystore.properties` at the repo root (copy
+[`keystore.properties.example`](keystore.properties.example)); with neither,
+Gradle prints a `WARNING [audit S8]` line and signs with the debug key, which
+is fine for a local smoke test and never for publishing.
+
+```bash
+# once: create the keystore and keep it, with both passwords, in a password manager
+keytool -genkeypair -v -keystore diapilot-release.jks -storetype PKCS12 \
+  -alias diapilot -keyalg RSA -keysize 4096 -validity 10000
+
+# locally, with keystore.properties filled in
+./gradlew :app:assembleOssRelease :app:assembleStoreRelease
+# APKs: app/build/outputs/apk/oss/release/app-oss-release.apk
+#       app/build/outputs/apk/store/release/app-store-release.apk
+
+# the fingerprint users compare against (README "Install")
+apksigner verify --print-certs app/build/outputs/apk/oss/release/app-oss-release.apk
+```
+
+The release itself is a tag: bump `versionCode` (and drop `-dev` from
+`versionName`) in `app/build.gradle.kts`, commit, `git tag v1.4.0`, push the
+tag. [`.github/workflows/release.yml`](.github/workflows/release.yml) then
+builds both editions with the key from the repository secrets
+`DIAPILOT_KEYSTORE_BASE64` (the `.jks`, `base64 -w0`),
+`DIAPILOT_KEYSTORE_PASSWORD`, `DIAPILOT_KEY_ALIAS` and `DIAPILOT_KEY_PASSWORD`,
+runs the unit tests, refuses any APK whose certificate is the debug one, and
+attaches the APKs, `SHA256SUMS` and `CERTIFICATE.txt` to a **draft** GitHub
+Release for the maintainer to publish. Losing the keystore means no future
+release can update an existing install in place — users would go through the
+export / uninstall / restore step above once more.
 
 ### Setting up the phone
 

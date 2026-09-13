@@ -10,7 +10,7 @@ import io.github.obdosok.diapilot.BuildConfig
 import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.data.FoodEraSettings
-import io.github.obdosok.diapilot.data.HybridShadowRegistry
+import io.github.obdosok.diapilot.data.PhysioForecastRegistry
 import io.github.obdosok.diapilot.data.IsfSource
 import io.github.obdosok.diapilot.data.MinuteCalCache
 import io.github.obdosok.diapilot.data.PhysioRuntime
@@ -124,8 +124,8 @@ object DiagnosticsReport {
                 isfSource = IsfSource.choice(context).name.lowercase(),
                 insulinProfile = Settings.insulinProfile(context).label,
                 physioArtifactId = PhysioRuntime.priorArtifactId(),
-                hybridModelSha = HybridShadowRegistry.modelSha256(),
-                hybridAlgoVersion = io.github.obdosok.diapilot.data.HYBRID_V11_SHADOW_ALGO_VERSION,
+                hybridModelSha = PhysioForecastRegistry.modelSha256(),
+                hybridAlgoVersion = io.github.obdosok.diapilot.data.PHYSIO_FORECAST_ALGO_VERSION,
             ),
             logLines = DiagLog.lines(nowMs),
             logDropped = DiagLog.dropped(),

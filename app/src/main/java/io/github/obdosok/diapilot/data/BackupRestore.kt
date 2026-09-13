@@ -6,7 +6,12 @@ import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.collect.CompanionSync
 import io.github.obdosok.diapilot.i18n.localized
+import android.database.sqlite.SQLiteDatabase
+import com.diapilot.core.backup.BackupAuthException
+import com.diapilot.core.backup.BackupCrypto
+import com.diapilot.core.backup.BackupFormatException
 import java.io.File
+import java.io.OutputStream
 
 /**
  * Disaster insurance. The entire history lives in one on-device SQLite file;
@@ -59,45 +64,292 @@ object BackupRestore {
         }
     }
 
+    /** The live database file name; the one `SqliteCollectorStore` opens by default. */
+    private const val DB_NAME = "diapilot.sqlite"
+
+    /**
+     * Tables a DiaPilot database has carried since version 1. Anything else is
+     * added by `onUpgrade` when the restored file is first opened.
+     */
+    internal val REQUIRED_TABLES = listOf("glucose_readings", "insulin_events", "annotations")
+
+    /** The database as it was before the last restore; see [undoRestore]. */
+    private const val ROLLBACK_NAME = "restore_rollback.sqlite"
+    private const val KEY_ROLLBACK_SAVED = "rollback_saved_ms"
+
+    /**
+     * How long the rollback copy is kept. A restore that turned out to be the
+     * wrong file is noticed within a day or two of using the app; a copy the
+     * size of the database (hundreds of MB) is not something to keep in the
+     * sandbox for ever.
+     */
+    internal const val ROLLBACK_TTL_MS = 7L * 24 * 3_600_000
+
+    /** True when a backup password is set, i.e. every file written now is a `.sqlite.enc`. */
+    fun encryptsBackups(context: Context): Boolean = Settings.backupPassword(context) != null
+
+    /**
+     * THE one writer every backup goes through — the Downloads copy, the
+     * cloud copy, the Settings export and the companion upload. With a backup
+     * password set the snapshot is wrapped in [BackupCrypto] on the way out,
+     * chunk by chunk, so a 600 MB database costs one chunk of heap; without
+     * one it is the plain SQLite file it always was. One writer, so no target
+     * can be forgotten when the password is set.
+     */
+    fun writeSnapshot(context: Context, store: SqliteCollectorStore, out: OutputStream) {
+        val password = Settings.backupPassword(context)
+        if (password == null) {
+            store.exportSnapshot(out)
+        } else {
+            BackupCrypto.encrypting(out, password.toCharArray()).use { store.exportSnapshot(it) }
+        }
+    }
+
+    /** Whether the file behind [uri] starts with the encrypted-backup magic. */
+    fun isEncrypted(context: Context, uri: Uri): Boolean =
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val head = ByteArray(BackupCrypto.MAGIC.size)
+            var got = 0
+            while (got < head.size) {
+                val n = input.read(head, got, head.size - got)
+                if (n < 0) break
+                got += n
+            }
+            got == head.size && BackupCrypto.isEncrypted(head)
+        } ?: false
+
     /**
      * Validate [uri] as a DiaPilot snapshot and swap it in as the live
      * database. Returns a human status; on success the CALLER must restart
      * the process (all SQLiteOpenHelper handles point at the old inode).
+     *
+     * An encrypted file (`DPBK1` header) is decrypted with [password] into a
+     * second cache file first; a plaintext file restores as before, whatever
+     * [password] says — old exports keep working. The two crypto failures
+     * are reported apart: a wrong password (or a modified file — the format
+     * cannot tell) and a file cut short.
+     *
+     * THE FILE IS UNTRUSTED INPUT. It is the one way a value reaches the
+     * store without passing the bounds every live input passes, so it is
+     * checked before it touches anything, in this order: SQLite's own
+     * integrity check; the schema version (a file from a NEWER build is
+     * refused — this build's `onUpgrade` cannot read forward; an older one is
+     * accepted, because `onUpgrade` migrates it on first open); the tables a
+     * DiaPilot database has always had; then every insulin row against the
+     * same dose fuses the command path uses — one impossible dose and the
+     * whole file is refused, because a restored dose becomes the model's
+     * history and there is no later gate to catch it.
+     *
+     * The previous database is kept as a rollback copy ([undoRestore]) and
+     * the swap runs under the store lock ([Stores.replaceDatabase]), so no
+     * thread can open the file while it is being replaced.
      */
-    fun restore(context: Context, uri: Uri): String {
+    fun restore(context: Context, uri: Uri, password: CharArray? = null): String {
         val text = context.localized()
         val tmp = File(context.cacheDir, "restore_candidate.sqlite")
+        val plain = File(context.cacheDir, "restore_candidate.plain.sqlite")
         context.contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { text.getString(R.string.backup_restore_file_unavailable) }
             tmp.outputStream().use { input.copyTo(it) }
         }
         try {
-            // Sanity: it must open as SQLite and carry our core table.
-            val readings: Long
-            val insulin: Long
-            android.database.sqlite.SQLiteDatabase.openDatabase(
-                tmp.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
-            ).use { db ->
-                fun count(table: String): Long =
-                    db.rawQuery("SELECT COUNT(*) FROM $table", null).use { c ->
-                        c.moveToFirst(); c.getLong(0)
+            val candidate = if (isEncryptedFile(tmp)) {
+                require(password != null && password.isNotEmpty()) {
+                    text.getString(R.string.backup_restore_encrypted_needs_password)
+                }
+                try {
+                    BackupCrypto.decrypting(tmp.inputStream().buffered(), password).use { input ->
+                        plain.outputStream().use { input.copyTo(it) }
                     }
-                readings = count("glucose_readings")
-                insulin = count("insulin_events")
+                } catch (e: BackupAuthException) {
+                    throw IllegalArgumentException(text.getString(R.string.backup_restore_wrong_password), e)
+                } catch (e: BackupFormatException) {
+                    throw IllegalArgumentException(text.getString(R.string.backup_restore_corrupt_encrypted, e.message), e)
+                }
+                plain
+            } else {
+                tmp
             }
-            require(readings > 0) { text.getString(R.string.backup_restore_no_readings) }
-
-            // Swap: close every handle, drop WAL sidecars, move the file in.
-            Stores.close()
-            val dbFile = context.getDatabasePath("diapilot.sqlite")
-            dbFile.parentFile?.mkdirs()
-            File(dbFile.path + "-wal").delete()
-            File(dbFile.path + "-shm").delete()
-            tmp.copyTo(dbFile, overwrite = true)
-            return text.resources.getQuantityString(R.plurals.backup_restore_success, readings.toInt(), readings, insulin)
+            val counts = validateCandidate(text, candidate)
+            swapIn(context, candidate, keepRollback = true)
+            return text.resources.getQuantityString(
+                R.plurals.backup_restore_success, counts.readings.toInt(), counts.readings, counts.insulin,
+            )
         } finally {
             tmp.delete()
+            plain.delete()
         }
+    }
+
+    private fun isEncryptedFile(file: File): Boolean =
+        file.inputStream().use { input ->
+            val head = ByteArray(BackupCrypto.MAGIC.size)
+            val got = input.read(head)
+            got == head.size && BackupCrypto.isEncrypted(head)
+        }
+
+    internal class Counts(val readings: Long, val insulin: Long)
+
+    /** Every check a candidate must pass; throws with a localized message. */
+    private fun validateCandidate(text: Context, candidate: File): Counts {
+        val db = try {
+            SQLiteDatabase.openDatabase(candidate.path, null, SQLiteDatabase.OPEN_READONLY)
+        } catch (e: android.database.sqlite.SQLiteException) {
+            throw IllegalArgumentException(text.getString(R.string.backup_restore_not_sqlite), e)
+        }
+        db.use {
+            // (a) SQLite's own verdict first: every later query assumes sane pages.
+            val verdict = try {
+                db.rawQuery("PRAGMA integrity_check", null).use { c -> if (c.moveToFirst()) c.getString(0) else "" }
+            } catch (e: android.database.sqlite.SQLiteException) {
+                e.message ?: e.javaClass.simpleName
+            }
+            require(verdict == "ok") {
+                // The first finding, not the "*** in database main ***" banner above it.
+                val finding = verdict.lineSequence().map(String::trim)
+                    .firstOrNull { it.isNotEmpty() && !it.startsWith("***") } ?: verdict
+                text.getString(R.string.backup_restore_corrupt, finding.take(120))
+            }
+
+            // (b) Schema version: forward is unreadable, backward is migrated.
+            val version = db.version
+            require(version >= 1) { text.getString(R.string.backup_restore_unversioned) }
+            require(version <= SqliteCollectorStore.DB_VERSION) {
+                text.getString(R.string.backup_restore_newer_version, version, SqliteCollectorStore.DB_VERSION)
+            }
+
+            // (c) The tables every DiaPilot database has.
+            val tables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { c ->
+                buildSet { while (c.moveToNext()) add(c.getString(0)) }
+            }
+            REQUIRED_TABLES.firstOrNull { it !in tables }?.let {
+                throw IllegalArgumentException(text.getString(R.string.backup_restore_missing_table, it))
+            }
+
+            // (d) The dose fuse: the same bounds as a typed or spoken command.
+            val params = com.diapilot.core.PersonalParams.DEFAULT
+            fun over(table: String, fuse: Double): Long =
+                db.rawQuery("SELECT COUNT(*) FROM $table WHERE units > ?", arrayOf(fuse.toString())).use { c ->
+                    c.moveToFirst(); c.getLong(0)
+                }
+            val overFuse = over("insulin_events", params.commandMaxBolusUnits) +
+                if ("basal_events" in tables) over("basal_events", params.commandMaxBasalUnits) else 0L
+            require(overFuse == 0L) {
+                text.resources.getQuantityString(
+                    R.plurals.backup_restore_dose_fuse, overFuse.toInt(),
+                    overFuse, params.commandMaxBolusUnits, params.commandMaxBasalUnits,
+                )
+            }
+
+            fun count(table: String): Long =
+                db.rawQuery("SELECT COUNT(*) FROM $table", null).use { c -> c.moveToFirst(); c.getLong(0) }
+            val readings = count("glucose_readings")
+            require(readings > 0) { text.getString(R.string.backup_restore_no_readings) }
+            return Counts(readings, count("insulin_events"))
+        }
+    }
+
+    /**
+     * Replace the live database with [source] under the store lock. With
+     * [keepRollback] the current file becomes the rollback copy first.
+     *
+     * The new file is staged next to the live one and renamed over it: a
+     * rename is atomic on the filesystem the sandbox lives on, so a handle
+     * opened at any instant sees either the old file or the whole new one,
+     * never a copy in progress. The `-wal`, `-shm` and `-journal` sidecars
+     * belong to the old file and would be replayed into the new one.
+     */
+    private fun swapIn(context: Context, source: File, keepRollback: Boolean) {
+        Stores.replaceDatabase {
+            val dbFile = context.getDatabasePath(DB_NAME)
+            dbFile.parentFile?.mkdirs()
+            if (keepRollback && dbFile.exists()) saveRollback(context, dbFile)
+            deleteSidecars(dbFile)
+            moveOver(source, dbFile)
+        }
+    }
+
+    private fun deleteSidecars(dbFile: File) {
+        listOf("-wal", "-shm", "-journal").forEach { File(dbFile.path + it).delete() }
+    }
+
+    /** Copy [source] to a staging file beside [target], then rename it over [target]. */
+    private fun moveOver(source: File, target: File) {
+        val staging = File(target.path + ".staging")
+        source.copyTo(staging, overwrite = true)
+        if (!staging.renameTo(target)) {
+            // Rename refused (different mount, odd filesystem): fall back to a
+            // plain overwrite, which is what the restore always did before.
+            staging.copyTo(target, overwrite = true)
+            staging.delete()
+        }
+    }
+
+    /**
+     * Keep the live database as the rollback copy.
+     *
+     * SQLite folds the WAL into the main file when the last connection closes,
+     * so after `Stores.close()` the file alone is normally the whole database.
+     * A `-wal` still lying there means a crash left committed rows in it, and
+     * a copy of the main file alone would lose them: fold it in first. Only
+     * then, and with WAL kept on — a plain `openDatabase` switches the journal
+     * mode back and rewrites the header, and the copy is meant to be the
+     * file as it was, byte for byte.
+     */
+    private fun saveRollback(context: Context, dbFile: File) {
+        if (File(dbFile.path + "-wal").length() > 0) {
+            runCatching {
+                SQLiteDatabase.openDatabase(
+                    dbFile.path, null,
+                    SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING,
+                ).use { db ->
+                    db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { it.moveToFirst() }
+                }
+            }
+        }
+        moveOver(dbFile, rollbackFile(context))
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(KEY_ROLLBACK_SAVED, System.currentTimeMillis()).apply()
+    }
+
+    private fun rollbackFile(context: Context) = File(context.filesDir, ROLLBACK_NAME)
+
+    /**
+     * True when a rollback copy exists and is younger than [ROLLBACK_TTL_MS].
+     * An expired copy is deleted here — this is called on every launch and
+     * from the Settings screen, so the seven-day bound needs no scheduler.
+     */
+    fun rollbackAvailable(context: Context, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val file = rollbackFile(context)
+        if (!file.exists()) return false
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val savedAt = prefs.getLong(KEY_ROLLBACK_SAVED, file.lastModified())
+        if (nowMs - savedAt > ROLLBACK_TTL_MS) {
+            file.delete()
+            prefs.edit().remove(KEY_ROLLBACK_SAVED).apply()
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Put the database from before the last [restore] back. Returns a human
+     * status; on success the CALLER must restart the process, as after a
+     * restore. The rollback copy is consumed: undo is one level deep.
+     */
+    fun undoRestore(context: Context): String {
+        val text = context.localized()
+        require(rollbackAvailable(context)) { text.getString(R.string.backup_restore_undo_unavailable) }
+        val rollback = rollbackFile(context)
+        Stores.replaceDatabase {
+            val dbFile = context.getDatabasePath(DB_NAME)
+            dbFile.parentFile?.mkdirs()
+            deleteSidecars(dbFile)
+            moveOver(rollback, dbFile)
+            rollback.delete()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_ROLLBACK_SAVED).apply()
+        }
+        return text.getString(R.string.backup_restore_undo_done)
     }
 
     /**
@@ -174,6 +426,7 @@ object BackupRestore {
 
     /** Daily silent export to the configured targets; call from any background thread. */
     fun autoBackupIfDue(context: Context) {
+        rollbackAvailable(context)   // expires a copy older than ROLLBACK_TTL_MS
         if (android.os.Build.VERSION.SDK_INT < 29) return
         val targets = autoBackupTargets(context)
         if (!targets.any) return
@@ -186,7 +439,7 @@ object BackupRestore {
             // below, the SAF lookup in the cloud folder and the prune all
             // match by name, and a name shared with another installed copy of
             // the app would reuse — through SAF, overwrite — that copy's file.
-            val name = AppIdentity.autoBackupName(day)
+            val name = AppIdentity.autoBackupName(day, encrypted = encryptsBackups(context))
             val resolver = context.contentResolver
             if (targets.downloads) {
                 val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
@@ -207,7 +460,8 @@ object BackupRestore {
                     },
                 ) ?: return
                 resolver.openOutputStream(uri, "wt")?.use { out ->
-                    (Stores.get(context) as? SqliteCollectorStore)?.exportSnapshot(out) ?: return
+                    val store = Stores.get(context) as? SqliteCollectorStore ?: return
+                    writeSnapshot(context, store, out)
                 }
             }
             // Second copy into the user's cloud folder when configured.
@@ -215,7 +469,7 @@ object BackupRestore {
                 try {
                     val target = findOrCreateChild(context, tree, name)
                     resolver.openOutputStream(target, "wt")?.use { out ->
-                        (Stores.get(context) as? SqliteCollectorStore)?.exportSnapshot(out)
+                        (Stores.get(context) as? SqliteCollectorStore)?.let { writeSnapshot(context, it, out) }
                     }
                     android.util.Log.i("BackupRestore", "cloud copy written: $name")
                 } catch (e: Exception) {

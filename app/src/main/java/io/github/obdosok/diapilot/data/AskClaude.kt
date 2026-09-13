@@ -769,7 +769,7 @@ Never any dose recommendations."""
                         .put("content", carbsTextPrompt(replyLanguage).format(description.trim()) + personalBlock(personalContext)),
                 ),
             )
-        return post(apiKey, body, replyLanguage)
+        return post(apiKey, body, context)
     }
 
     /**
@@ -1020,7 +1020,7 @@ Never any dose recommendations."""
                         .put("content", imageContent(b64, foodPrompt(replyLanguage) + captionLine + personalBlock(personalContext))),
                 ),
             )
-        return VisionResult(post(apiKey, body, replyLanguage))
+        return VisionResult(post(apiKey, body, context))
     }
 
     /** Blocking HTTP call — invoke on Dispatchers.IO. [context] picks the
@@ -1042,7 +1042,7 @@ Never any dose recommendations."""
             .put("max_tokens", 1024)
             .put("system", systemPrompt(context))
             .put("messages", messages)
-        return post(apiKey, body, LlmLanguage.replyLanguage(context))
+        return post(apiKey, body, context)
     }
 
     /** Blocking HTTP call — the full parsed response JSON. Invoke on Dispatchers.IO. */
@@ -1070,9 +1070,12 @@ Never any dose recommendations."""
         }
     }
 
-    /** Text answer — concatenated text blocks. [replyLanguage] only decides
-     *  the rare empty-response fallback message below. */
-    private fun post(apiKey: String, body: JSONObject, replyLanguage: String = "English"): String {
+    /** Text answer — concatenated text blocks. [context] only localizes the
+     *  rare empty-response fallback message below; a caller without one gets
+     *  the English resource text. Used to switch on a `replyLanguage` string
+     *  with the Russian sentence hardcoded here — the one UI string in this
+     *  file that bypassed the resources. */
+    private fun post(apiKey: String, body: JSONObject, context: Context? = null): String {
         val json = postRaw(apiKey, body)
         val content = json.getJSONArray("content")
         return buildString {
@@ -1081,8 +1084,9 @@ Never any dose recommendations."""
                 if (block.getString("type") == "text") append(block.getString("text"))
             }
         }.ifBlank {
-            if (replyLanguage == "Russian") "Пустой ответ (stop_reason: ${json.optString("stop_reason")})"
-            else "Empty response (stop_reason: ${json.optString("stop_reason")})"
+            val stop = json.optString("stop_reason")
+            context?.localized()?.getString(R.string.ask_claude_empty_response, stop)
+                ?: "Empty response (stop_reason: $stop)"
         }
     }
 

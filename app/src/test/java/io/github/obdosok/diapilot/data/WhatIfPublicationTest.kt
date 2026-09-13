@@ -21,9 +21,9 @@ class WhatIfPublicationTest {
         File(rel).let { if (it.exists()) it else File("app/$rel") }.readText()
 
     @Test fun `candidate runs cannot publish the What-if profile`() {
-        val shadow = source("src/main/java/io/github/obdosok/diapilot/data/HybridShadow.kt")
+        val shadow = source("src/main/java/io/github/obdosok/diapilot/data/PhysioForecastBridge.kt")
         val gate = shadow.indexOf("if (publishWhatIf) {")
-        val call = shadow.indexOf("HybridShadowRegistry.updateWhatIf(")
+        val call = shadow.indexOf("PhysioForecastRegistry.updateWhatIf(")
         assertTrue("updateWhatIf must be gated on publishWhatIf", gate in 0 until call)
         // CODE, NOT LINES. The check used to count all lines in a row and broke
         // on a comment — the explanation of the bug where "What-if" fell back

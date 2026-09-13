@@ -268,14 +268,42 @@ object Settings {
      * model at all. `contains` is the only thing that can tell a value somebody
      * chose from the constant every install reads.
      *
-     * NOTHING IN THIS TREE WRITES THE KEY. So today this returns null on every
-     * install except one that stored a value under an older build — which is
+     * The key is written by exactly one setter, [setCarbSensOverrideMmolPerG],
+     * and before that setter existed by nothing at all — so an older install
+     * answers null here unless a still older build stored a value, which is
      * precisely the case that must keep winning: a number that a user's own
      * measurement put there outranks a prior derived from their weight.
      */
     fun storedCarbSensOverrideMmolPerG(context: Context): Double? =
         if (!prefs(context).contains(KEY_CARB_SENS_OVERRIDE)) null
         else carbSensOverrideMmolPerG(context)
+
+    /**
+     * THE DOOR INTO TIER ONE of the carb-sensitivity chain (audit M4): the
+     * first-run pages and the Body card write through it. Null REMOVES the key
+     * rather than storing a zero, because [storedCarbSensOverrideMmolPerG]
+     * decides by `contains` — a stored 0 would read as "the user chose 0" and
+     * the weight-derived prior beneath it would never be consulted again.
+     *
+     * Per RECORDED GRAM, like the getter; the pages ask per 10 g and divide.
+     * Out of the getter's own domain (0.02..1.0) the value is refused rather
+     * than clamped — the getter would read it back as null anyway, and a
+     * silently moved number is the one kind of entry this app does not make.
+     *
+     * `commit` and a twin invalidation for the same reason [ManualInsulinRuntime]
+     * gives: the physio artifact cache is keyed on this preference and the next
+     * redraw must see the number that was just typed.
+     */
+    fun setCarbSensOverrideMmolPerG(context: Context, mmolPerG: Double?) {
+        val editor = prefs(context).edit()
+        when {
+            mmolPerG == null -> editor.remove(KEY_CARB_SENS_OVERRIDE)
+            mmolPerG in 0.02..1.0 -> editor.putFloat(KEY_CARB_SENS_OVERRIDE, mmolPerG.toFloat())
+            else -> return
+        }
+        editor.commit()
+        runCatching { TwinCache.invalidate() }
+    }
 
 
     fun carbSensPer10gMmol(context: Context): Double? =
@@ -309,6 +337,20 @@ object Settings {
     /** False when the secret could not be stored securely; nothing is saved then. */
     fun setXdripApiSecret(context: Context, v: String?): Boolean =
         Secrets.store(context).set(SecretStore.Secret.XDRIP_API_SECRET, v)
+
+    // --- Backup password: when set, every backup file is encrypted with it ---
+
+    /**
+     * Encrypted at rest; see [SecretStore]. Null means backups are written as
+     * plain SQLite files, which is how every file before this setting existed
+     * was written and how they still restore.
+     */
+    fun backupPassword(context: Context): String? =
+        Secrets.store(context).get(SecretStore.Secret.BACKUP_PASSWORD)
+
+    /** False when the password could not be stored securely; nothing is saved then. */
+    fun setBackupPassword(context: Context, v: String?): Boolean =
+        Secrets.store(context).set(SecretStore.Secret.BACKUP_PASSWORD, v)
 
     /** The user's own pre-agreed hypo first step ("10 g soka") - reminded
      *  verbatim on predicted lows; the app never computes rescue carbs. */

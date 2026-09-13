@@ -30,6 +30,10 @@
         <item quantity="one">prime — %1$d</item>
         <item quantity="other">primes — %1$d</item>
     </plurals>
+    <plurals name="main_activity_pen_refused">
+        <item quantity="one">dose over the limit, not recorded — %1$d</item>
+        <item quantity="other">doses over the limit, not recorded — %1$d</item>
+    </plurals>
 
     <!-- MainActivity.kt: bottom nav tabs -->
     <string name="main_activity_tab_today">Today</string>

@@ -1,0 +1,116 @@
+name: Release
+
+# A `v*` tag builds both editions of the release build type, signed with the
+# real release key (audit S8 — the debug key is only a local fallback and this
+# job refuses to publish it), runs the unit tests, and attaches the APKs plus a
+# SHA256SUMS file to a DRAFT GitHub Release for the tag. The maintainer writes
+# the notes and publishes; nothing goes public on the tag push alone.
+#
+# The four values `app/build.gradle.kts` reads from the environment come from
+# repository secrets:
+#   DIAPILOT_KEYSTORE_BASE64   the .jks, base64-encoded (`base64 -w0 x.jks`)
+#   DIAPILOT_KEYSTORE_PASSWORD
+#   DIAPILOT_KEY_ALIAS
+#   DIAPILOT_KEY_PASSWORD
+# DIAPILOT_KEYSTORE_FILE is derived here from the decoded secret.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build, test and attach signed APKs
+    runs-on: ubuntu-latest
+    # `contents: write` is what creating the release and uploading assets
+    # needs; nothing else in this workflow has it.
+    permissions:
+      contents: write
+    env:
+      DIAPILOT_KEYSTORE_PASSWORD: ${{ secrets.DIAPILOT_KEYSTORE_PASSWORD }}
+      DIAPILOT_KEY_ALIAS: ${{ secrets.DIAPILOT_KEY_ALIAS }}
+      DIAPILOT_KEY_PASSWORD: ${{ secrets.DIAPILOT_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Fail here, before Gradle runs, if any secret is missing. Without this
+      # the build script would fall back to the debug key and the job would
+      # happily attach a debug-signed APK to a release.
+      - name: Check signing secrets and decode the keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DIAPILOT_KEYSTORE_BASE64 }}
+        run: |
+          missing=()
+          [ -n "$KEYSTORE_BASE64" ]             || missing+=(DIAPILOT_KEYSTORE_BASE64)
+          [ -n "$DIAPILOT_KEYSTORE_PASSWORD" ]  || missing+=(DIAPILOT_KEYSTORE_PASSWORD)
+          [ -n "$DIAPILOT_KEY_ALIAS" ]          || missing+=(DIAPILOT_KEY_ALIAS)
+          [ -n "$DIAPILOT_KEY_PASSWORD" ]       || missing+=(DIAPILOT_KEY_PASSWORD)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Release signing secrets missing: ${missing[*]}. Refusing to build a release that would be signed with the debug key (audit S8)."
+            exit 1
+          fi
+          keystore="$RUNNER_TEMP/diapilot-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          [ -s "$keystore" ] || { echo "::error::DIAPILOT_KEYSTORE_BASE64 did not decode to a non-empty file."; exit 1; }
+          echo "DIAPILOT_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Test and build both release editions
+        run: ./gradlew :core:test :app:test :app:assembleOssRelease :app:assembleStoreRelease --console=plain
+
+      # Belt and braces: the build script cannot have used the debug key with
+      # all four variables set, but a wrong keystore could still carry the
+      # debug certificate. Check the APKs themselves and record the fingerprint
+      # users verify against (README "Install").
+      - name: Verify signatures and collect assets
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          mkdir -p dist
+          cp app/build/outputs/apk/oss/release/app-oss-release.apk     "dist/diapilot-oss-${tag}.apk"
+          cp app/build/outputs/apk/store/release/app-store-release.apk "dist/diapilot-store-${tag}.apk"
+          : > dist/CERTIFICATE.txt
+          for apk in dist/*.apk; do
+            "$apksigner" verify --print-certs "$apk" | tee -a dist/CERTIFICATE.txt
+            if "$apksigner" verify --print-certs "$apk" | grep -q 'CN=Android Debug'; then
+              echo "::error::$apk is signed with the Android debug certificate. Not publishing."
+              exit 1
+            fi
+          done
+          (cd dist && sha256sum ./*.apk > SHA256SUMS && cat SHA256SUMS)
+          {
+            echo "## Verify the download"
+            echo
+            echo '```'
+            grep 'SHA-256 digest' dist/CERTIFICATE.txt | sort -u
+            echo '```'
+            echo
+            echo "Check the APK you downloaded with \`apksigner verify --print-certs <apk>\` and compare the certificate digest with the line above, and the file with \`sha256sum -c SHA256SUMS\`. The procedure, and why it matters, is in the README's \"Install\" section."
+          } > dist/notes.md
+
+      # A DRAFT release: the tag push builds and attaches, a person publishes.
+      # `gh` is on the runner image and authenticates with the job token, so
+      # nothing here needs a third-party action.
+      - name: Create the draft release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --draft --verify-tag --title "DiaPilot $tag" --notes-file dist/notes.md
+          fi
+          gh release upload "$tag" --clobber dist/*.apk dist/SHA256SUMS dist/CERTIFICATE.txt

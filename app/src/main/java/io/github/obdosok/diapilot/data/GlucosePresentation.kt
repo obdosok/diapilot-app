@@ -128,6 +128,16 @@ internal fun sensorTrustFromStreams(
  * calibration rules. A meter check is ground truth and wins when newer than
  * the sensor; otherwise the same minute promotion and current sensor lens are
  * used everywhere.
+ *
+ * THE MINUTE READING IS PREFERRED AS THE ANCHOR. When the newest OOP2 minute
+ * reading is more than 90 s newer than the main 5-minute reading and under
+ * 10 min old, it is promoted through the minute→main calibration and becomes
+ * the value the forecast and the low alert start from — the main reading is
+ * only its fallback. That is why the minute stream is bounded on the way in
+ * (`parseOop2Trend`: CGM range, live time window) and refused when
+ * OOPAlgorithm2 is not installed (`Oop2App`): "stored separately, never fed
+ * into analytics" describes the model inputs, not this anchor, and a forged
+ * minute value would otherwise sit here for up to ten minutes.
  */
 fun forecastAnchor(
     store: CollectorStore,

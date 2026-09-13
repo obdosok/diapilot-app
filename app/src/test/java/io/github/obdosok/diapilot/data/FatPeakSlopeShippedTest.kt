@@ -51,7 +51,7 @@ class FatPeakSlopeShippedTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "fat-peak-slope-retired")
+        PhysioForecastRegistry.install(model, "fat-peak-slope-retired")
         requireNotNull(PhysioRuntime.artifact())
     }
 

@@ -60,6 +60,7 @@ import io.github.obdosok.diapilot.collect.glucoseStalled
 import io.github.obdosok.diapilot.data.DishDialogRuntime
 import io.github.obdosok.diapilot.data.FoodCalculationRegistry
 import io.github.obdosok.diapilot.data.FoodCalculationV1
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.Settings
 import io.github.obdosok.diapilot.i18n.FoodText
 import io.github.obdosok.diapilot.i18n.TokenText
@@ -68,6 +69,7 @@ import io.github.obdosok.diapilot.i18n.unitLabel
 import io.github.obdosok.diapilot.ui.AnalysisScreen
 import io.github.obdosok.diapilot.ui.AnnotationEditor
 import io.github.obdosok.diapilot.ui.GlucoseChart
+import io.github.obdosok.diapilot.ui.ModelCalibrationCard
 import io.github.obdosok.diapilot.ui.theme.DiaPilotTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -96,6 +98,8 @@ internal fun TodayScreen(
     onConnectHc: () -> Unit = {},
     onOpenLabel: () -> Unit = {},
     onOpenDataSources: () -> Unit = {},
+    /** The calibration card's button: re-enter the first-run model pages. */
+    onSetUpModel: () -> Unit = {},
     onAddBasal: (Long, Double) -> Unit = { _, _ -> },
     onTagBolus: (Long, String?) -> Unit = { _, _ -> },
     onEditBolusUnits: (Long, Double) -> Unit = { _, _ -> },
@@ -162,10 +166,16 @@ internal fun TodayScreen(
     // panel further down is composed only while this is true, so that edition
     // loses a block rather than gaining an empty one, and the chart's what-if
     // overlays stay at their empty defaults and draw nothing.
-    val hasWhatIfEngine = Edition.prospective &&
+    //
+    // And an oss install whose first-run pages are still owed does not carry
+    // it either: the same predicate that keeps `state.prediction` empty in
+    // `MainState` keeps the panel out of the composition here, so the two
+    // cannot disagree about whether there is a line to superpose a dose on.
+    val forecastAllowed = remember(state.readings) { ModelCalibration.forecastAllowed(context) }
+    val hasWhatIfEngine = forecastAllowed &&
         ((state.selectedArmWhatIf && state.hybridWhatIfProfile != null) ||
             state.twinKernel.isNotEmpty())
-    val activityWhatIfAvailable = Edition.prospective &&
+    val activityWhatIfAvailable = forecastAllowed &&
         state.selectedArmWhatIf && state.hybridWhatIfProfile != null
     val whatIfDoses = remember(wiUnits, wiOffset, wiSecond, wiUnits2, wiOffset2) {
         buildList {
@@ -376,6 +386,24 @@ internal fun TodayScreen(
                         }
                     }
                 }
+            }
+        }
+        // WHOSE NUMBERS THE MODEL RUNS ON — persistent, above the hero number,
+        // because it is the one thing about the line below that the line
+        // cannot say for itself. Prospective only: the store edition draws no
+        // line, so a card about who the line belongs to would open onto
+        // nothing. Read off the composition thread — the report runs the
+        // insulin-profile reader on the store.
+        if (Edition.prospective) {
+            val calibration by androidx.compose.runtime.produceState<ModelCalibration.Report?>(
+                null, state.readings, state.insulin,
+            ) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching { ModelCalibration.report(context, graph.store) }.getOrNull()
+                }
+            }
+            calibration?.let {
+                ModelCalibrationCard(it, mgdl = state.mgdl, onSetUpModel = onSetUpModel)
             }
         }
         state.lastReading?.let { r ->
@@ -719,7 +747,14 @@ internal fun TodayScreen(
                             androidx.health.connect.client.HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS,
                         ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // A phone without the Health Connect settings activity:
+                    // the tap did nothing, and the ring should say so.
+                    io.github.obdosok.diapilot.diag.DiagLog.w(
+                        "TodayScreen",
+                        "Health Connect settings activity not found (${e.javaClass.simpleName})",
+                    )
+                }
             }) { Text(stringResource(R.string.today_screen_allow_steps)) }
         }
         }

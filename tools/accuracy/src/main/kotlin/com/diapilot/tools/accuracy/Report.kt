@@ -10,6 +10,9 @@ data class AccuracyReport(
     val errorByHorizon: List<Pair<Int, ErrorStats?>>,
     val hypo: HypoConfusion,
     val hypoRunCount: Int,
+    /** The model beside the two naive baselines on one common set per
+     *  horizon — see the "Naive baselines" block in Metrics.kt. */
+    val baselinesByHorizon: List<Pair<Int, HorizonBaselines?>> = emptyList(),
 )
 
 fun buildReport(
@@ -24,13 +27,36 @@ fun buildReport(
     val errorByHorizon = REPORT_HORIZONS_MIN.map { h ->
         h to errorStats(matchHorizon(mainPoints, readings, h))
     }
+    val runsById = mainRuns.associateBy { it.id }
+    val baselinesByHorizon = REPORT_HORIZONS_MIN.map { h ->
+        h to baselineStats(matchHorizonWithBaselines(mainPoints, runsById, readings, h))
+    }
 
     val hypoRuns = readRuns(conn, "hypo_alert")
     val hypoPoints = readPoints(conn, hypoRuns.map { it.id }).groupBy { it.runId }
     val outcomes = evaluateHypoAlert(hypoRuns, hypoPoints, readings, thresholdMmol, leadMaxMin)
     val hypo = hypoConfusion(outcomes)
 
-    return AccuracyReport(errorByHorizon, hypo, hypoRuns.size)
+    return AccuracyReport(errorByHorizon, hypo, hypoRuns.size, baselinesByHorizon)
+}
+
+private fun Double?.skill(): String = this?.let { "%+6.3f".format(it) } ?: "   n/a"
+
+/** One horizon of the baseline block: the model, then the two baselines,
+ *  each with bias / MAE / RMSE, and the skill score on the baseline rows. */
+private fun StringBuilder.appendBaselineRows(horizon: Int, b: HorizonBaselines?) {
+    if (b == null) {
+        appendLine("%6d min     --  -- no run with a reading at its anchor --".format(horizon))
+        return
+    }
+    fun row(label: String, s: ErrorStats, skill: String) =
+        appendLine(
+            "%6d min  %5d  %-10s  %+7.3f  %7.3f  %7.3f  %s"
+                .format(horizon, b.n, label, s.biasMmol, s.maeMmol, s.rmseMmol, skill),
+        )
+    row("model", b.model, "")
+    row("last-value", b.lastValue, b.skillVsLastValue.skill())
+    row("linear-15", b.linear, b.skillVsLinear.skill())
 }
 
 fun formatReport(report: AccuracyReport): String = buildString {
@@ -45,6 +71,13 @@ fun formatReport(report: AccuracyReport): String = buildString {
                     .format(horizon, stats.n, stats.biasMmol, stats.maeMmol, stats.rmseMmol),
             )
         }
+    }
+    if (report.baselinesByHorizon.isNotEmpty()) {
+        appendLine()
+        appendLine("Naive baselines from glucose_readings alone, at each run's anchor — same matched points")
+        appendLine("skill = 1 - MAE(model) / MAE(baseline): positive = the model beat it, 0 = no better, negative = worse")
+        appendLine("horizon   n      arm          bias      MAE     RMSE   skill")
+        for ((horizon, b) in report.baselinesByHorizon) appendBaselineRows(horizon, b)
     }
     appendLine()
     appendLine("Hypo alert vs what happened, consumer='hypo_alert' (${report.hypoRunCount} runs scored)")

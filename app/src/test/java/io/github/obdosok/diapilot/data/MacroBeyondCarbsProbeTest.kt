@@ -30,7 +30,7 @@ class MacroBeyondCarbsProbeTest {
     fun `print the amplitude each dish delivers against grams times carbSens`() {
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "macro-probe")
+        PhysioForecastRegistry.install(model, "macro-probe")
         val artifact = requireNotNull(PhysioRuntime.artifact())
         val person = requireNotNull(artifact.personModelAt(21.0, emptySet()))
         val cs = person.food.globalFactor

@@ -4,6 +4,8 @@
 <resources>
     <!-- AskClaude: a failed LLM call, shown to the user, never stored. -->
     <string name="ask_claude_error">Error: %1$s</string>
+    <!-- AskClaude: the model returned no text block; %1$s is the API's stop_reason. -->
+    <string name="ask_claude_empty_response">Empty response (stop_reason: %1$s)</string>
 
     <!-- StreamStallNotifier: why the stream is considered stalled. -->
     <string name="stream_stall_notifier_reason_stopped">The sensor stream stopped</string>
@@ -32,7 +34,7 @@
         <item>slow·macro</item>
     </string-array>
 
-    <!-- HybridShadow: carb kinetics line of the "How it was calculated" dialog. -->
+    <!-- PhysioForecastBridge: carb kinetics line of the "How it was calculated" dialog. -->
     <string name="hybrid_shadow_kinetics">carbs: fast %1$s%%, medium %2$s%%, slow %3$s%%; form %4$s; confidence %5$s%%; source %6$s</string>
     <string name="hybrid_shadow_kinetics_tail">carbs: fast %1$s%%, medium %2$s%%, slow %3$s%%; form %4$s; confidence %5$s%%; source %6$s; the model\'s remaining protein/fat tail lasts to ~%7$s min (after 90%% of the response)</string>
     <string name="hybrid_shadow_kinetics_none">no structural features recorded; neutral prior</string>

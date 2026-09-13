@@ -27,8 +27,28 @@ at all. See the README's "Building" section for the phone-side setup needed
 to run the app itself, and `:app:connectedOssDebugAndroidTest` for instrumented
 tests, which need a device.
 
-CI runs `:core:test`, `:app:test` and `:app:assembleDebug` on every push and
-pull request — both editions — please keep these green.
+CI runs `:core:test`, `:app:test`, `:app:assembleDebug`,
+`:app:assembleOssRelease` and `:app:lintOssDebug` on every push and pull
+request — both editions — please keep these green. Lint aborts on errors and
+has no baseline; if a change trips a check, fix it or, when the check is
+wrong for this code, disable that single check in `app/build.gradle.kts` with
+the reason written next to it (two are already there as examples).
+
+## Releasing
+
+Releases are cut by the maintainer from a `v*` tag; the procedure — the
+release keystore, the four `DIAPILOT_*` environment variables /
+`keystore.properties`, the version bump, and what
+`.github/workflows/release.yml` does with the tag — is in the README's
+"Building → Cutting a release" section, and the user-facing verification
+steps in its "Install" section. Two rules for contributors:
+
+- Never commit a keystore or its passwords. `keystore.properties`, `*.jks`
+  and `*.keystore` are gitignored; `keystore.properties.example` is the only
+  file of that shape that belongs in the tree.
+- Do not publish a debug-signed APK anywhere. Locally, without a keystore,
+  `:app:assembleOssRelease` prints `WARNING [audit S8]` and signs with the
+  debug key; that build is for smoke tests only.
 
 ## Code style
 

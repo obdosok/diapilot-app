@@ -1,11 +1,12 @@
 package io.github.obdosok.diapilot.collect
 
+import com.diapilot.core.collector.MGDL_PER_MMOL
 import android.content.Context
 import android.os.BatteryManager
-import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.R
 import io.github.obdosok.diapilot.api.DiaForApi
 import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
 import io.github.obdosok.diapilot.data.MeterCalCache
 import io.github.obdosok.diapilot.data.MinuteCalCache
@@ -59,11 +60,43 @@ class WatchServer(private val context: Context) {
     companion object {
         private const val TAG = "WatchServer"
         const val PORT = 29863
-        private const val MGDL_PER_MMOL = 18.0182
 
         /** Ceiling on a request body. The parameters fit in a few dozen
          *  characters; anything longer is not a client of ours. */
         private const val MAX_BODY_CHARS = 4096
+
+        /** Ceiling on one request-line or header line. Ours are under 200
+         *  characters; 8 KB is the figure common servers refuse above. */
+        internal const val MAX_HEADER_LINE_CHARS = 8192
+
+        /** Ceiling on the number of header lines in one request. */
+        internal const val MAX_HEADERS = 64
+
+        /**
+         * Connections handled at once. A long poll on `/info.json` holds its
+         * thread for ~80 s, so a handful is normal; a hundred is an app on the
+         * phone opening sockets to exhaust threads, and gets a 503 in-line.
+         */
+        internal const val MAX_CONNECTIONS = 16
+    }
+
+    /** Connections currently being handled — see [admit]. */
+    private val connections = java.util.concurrent.atomic.AtomicInteger()
+
+    /**
+     * Take a slot for one connection, or refuse it. The caller must [release]
+     * the slot when the connection is done, whatever happened in between.
+     */
+    internal fun admit(): Boolean {
+        while (true) {
+            val n = connections.get()
+            if (n >= MAX_CONNECTIONS) return false
+            if (connections.compareAndSet(n, n + 1)) return true
+        }
+    }
+
+    internal fun release() {
+        connections.decrementAndGet()
     }
 
     // Both loopback stacks: the Zepp side-service resolves "localhost", which
@@ -94,12 +127,25 @@ class WatchServer(private val context: Context) {
                         val client = ss.accept()
                         // Thread per connection: long-poll requests hold their
                         // socket for up to ~80s and must not block the others.
+                        // Bounded: past MAX_CONNECTIONS the answer is a 503
+                        // written here, on the accept thread, with no thread
+                        // spawned for it — the whole point is that the caller
+                        // cannot make the server allocate.
+                        if (!admit()) {
+                            runCatching {
+                                client.soTimeout = 1_000
+                                writeResponse(client, Response("503 Service Unavailable", "Too many connections"))
+                            }
+                            runCatching { client.close() }
+                            continue
+                        }
                         Thread({
                             try {
                                 handle(client)
                             } catch (e: Exception) {
                                 DiagLog.w(TAG, "request failed: ${e.message}")
                             } finally {
+                                release()
                                 runCatching { client.close() }
                             }
                         }, "diapilot-watch-req").apply { isDaemon = true }.start()
@@ -128,21 +174,21 @@ class WatchServer(private val context: Context) {
     private fun handle(client: Socket) {
         client.soTimeout = 5_000
         val reader = client.getInputStream().bufferedReader()
-        val requestLine = reader.readLine() ?: return
-        val headers = HashMap<String, String>()
-        while (true) {
-            val line = reader.readLine() ?: break
-            if (line.isBlank()) break  // headers done
-            val colon = line.indexOf(':')
-            if (colon > 0) {
-                headers[line.substring(0, colon).trim().lowercase(Locale.ENGLISH)] =
-                    line.substring(colon + 1).trim()
+        val head = when (val h = readHead(reader)) {
+            Head.Closed -> return
+            is Head.Refused -> {
+                writeResponse(client, Response(h.status, h.status))
+                return
             }
+            is Head.Ok -> h
         }
-        val words = requestLine.split(" ")
-        val method = words.getOrNull(0)?.uppercase(Locale.ENGLISH) ?: "GET"
-        val target = words.getOrNull(1) ?: "/"
-        val r = respond(method, target, headers, readBody(reader, headers), client.inetAddress?.toString())
+        val r = respond(
+            head.method, head.target, head.headers, readBody(reader, head.headers), client.inetAddress?.toString(),
+        )
+        writeResponse(client, r)
+    }
+
+    private fun writeResponse(client: Socket, r: Response) {
         val bytes = r.body.toByteArray()
         client.getOutputStream().apply {
             write(
@@ -155,6 +201,79 @@ class WatchServer(private val context: Context) {
             write(bytes)
             flush()
         }
+    }
+
+    /** What reading the request line and headers came to. */
+    internal sealed interface Head {
+        class Ok(val method: String, val target: String, val headers: Map<String, String>) : Head
+
+        /** The request was refused before its body: the status to answer with. */
+        class Refused(val status: String) : Head
+
+        /** The peer closed without sending a request line. */
+        data object Closed : Head
+    }
+
+    private class LineTooLong : Exception()
+
+    /**
+     * The request line and the headers, BOUNDED, with no socket in it so the
+     * tests can drive it from a string.
+     *
+     * `BufferedReader.readLine()` reads until a newline arrives, however far
+     * away that is; on a port any app on the phone can connect to, that is a
+     * memory hole one client fills by never sending one. So a line longer than
+     * [MAX_HEADER_LINE_CHARS] refuses the request (414 for the request line,
+     * 431 for a header), and so does the [MAX_HEADERS]-plus-first header; the
+     * bytes already read are not kept. Header names are lower-cased as before.
+     */
+    internal fun readHead(reader: java.io.Reader): Head {
+        val requestLine = try {
+            readLine(reader) ?: return Head.Closed
+        } catch (_: LineTooLong) {
+            return Head.Refused("414 URI Too Long")
+        }
+        val headers = HashMap<String, String>()
+        var count = 0
+        while (true) {
+            val line = try {
+                readLine(reader) ?: break
+            } catch (_: LineTooLong) {
+                return Head.Refused("431 Request Header Fields Too Large")
+            }
+            if (line.isBlank()) break  // headers done
+            if (++count > MAX_HEADERS) return Head.Refused("431 Request Header Fields Too Large")
+            val colon = line.indexOf(':')
+            if (colon > 0) {
+                headers[line.substring(0, colon).trim().lowercase(Locale.ENGLISH)] =
+                    line.substring(colon + 1).trim()
+            }
+        }
+        val words = requestLine.split(" ")
+        val method = words.getOrNull(0)?.uppercase(Locale.ENGLISH) ?: "GET"
+        val target = words.getOrNull(1) ?: "/"
+        return Head.Ok(method, target, headers)
+    }
+
+    /**
+     * One line, without its terminator, accepting both `\r\n` and `\n` the
+     * way `readLine()` did. Null at end of stream with nothing read; throws
+     * [LineTooLong] the moment the cap is passed, before reading further.
+     */
+    private fun readLine(reader: java.io.Reader): String? {
+        val sb = StringBuilder()
+        while (true) {
+            val c = reader.read()
+            if (c < 0) return if (sb.isEmpty()) null else sb.toString()
+            if (c == '\n'.code) break
+            // One over the cap is allowed into the buffer: it may be the
+            // terminator's '\r', which is not part of the line.
+            if (sb.length > MAX_HEADER_LINE_CHARS) throw LineTooLong()
+            sb.append(c.toChar())
+        }
+        if (sb.isNotEmpty() && sb[sb.length - 1] == '\r') sb.setLength(sb.length - 1)
+        if (sb.length > MAX_HEADER_LINE_CHARS) throw LineTooLong()
+        return sb.toString()
     }
 
     /**
@@ -461,10 +580,17 @@ class WatchServer(private val context: Context) {
      * the `predict` / `predLo` / `predHi` graph lines and the background model
      * build this call would otherwise trigger from the collector's heartbeat.
      * Every reader below already handles the empty list.
+     *
+     * The same empty list for an oss install whose first-run pages are still
+     * owed: `ModelCalibration.forecastAllowed` is the edition gate with the
+     * calibration fact folded in, so the wrist carries no `predictBWP` and no
+     * prediction lines drawn from the example person. `hypoAlert` and `isLow`
+     * are NOT gated here, in either edition — they carry the reading-driven
+     * alarm state, which keeps firing without a forecast.
      */
     private fun predictionPoints(now: Long): List<com.diapilot.core.twin.PredictedPoint> {
-        if (!Edition.prospective) return emptyList()
         val store = Stores.get(context)
+        if (!ModelCalibration.forecastAllowed(context, store)) return emptyList()
         return try {
             val model = TwinCache.getForForecast(store, context)
             val anchor = forecastAnchor(store, context, now)

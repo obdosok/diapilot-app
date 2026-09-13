@@ -18,8 +18,68 @@ Work done and work still planned, neither in a tag yet. The gates are in
 [`docs/roadmap.md`](docs/roadmap.md); the findings are in
 [`docs/audit.md`](docs/audit.md).
 
+### Security
+
+The September second read of [`docs/audit.md`](docs/audit.md) re-checked every
+status against the code and closed what it found; the numbers are the audit's.
+
+- **Every glucose parser is bounded, not just the broadcast.** The xDrip
+  web-service backfill (`/sgv.json`, `/pebble`) and the OOPAlgorithm2 minute
+  stream accepted any value above zero at any timestamp; a squatter on the
+  loopback port or any app sending the OOP2 broadcast could park a reading in
+  the future as the freshest anchor. Values must now sit in 20–600 mg/dL,
+  backfill timestamps inside the last fourteen days and never more than five
+  minutes ahead, minute-stream timestamps inside the broadcast window; the
+  poll and the minute receiver are skipped while xDrip or OOPAlgorithm2 is not
+  installed (audit S4, S13).
+- **Stored doses have source ownership like stored readings.** A re-sync from
+  one source can no longer restate a bolus recorded by another; a dose the
+  user edited by hand is never overwritten (audit S12).
+- **The dose fuse covers every input.** A NovoPen scan, a hand-typed bolus or
+  basal and the rows of a restored backup pass the same plausibility check as
+  the sockets and the LLM command; a refused pen dose is announced, not
+  dropped (audit S14, S7).
+- **Restore validates before it swaps.** `PRAGMA integrity_check`, a schema
+  version no newer than the app's, the core tables present, no impossible
+  dose; the displaced database is kept for seven days behind an "Undo last
+  restore" button, and the swap happens under the store's own lock (audit S7).
+- **Optional backup password.** With one set in Settings, every backup —
+  Downloads, cloud folder, export, companion upload — is an AES-256-GCM file
+  (`*.sqlite.enc`, format `DPBK1`, PBKDF2-HMAC-SHA256 with 200 000
+  iterations) and restore asks for the password. The default stays plaintext:
+  a forgotten password loses the history (audit S6).
+- **Libre 2 pairing state moved into the keystore** with the other secrets,
+  migrated from the plain preferences on first read (audit S16).
+- **The loopback HTTP server bounds its input**: header lines, header count
+  and concurrent connections are capped (audit S15); an NFC tag whose id is
+  not eight bytes is ignored instead of crashing the scanner (audit S17).
+- **Companion server**: uploads land in a temp file and replace the old
+  backup only on success, request bodies are size-limited, a malformed push
+  is a 400, and ten wrong tokens from one address lock it out for a minute;
+  its README no longer suggests a cleartext LAN URL (audit S9).
+- **Release signing is wired**: the build reads a key from the environment or
+  a gitignored `keystore.properties`, warns loudly when it has to fall back to
+  the debug key, and the tag-triggered release workflow refuses to publish a
+  debug-signed APK. No key has been created yet (audit S8).
+
 ### Added
 
+- **A first-run flow and an uncalibrated mode** (audit M2, P2): the
+  disclaimer with an explicit acceptance, language, body weight, insulin
+  sensitivity in either unit, one of three insulin-action presets written into
+  the hand-entered tier, optional carbohydrate sensitivity (its setter did not
+  exist before — audit M4), and a summary. Until the flow is finished the
+  forecast is refused — no line, band, What-if, predictive low or high,
+  `predictBWP` or watch prediction lines — while every reading-based alert
+  keeps firing. Today and the model section show whether the model runs on
+  the example person, on hand-entered values, or on a curve measured from the
+  user's own doses. An install that already holds a day of readings and a
+  hand-entered ISF is adopted with the disclaimer page only.
+- **Two naive baselines in the accuracy tool** (audit M13): last value and a
+  15-minute linear extrapolation, scored on the same set as the model per
+  horizon, with the skill score beside them.
+- A GitHub Releases workflow on `v*` tags, `keystore.properties.example`, and
+  `:app:lintOssDebug` plus the release build type in CI.
 - Two editions from one trunk: an `oss` build with the forecast, and a `store`
   build that collects, logs and summarises the past without stating anything
   about later. One branching point in the code
@@ -46,19 +106,43 @@ Work done and work still planned, neither in a tag yet. The gates are in
 
 ### Changed
 
+- **The bundled example person no longer drifts upward.** Its background
+  intercept encoded an equilibrium near 9.5 mmol/L, which biased every fresh
+  install's forecast high — the direction that hides a predicted low. The
+  intercept is 0.0 now; an install still running the bundled model picks the
+  new file up on the next launch (audit M11).
+- The production forecast path is named for what it is: `HybridShadow` became
+  `PhysioForecastBridge`; the identifier it writes into the ledger is
+  unchanged (audit A10). The shipped engine is built through one factory
+  instead of 23 hand-written constructor calls (audit A11).
+- A failing model artifact is logged instead of silently becoming "no
+  forecast" (audit A12); one stale Russian-token reader that survived the v50
+  label migration reads the key now (audit A13); one mg/dL constant instead of
+  three (audit A14).
+- `versionName` is `1.4.0-dev`.
 - The insulin tail domain starts at 240 minutes rather than 120 — the reach of
   the instrument that measures it — the bundled example person's tail moved to
   300 minutes, Auto-fit searches 240–480, and the settings card marks a
   measured end of action that lands short of the floor (audit M1, the first
   half; the measurement itself is unchanged and still lands short).
 
+### Known issues carried into 1.4.0
+
+- A measured or hand-entered insulin curve is dose-independent in duration;
+  only the parametric fallback lengthens the tail for a larger dose
+  (audit M10, pinned by test, waits for a bench).
+- The uncertainty band is several-fold narrower than the measured error and
+  its calibration is in-sample (audit M12).
+- The xDrip broadcast can still be spoofed with a plausible value by any app
+  on the phone; the bounds narrow the attack, they do not remove it (audit S3).
+- `/info.json?graph=1` on the loopback watch feed still answers without a
+  token (audit S2).
+- Backups are plaintext unless the user sets a password (audit S6).
+
 ### Planned for 1.4.0 (phase O-B, "first users")
 
-- Onboarding: the disclaimer, manual ISF / ICR / weight, insulin presets, and a
-  visible calibration status, so the bundled example person no longer drives a
-  stranger's forecast on day one (audit M2, P2).
-- Release signing with a real upload key, and signed APKs on GitHub Releases
-  (audit S8).
+- The maintainer's release keystore, and the first signed APKs on GitHub
+  Releases (audit S8 — the build and the workflow are ready).
 - A Nightscout glucose source — the data-sources screen already has its row.
 
 ## [1.3.0] — phase A, "portfolio" — September 2026

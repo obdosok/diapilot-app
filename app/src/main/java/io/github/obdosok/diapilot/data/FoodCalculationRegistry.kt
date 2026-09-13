@@ -452,7 +452,7 @@ object FoodCalculationRegistry {
         values = baseValues
     }
     fun get(annotationId: Long) = values[annotationId]
-    /** History can read old notes even when HybridShadow has no current-window base row. */
+    /** History can read old notes even when PhysioForecastBridge has no current-window base row. */
     fun getEpisode(annotationId: Long) = episode[annotationId]
     fun latest()=values.values.maxByOrNull{it.eventTsMs}
 }

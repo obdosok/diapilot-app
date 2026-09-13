@@ -159,7 +159,16 @@ data class HybridInsulinParams(
     val tailWeight: Double,
     val tailWeightPerUnit: Double = 0.0,
     val tailReferenceUnits: Double = 2.0,
-    /** Optional v12.1 empirical cumulative action curve. */
+    /**
+     * Optional v12.1 empirical cumulative action curve.
+     *
+     * When present it REPLACES the parametric fields above in
+     * `HybridForecastEngine.insulinCdf`, including their dose dependence:
+     * `tailWeightPerUnit` and `tailReferenceUnits` are not read while knots are
+     * set, so a measured or hand-entered curve acts over the same duration for
+     * every dose size. Recorded limitation (audit M10), pinned by
+     * `InsulinKnotsDoseIndependenceTest`.
+     */
     val actionCdfKnots: List<HybridCdfKnot> = emptyList(),
 )
 

@@ -42,11 +42,31 @@ Two numbers, from the two ledger consumers that keep their points
    `ForecastLedger.HORIZONS`, so a faithful re-run of the live rule is not
    possible from this data — the coarser rule is stated as what it is rather
    than passed off as the production one.
+3. **Two naive baselines beside the model**, so the MAE has something to be
+   judged against. Both are computed from `glucose_readings` alone at each
+   run's anchor — the last reading at or before `anchor_ts_ms`, within the
+   same 6-minute tolerance: (a) **last-value**, "the glucose stays where it
+   is"; (b) **linear-15**, the least-squares slope of the last 15 minutes
+   continued to the horizon, clamped to 2..30 mmol/L (2.0 is the engine's own
+   floor, `HYBRID_FLOOR_MMOL`). The model and both baselines are scored on
+   **one common set** per horizon — a run with no reading in hand at its
+   anchor contributes nothing to this block, so its `n` can be smaller than
+   the model-only table's. Beside each baseline the report prints the skill
+   score `1 − MAE(model) / MAE(baseline)`: positive means the model beat the
+   baseline by that fraction of the baseline's error, 0 means no better,
+   negative means worse. Glucose is autocorrelated, so at 30 minutes a
+   last-value skill near zero is the expected finding, not a defect; the
+   number to watch is where the skill against **linear-15** goes at 120–180
+   minutes, because that is where insulin and food are supposed to earn their
+   place. Neither baseline knows about either — that is the point.
 
 Both metric functions (`errorStats`, `evaluateHypoAlert`,
-`hypoConfusion`) are pure and unit-tested on hand-written vectors in
-`tools/accuracy/src/test/kotlin/.../MetricsTest.kt` — no database involved in
-the tests, only in the CLI. The end-of-action comparison below adds
+`hypoConfusion`) and the baselines (`lastValueBaseline`, `linearBaseline`,
+`skillScore`) are pure and unit-tested on hand-written vectors in
+`tools/accuracy/src/test/kotlin/.../MetricsTest.kt` and `BaselineTest.kt`;
+`ReportBaselinesTest.kt` then runs the whole report against a hand-built
+three-table database whose expected numbers are worked out in its comments.
+The end-of-action comparison below adds
 `TailComparisonTest.kt` beside it, on the same terms: it reuses these metric
 functions rather than growing a second implementation of them, so the only new
 things it can get wrong — reading the applied tail out of a ledger row, and
@@ -248,6 +268,14 @@ horizon   n      bias      MAE      RMSE
     60 min      1   +0.400    0.400    0.400
    120 min      1   +0.600    0.600    0.600
    180 min      1   +0.700    0.700    0.700
+
+Naive baselines from glucose_readings alone, at each run's anchor — same matched points
+skill = 1 - MAE(model) / MAE(baseline): positive = the model beat it, 0 = no better, negative = worse
+horizon   n      arm          bias      MAE     RMSE   skill
+    30 min      1  model       +0.200    0.200    0.200
+    30 min      1  last-value  +0.500    0.500    0.500  +0.600
+    30 min      1  linear-15   -0.100    0.100    0.100  -1.000
+   ...
 
 Hypo alert vs what happened, consumer='hypo_alert' (3 runs scored)
 TP=1  FP=1  FN=1  TN=0

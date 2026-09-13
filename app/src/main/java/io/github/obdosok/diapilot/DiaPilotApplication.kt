@@ -32,7 +32,7 @@ class DiaPilotApplication : Application() {
             )
         } catch (error: Exception) {
             // Shadow failure must never affect the shipped forecast.
-            Log.w("HybridShadow", "v11 model not installed: ${error.message}")
+            Log.w("PhysioForecastBridge", "v11 model not installed: ${error.message}")
         }
     }
 }

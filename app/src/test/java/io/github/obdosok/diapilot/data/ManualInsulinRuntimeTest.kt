@@ -185,7 +185,7 @@ class ManualInsulinRuntimeTest {
     @Test fun theArtifactServesAShortHandEnteredEndOfAction() {
         val name = "manual-short-tail-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context, name).use { store ->
-            HybridShadowRegistry.install(model(), "manual-short-tail-test")
+            PhysioForecastRegistry.install(model(), "manual-short-tail-test")
             ManualInsulinRuntime.setParams(
                 context, ManualInsulinParamsV1(onsetMin = 27.0, peakMin = 55.0, tailMin = 130.0),
             )
@@ -198,6 +198,30 @@ class ManualInsulinRuntimeTest {
     }
 
     /**
+     * AN ORDINARY ADULT ISF REACHES THE ARTIFACT. The prior's band is widened
+     * to 1.0..5.0 around 1.8, and rescaling it for a hand ISF of 3.0 pushed the
+     * upper edge past the physiological maximum, so `PhysioArtifactV1` refused
+     * the whole artifact and the PHYSIO arm was gone for anyone above ~2.9 —
+     * found the moment the first-run pages made entering an ISF ordinary. The
+     * band edge is clamped; the centre is the entered number.
+     */
+    @Test fun aHandIsfOfThreeReachesTheArtifactWithItsBandInsideTheDomain() {
+        val name = "manual-isf-three-${System.nanoTime()}.sqlite"
+        SqliteCollectorStore(context, name).use { store ->
+            PhysioForecastRegistry.install(model(), "manual-isf-three-test")
+            ManualInsulinRuntime.setParams(context, ManualInsulinParamsV1(isfMmolPerU = 3.0))
+            val served = PhysioRuntime.artifact(store, System.currentTimeMillis())?.personModelAt(12.0)
+            assertNotNull("the artifact must be built, not refused", served)
+            assertEquals(3.0, served!!.insulin.isf, 1e-9)
+            val bounds = com.diapilot.core.physio.PhysioBoundsV1()
+            assertTrue(served.insulin.isfHigh <= bounds.isfMmolPerLUmax)
+            assertTrue(served.insulin.isfLow >= bounds.isfMmolPerLUmin)
+            assertTrue("the band still has width", served.insulin.isfHigh > served.insulin.isfLow)
+        }
+        context.deleteDatabase(name)
+    }
+
+    /**
      * A hand-entered value is model input, so the artifact cache must not
      * outlive it. This reads the artifact the app would serve, before and
      * after — not the preferences.
@@ -205,7 +229,7 @@ class ManualInsulinRuntimeTest {
     @Test fun theArtifactCacheDoesNotOutliveAnEntry() {
         val name = "manual-insulin-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context, name).use { store ->
-            HybridShadowRegistry.install(model(), "manual-insulin-test")
+            PhysioForecastRegistry.install(model(), "manual-insulin-test")
             val now = System.currentTimeMillis()
             val before = PhysioRuntime.artifact(store, now)?.personModelAt(12.0)
             assertNotNull(before)

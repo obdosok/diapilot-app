@@ -39,8 +39,10 @@ reason every number in the forecast can be reproduced from a recorded state.
 
 Four contributions are summed on a five-minute grid:
 
-- **insulin** — a personalized, dose-dependent action CDF, whose landmarks are
-  measured from the user's own doses (section 3) or entered by hand;
+- **insulin** — a personalized action CDF, whose landmarks are measured from
+  the user's own doses (section 3) or entered by hand. The parametric fallback
+  is dose-dependent (a longer tail for a larger dose); a measured or
+  hand-entered knot curve is not — audit M10 records that gap;
 - **food** — grams times carbohydrate sensitivity, shaped by a mixture of three
   population triangles and metered by a gastric queue (section 2);
 - **background** — the drift the body has without an intervention, plus a

@@ -1,5 +1,7 @@
 package com.diapilot.core
 
+import com.diapilot.core.collector.MGDL_PER_MMOL
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -7,7 +9,7 @@ class PersonalParamsTest {
     @Test
     fun trendNameFollowsXdripConvention() {
         // mg/dl per 5 min → mmol input
-        fun name(mgdl: Double) = trendName(mgdl / 18.016)
+        fun name(mgdl: Double) = trendName(mgdl / MGDL_PER_MMOL)
         assertEquals("DoubleUp", name(18.0))
         assertEquals("SingleUp", name(10.6))   // the anchored WatchDrip sample
         assertEquals("FortyFiveUp", name(5.0))

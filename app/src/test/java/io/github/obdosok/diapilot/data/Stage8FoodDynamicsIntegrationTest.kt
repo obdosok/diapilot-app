@@ -72,7 +72,7 @@ class Stage8FoodDynamicsIntegrationTest {
     @Test fun `history receipt uses structured features and never dish title`() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"stage8-history-receipt")
+        PhysioForecastRegistry.install(model,"stage8-history-receipt")
         val artifact=requireNotNull(PhysioRuntime.artifact())
         val kinetics="KINETICS_V2: fast=1;medium=0;slow=0;form=LIQUID;confidence=1;source=test;alcohol=false"
         val smoothie=requireNotNull(HybridRuntimeMetrics.foodReadoutForModel(
@@ -96,7 +96,7 @@ class Stage8FoodDynamicsIntegrationTest {
     @Test fun `batched history receipts are identical to per-row receipts`() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"history-batch-equivalence")
+        PhysioForecastRegistry.install(model,"history-batch-equivalence")
         val artifact=requireNotNull(PhysioRuntime.artifact())
         val kinetics="KINETICS_V2: fast=.3;medium=.5;slow=.2;form=SOLID;confidence=.8;source=test;alcohol=false"
         val notes=listOf(
@@ -134,7 +134,7 @@ class Stage8FoodDynamicsIntegrationTest {
     @Test fun `history receipt exposes partial live insulin deconvolution`() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"stage8-live-observation")
+        PhysioForecastRegistry.install(model,"stage8-live-observation")
         val artifact=requireNotNull(PhysioRuntime.artifact())
         val ts=123_456_789L
         HybridRuntimeMetrics.installLiveFoodObservations(listOf(
@@ -159,7 +159,7 @@ class Stage8FoodDynamicsIntegrationTest {
     @Test fun `pre strict era observational cs cannot replace stage8 live anchor`() {
         val context=ApplicationProvider.getApplicationContext<android.content.Context>()
         val model=context.assets.open("models/person_model_v11_runtime.json").use{HybridPersonModelJson.read(it)}
-        HybridShadowRegistry.install(model,"stage8-cs-gate")
+        PhysioForecastRegistry.install(model,"stage8-cs-gate")
         val name="stage8-cs-gate-${System.nanoTime()}.sqlite"
         SqliteCollectorStore(context,name).use{store->
             store.writableDatabase.execSQL(

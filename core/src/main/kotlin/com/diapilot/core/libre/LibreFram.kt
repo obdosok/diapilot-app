@@ -186,8 +186,20 @@ fun attachBg(samples: List<LibreSample>, bg: IntArray?): List<LibreSample> {
     }
 }
 
-/** Serial number from the 8-byte NFC UID (xDrip decodeSerialNumberKey). */
-fun decodeLibreSerial(uid: ByteArray): String {
+/** Length of an ISO-15693 UID — the only id a Libre sensor presents. */
+const val LIBRE_UID_BYTES = 8
+
+/**
+ * Serial number from the 8-byte NFC UID (xDrip decodeSerialNumberKey), or
+ * null when [uid] is not [LIBRE_UID_BYTES] long.
+ *
+ * Null rather than a throw because the app's reader mode also dispatches
+ * NFC-A and NFC-B tags (the pen, a transit card, anything in a wallet), whose
+ * ids are 4, 7 or 10 bytes; copying eight bytes out of one of those threw an
+ * exception inside the scan thread. A wrong-sized id is not a Libre.
+ */
+fun decodeLibreSerial(uid: ByteArray): String? {
+    if (uid.size != LIBRE_UID_BYTES) return null
     val lookup = "0123456789ACDEFGHJKLMNPQRTUVWXYZ"
     val input = ByteArray(11).also { uid.copyInto(it, 3, 0, 8) }
     val short = ByteArray(8)

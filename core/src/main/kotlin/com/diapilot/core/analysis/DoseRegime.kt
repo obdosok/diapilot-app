@@ -14,6 +14,7 @@
 package com.diapilot.core.analysis
 
 import com.diapilot.core.collector.BolusPoint
+import com.diapilot.core.collector.MGDL_PER_MMOL
 
 /**
  * A break in DOSING BEHAVIOR — not proof of a changed body. Doses can drop
@@ -137,7 +138,9 @@ fun isfPriorFromTdd(tdd: TddWindow): IsfPrior? {
     // says so.
     if (tdd.basalSparse) return null
     if (tdd.unitsPerDay < 2.0) return null
-    val raw = 1800.0 / tdd.unitsPerDay / 18.0
+    // The 1800 rule is stated in mg/dL per unit; one shared factor brings it
+    // to mmol/L rather than a rounded 18.0 that disagreed with every display.
+    val raw = 1800.0 / tdd.unitsPerDay / MGDL_PER_MMOL
     return IsfPrior(raw.coerceIn(0.8, 4.5), tdd.unitsPerDay, raw !in 0.8..4.5, tdd.basalSparse)
 }
 

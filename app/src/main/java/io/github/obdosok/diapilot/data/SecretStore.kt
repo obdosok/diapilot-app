@@ -104,7 +104,7 @@ class KeystoreSecretCipher(private val alias: String = DEFAULT_ALIAS) : SecretCi
 }
 
 /**
- * The app's two credentials, encrypted at rest in the ordinary preferences file.
+ * The app's credentials, encrypted at rest in the ordinary preferences file.
  *
  * Stored form: `base64(iv + ciphertext)` under [Secret.prefKey]. The plaintext
  * names the app used before ([Secret.legacyPrefKey]) are migrated on the first
@@ -142,6 +142,19 @@ class SecretStore(internal val prefs: SharedPreferences, private val cipher: Sec
         /** Optional `api-secret` for xDrip's local web service, entered by the
          *  user if their xDrip has one configured. */
         XDRIP_API_SECRET("xdrip_api_secret_enc", "xdrip_api_secret"),
+
+        /** The optional password every backup file is encrypted with
+         *  ([com.diapilot.core.backup.BackupCrypto]). Born encrypted. Lost
+         *  with the keystore key, like the others — and then the user types
+         *  it again, as with the others: the FILES are what it protects, and
+         *  they were written with the password itself, not with this entry. */
+        BACKUP_PASSWORD("backup_password_enc", "backup_password"),
+
+        /** The Libre 2 streaming context ([Libre2State]): sensor UID, patch
+         *  info and the precomputed unlock array, as one JSON blob. The
+         *  legacy name is the plaintext key the state lived under before;
+         *  the ordinary first-read migration moves it. */
+        LIBRE2_BLE_STATE("libre2_ble_state_enc", "libre2_ble_state"),
     }
 
     private class Cached(val value: String?)

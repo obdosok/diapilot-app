@@ -8,7 +8,7 @@ import kotlin.math.min
  * Recent movement, decayed, as the forecast state carries it.
  *
  * MOVED HERE BECAUSE THE BENCH WAS BLIND TO IT. This arithmetic lived only in
- * `HybridShadow`, an app file the harness cannot call, so every off-device
+ * `PhysioForecastBridge`, an app file the harness cannot call, so every off-device
  * measurement built its state without `activityExposure` — every episode fit,
  * every walk-forward, every study run this week modelled a body that never
  * moves. Production passes it; the stand did not. That is the instrument-versus-
@@ -68,7 +68,7 @@ object ActivityExposureV1 {
      * where exposure is MEASURED keeps the physics identical across languages
      * and bounds the input, which is what the gate actually scored — it capped
      * the episode's exposure field, not the engine's arithmetic. Both the app
-     * (`HybridShadow.activityExposure`) and the bench (`WalkForwardStand`) read
+     * (`PhysioForecastBridge.activityExposure`) and the bench (`WalkForwardStand`) read
      * this function, so the two stay in step (discipline #7).
      */
     const val MAX_EXPOSURE = 0.30

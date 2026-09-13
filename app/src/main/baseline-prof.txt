@@ -4,7 +4,7 @@
 # 18–26 s against 1.3 s warm, and logcat named the reason directly —
 #
 #   Compiler allocated 19MB to compile ClosedEpisodeRuntime.rebuildBody
-#   Compiler allocated 8011KB to compile HybridShadow.forecast
+#   Compiler allocated 8011KB to compile PhysioForecastBridge.forecast
 #   Compiler allocated 12MB to compile TwinCache.get
 #
 # Those methods are far past ART's instruction limit, so on a cold process they
@@ -33,7 +33,7 @@ HSPLio/github/obdosok/diapilot/LabelScreen*;->**(**)**
 
 # ---- the forecast itself --------------------------------------------------
 HSPLio/github/obdosok/diapilot/data/Forecaster;->**(**)**
-HSPLio/github/obdosok/diapilot/data/HybridShadow*;->**(**)**
+HSPLio/github/obdosok/diapilot/data/PhysioForecastBridge*;->**(**)**
 HSPLio/github/obdosok/diapilot/data/PhysioRuntime*;->**(**)**
 HSPLio/github/obdosok/diapilot/data/HybridRuntimeMetrics*;->**(**)**
 HSPLio/github/obdosok/diapilot/data/FoodSources*;->**(**)**

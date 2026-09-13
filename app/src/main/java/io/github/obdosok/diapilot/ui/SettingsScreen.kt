@@ -30,6 +30,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.diapilot.core.analysis.MGDL_PER_MMOL_F
+import com.diapilot.core.analysis.fmtBg
 import io.github.obdosok.diapilot.AppIdentity
 import io.github.obdosok.diapilot.Edition
 import io.github.obdosok.diapilot.LocalAppGraph
@@ -42,6 +43,7 @@ import io.github.obdosok.diapilot.collect.LockScreenOverlay
 import io.github.obdosok.diapilot.data.BackupRestore
 import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.HybridModelStore
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
 import io.github.obdosok.diapilot.data.InsulinProfileRuntime
 import io.github.obdosok.diapilot.data.Libre2State
@@ -68,6 +70,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onShowOnChart: (Long) -> Unit = {},
     onOpenDataSources: () -> Unit = {},
+    /** "Set up model again": re-enter the first-run pages. */
+    onSetUpModel: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val graph = LocalAppGraph.current
@@ -128,6 +132,28 @@ fun SettingsScreen(
                     stringResource(R.string.settings_screen_personal_model_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
+                // WHOSE NUMBERS THE MODEL RUNS ON — the same card Today shows,
+                // from the same report, so the two cannot disagree. Prospective
+                // only: the store edition runs no forward model to describe.
+                // The button beneath it is in both editions, because the pages
+                // it reopens (disclaimer, language, weight) are too.
+                if (Edition.prospective) {
+                    val calibration by androidx.compose.runtime.produceState<ModelCalibration.Report?>(null) {
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching { ModelCalibration.report(context, graph.store) }.getOrNull()
+                        }
+                    }
+                    calibration?.let {
+                        ModelCalibrationCard(
+                            it, mgdl = mgdl, onSetUpModel = onSetUpModel,
+                            actionLabel = stringResource(R.string.onboarding_settings_rerun),
+                        )
+                    }
+                } else {
+                    TextButton(onClick = onSetUpModel) {
+                        Text(stringResource(R.string.onboarding_settings_rerun))
+                    }
+                }
                 var modelStatus by remember {
                     mutableStateOf(
                         HybridModelStore.status(context),
@@ -278,6 +304,38 @@ fun SettingsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // TIER ONE OF THE CARB CHAIN (audit M4): manual over weight over
+                // the shipped constant. Entered per 10 g in the display units,
+                // stored per gram in mmol/L through the one setter; empty
+                // REMOVES the key, which is what lets the weight line above win
+                // again — see `Settings.setCarbSensOverrideMmolPerG`.
+                var carbOverrideText by remember(mgdl) {
+                    mutableStateOf(
+                        Settings.storedCarbSensOverrideMmolPerG(context)
+                            ?.let { fmtBg(it * 10.0, mgdl).replace(',', '.') } ?: "",
+                    )
+                }
+                val carbParsed = io.github.obdosok.diapilot.data.Onboarding.Input
+                    .carbSensMmolPerG(carbOverrideText, mgdl)
+                OutlinedTextField(
+                    value = carbOverrideText,
+                    onValueChange = { t ->
+                        carbOverrideText = t
+                        when (val parsed = io.github.obdosok.diapilot.data.Onboarding.Input.carbSensMmolPerG(t, mgdl)) {
+                            is io.github.obdosok.diapilot.data.Onboarding.Input.Parsed.Valid ->
+                                Settings.setCarbSensOverrideMmolPerG(context, parsed.value)
+                            is io.github.obdosok.diapilot.data.Onboarding.Input.Parsed.Empty ->
+                                Settings.setCarbSensOverrideMmolPerG(context, null)
+                            else -> Unit // an unfinished entry changes nothing
+                        }
+                    },
+                    label = { Text(stringResource(R.string.settings_screen_carb_override_label, unitLabel(mgdl))) },
+                    supportingText = { Text(stringResource(R.string.settings_screen_carb_override_hint)) },
+                    isError = carbParsed is io.github.obdosok.diapilot.data.Onboarding.Input.Parsed.Invalid,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 
@@ -388,7 +446,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (insulinModel != null) {
-                    val insulinLandmarks=com.diapilot.core.hybrid.HybridForecastEngine(insulinModel).insulinLandmarks()
+                    val insulinLandmarks=com.diapilot.core.hybrid.physioForecastEngine(insulinModel).insulinLandmarks()
                     val isf = if (mgdl) {
                         insulinModel.insulin.isf * MGDL_PER_MMOL_F
                     } else {
@@ -435,7 +493,7 @@ fun SettingsScreen(
                     // the shape the forecast, IOB, What-if and the meal
                     // deconvolution all run, because they read the same model.
                     run {
-                        val engine = com.diapilot.core.hybrid.HybridForecastEngine(insulinModel)
+                        val engine = com.diapilot.core.hybrid.physioForecastEngine(insulinModel)
                         val end = insulinLandmarks.effectEndMin.coerceIn(60.0, 720.0)
                         val sampled = (0..(end / 5.0).toInt()).map { i ->
                             val t = i * 5.0
@@ -1109,6 +1167,37 @@ fun SettingsScreen(
                         },
                     )
                 }
+                // --- Backup password: optional; when set, every backup file
+                // is a `.sqlite.enc` nobody opens without it — DiaPilot included.
+                var backupPassword by remember { mutableStateOf(Settings.backupPassword(context) ?: "") }
+                var backupPasswordStored by remember { mutableStateOf(true) }
+                androidx.compose.material3.OutlinedTextField(
+                    value = backupPassword,
+                    onValueChange = {
+                        backupPassword = it
+                        backupPasswordStored = Settings.setBackupPassword(context, it)
+                    },
+                    label = { Text(stringResource(R.string.settings_screen_backup_password_label)) },
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    if (backupPasswordStored) {
+                        stringResource(R.string.settings_screen_backup_password_hint)
+                    } else {
+                        stringResource(R.string.settings_screen_backup_password_unavailable)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (backupPasswordStored) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
                 var exportStatus by remember { mutableStateOf<String?>(null) }
                 val exportScope = androidx.compose.runtime.rememberCoroutineScope()
                 androidx.compose.material3.TextButton(onClick = {
@@ -1118,6 +1207,7 @@ fun SettingsScreen(
                             val name = AppIdentity.manualExportName(
                                 java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.ROOT)
                                     .format(java.util.Date()),
+                                encrypted = BackupRestore.encryptsBackups(context),
                             )
                             val store = graph.store
                                 as SqliteCollectorStore
@@ -1133,14 +1223,14 @@ fun SettingsScreen(
                                     android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values,
                                 ) ?: error(context.localized().getString(R.string.settings_screen_export_create_failed))
                                 context.contentResolver.openOutputStream(uri)!!.use {
-                                    store.exportSnapshot(it)
+                                    BackupRestore.writeSnapshot(context, store, it)
                                 }
                                 context.localized().getString(R.string.settings_screen_export_saved_downloads, name)
                             } else {
                                 val f = java.io.File(
                                     context.getExternalFilesDir(null), name,
                                 )
-                                f.outputStream().use { store.exportSnapshot(it) }
+                                f.outputStream().use { BackupRestore.writeSnapshot(context, store, it) }
                                 context.localized().getString(R.string.settings_screen_export_saved_path, f.path)
                             }
                         } catch (e: Exception) {
@@ -1296,21 +1386,67 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // --- Undo: the database from before the last restore, kept
+                // seven days. Shown only while that copy exists.
+                var rollbackAvailable by remember { mutableStateOf(BackupRestore.rollbackAvailable(context)) }
+                if (rollbackAvailable) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        restoreStatus = context.localized().getString(R.string.settings_screen_restoring)
+                        exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            try {
+                                restoreStatus = BackupRestore.undoRestore(context)
+                                rollbackAvailable = false
+                                kotlinx.coroutines.delay(1500)   // let the text render
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            } catch (e: Exception) {
+                                restoreStatus = context.localized().getString(R.string.settings_screen_restore_error, e.message)
+                            }
+                        }
+                    }) { Text(stringResource(R.string.settings_screen_undo_restore)) }
+                    Text(
+                        stringResource(R.string.settings_screen_undo_restore_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 restoreUri?.let { uri ->
+                    // An encrypted file needs its password; the one set above is
+                    // the likely answer, so it is offered, editable, for a file
+                    // written under an earlier password.
+                    val restoreEncrypted = remember(uri) {
+                        runCatching { BackupRestore.isEncrypted(context, uri) }.getOrDefault(false)
+                    }
+                    var restorePassword by remember(uri) { mutableStateOf(Settings.backupPassword(context) ?: "") }
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { restoreUri = null },
                         title = { Text(stringResource(R.string.settings_screen_replace_all_data_title)) },
                         text = {
-                            Text(stringResource(R.string.settings_screen_replace_all_data_text))
+                            Column {
+                                Text(stringResource(R.string.settings_screen_replace_all_data_text))
+                                if (restoreEncrypted) {
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = restorePassword,
+                                        onValueChange = { restorePassword = it },
+                                        label = { Text(stringResource(R.string.settings_screen_restore_password_label)) },
+                                        singleLine = true,
+                                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                                        ),
+                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                    )
+                                }
+                            }
                         },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
                                 restoreUri = null
                                 restoreStatus = context.localized().getString(R.string.settings_screen_restoring)
+                                val password = restorePassword.trim().toCharArray().takeIf { restoreEncrypted }
                                 exportScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     try {
                                         restoreStatus = BackupRestore
-                                            .restore(context, uri)
+                                            .restore(context, uri, password)
                                         kotlinx.coroutines.delay(1500)   // let the text render
                                         android.os.Process.killProcess(android.os.Process.myPid())
                                     } catch (e: Exception) {

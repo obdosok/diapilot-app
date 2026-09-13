@@ -238,11 +238,20 @@ object ManualInsulinRuntime {
             // and a zero-width band would silently narrow every forecast
             // corridor and with it the hypo alert's own margin.
             val scale = if (insulin.isf > 0.0) isf / insulin.isf else 1.0
-            insulin = insulin.copy(
-                isf = isf,
-                isfLow = (insulin.isfLow * scale).coerceAtLeast(1e-3),
-                isfHigh = (insulin.isfHigh * scale).coerceAtLeast(insulin.isfLow * scale),
-            )
+            // AND THE RESCALED BAND STAYS INSIDE THE PHYSIOLOGICAL DOMAIN. The
+            // prior's band is widened to 1.0..5.0 around a 1.8 centre
+            // (`InsulinPriorV1.widen`), so a hand ISF of 3.0 — an ordinary adult
+            // value — scaled the upper edge to 8.3, past `isfMmolPerLUmax`, and
+            // `PhysioArtifactV1` refused the whole artifact: no forecast at all,
+            // for an entry the resolver had just accepted. The centre is what the
+            // person stated and is untouched; a band edge is a statement of
+            // uncertainty, and uncertainty beyond what a body can do is not
+            // information. Clamped to the same bounds the artifact checks, with
+            // the centre kept inside the band.
+            val bounds = com.diapilot.core.physio.PhysioBoundsV1()
+            val low = (insulin.isfLow * scale).coerceIn(bounds.isfMmolPerLUmin, isf)
+            val high = (insulin.isfHigh * scale).coerceIn(isf, bounds.isfMmolPerLUmax)
+            insulin = insulin.copy(isf = isf, isfLow = low, isfHigh = high)
         }
         val tag = resolution.manualFields.sorted().joinToString(",")
         return runCatching {

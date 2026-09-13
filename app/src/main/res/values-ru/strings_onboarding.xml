@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Настройка</string>
+    <string name="onboarding_step">Шаг %1$d из %2$d</string>
+    <string name="onboarding_back">Назад</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_finish">Готово</string>
+
+    <!-- Disclaimer page -->
+    <string name="onboarding_disclaimer_title">Прежде чем начать</string>
+    <string name="onboarding_disclaimer_body_1">DiaPilot — не медицинское изделие. Это личный дневник и исследовательский инструмент, который показывает ваши собственные данные.</string>
+    <string name="onboarding_disclaimer_body_2">Приложение никогда не предлагает и не рассчитывает дозу инсулина. Каждое решение об инсулине, еде и лечении принимаете вы и ваш врач.</string>
+    <string name="onboarding_disclaimer_body_3">Оповещения — это подсказки, а не гарантия: они зависят от сенсора, телефона и цепочки данных, и любое звено может остановиться. Прежде чем действовать, подтвердите низкий или высокий сахар глюкометром.</string>
+    <string name="onboarding_disclaimer_body_4">Ваши данные остаются на этом телефоне, пока вы сами их не экспортируете.</string>
+    <string name="onboarding_disclaimer_accept">Я прочитал(а) это и понимаю, что приложение не даёт медицинских рекомендаций.</string>
+    <string name="onboarding_disclaimer_button">Принять</string>
+    <string name="onboarding_disclaimer_accepted_on">Принято %1$s.</string>
+
+    <!-- Language page -->
+    <string name="onboarding_language_intro">Это можно изменить позже в разделе «Ещё».</string>
+
+    <!-- Weight page -->
+    <string name="onboarding_weight_title">Масса тела</string>
+    <string name="onboarding_weight_body">Необязательно. Нужна для стартовой оценки того, насколько 10 г углеводов поднимают сахар; оценка обратна весу. Пустое поле означает эталонные 70 кг.</string>
+    <string name="onboarding_weight_invalid">Введите вес от 20 до 300 кг или оставьте поле пустым.</string>
+
+    <!-- ISF page -->
+    <string name="onboarding_isf_title">Чувствительность к инсулину (ISF)</string>
+    <string name="onboarding_isf_body">Насколько ОДНА единица быстрого инсулина снижает сахар, когда больше ничего не действует — врач может называть это коэффициентом коррекции. У большинства взрослых от %1$s до %2$s на единицу; у детей и очень чувствительных людей выше.</string>
+    <string name="onboarding_isf_units">Единицы для этого поля и для всего приложения</string>
+    <string name="onboarding_isf_label">ISF, %1$s на единицу</string>
+    <string name="onboarding_isf_required">Введите ISF от %1$s до %2$s на единицу. Без него прогноз остаётся выключенным.</string>
+
+    <!-- Insulin preset page -->
+    <string name="onboarding_preset_title">Как быстро действует ваш инсулин?</string>
+    <string name="onboarding_preset_body">Стартовая форма кривой действия, в минутах после укола: когда начинает, когда действует сильнее всего, когда заканчивается. Достаточно приблизительно — ваши собственные дозы уточнят её позже.</string>
+    <string name="onboarding_preset_typical">Быстрый аналог, типичный (НовоРапид, Хумалог, Апидра). Не уверены? Выберите это.</string>
+    <string name="onboarding_preset_slower">Медленнее типичного</string>
+    <string name="onboarding_preset_ultra">Ультрабыстрый (Фиасп, Люмжев)</string>
+    <string name="onboarding_preset_landmarks">начало %1$d · пик %2$d · конец %3$d мин</string>
+
+    <!-- Carb sensitivity page -->
+    <string name="onboarding_carb_title">Чувствительность к углеводам</string>
+    <string name="onboarding_carb_body">Необязательно. Насколько 10 г углеводов поднимают сахар, когда инсулин не действует. Пустое поле означает оценку по весу: %1$s на 10 г.</string>
+    <string name="onboarding_carb_label">Подъём на 10 г, %1$s</string>
+    <string name="onboarding_carb_invalid">Введите подъём от %1$s до %2$s на 10 г или оставьте поле пустым.</string>
+
+    <!-- Summary page -->
+    <string name="onboarding_summary_title">Что приложение знает сейчас</string>
+    <string name="onboarding_summary_hand_entered">Введено вручную, не измерено:</string>
+    <string name="onboarding_summary_weight">Вес: %1$s кг</string>
+    <string name="onboarding_summary_weight_none">Вес: не введён (эталонные 70 кг)</string>
+    <string name="onboarding_summary_isf">ISF: %1$s на единицу</string>
+    <string name="onboarding_summary_preset">Действие инсулина: %1$s</string>
+    <string name="onboarding_summary_carb">Подъём от углеводов: %1$s на 10 г</string>
+    <string name="onboarding_summary_carb_from_weight">Подъём от углеводов: по весу, %1$s на 10 г</string>
+    <string name="onboarding_summary_measured_note">Форма действия инсулина со временем измеряется по вашим собственным дозам и показывается рядом с этими значениями в «Ещё → Персональная модель». Прогноз, «Что если» и предиктивные оповещения отталкиваются от этих чисел.</string>
+    <string name="onboarding_summary_change_note">Всё это можно изменить в разделе «Ещё».</string>
+
+    <!-- More -> Personal model -->
+    <string name="onboarding_settings_rerun">Настроить модель заново</string>
+
+    <!-- Calibration card -->
+    <string name="calibration_example_title">Модель не настроена</string>
+    <string name="calibration_example_body">Прогноз, «Что если» и предиктивные оповещения не работают, пока вы не введёте свой ISF и время действия инсулина. Оповещения по самим показаниям — низкий, высокий, быстрое падение, нет данных — работают.</string>
+    <string name="calibration_example_action">Настроить</string>
+    <string name="calibration_hand_title">Модель на введённых вручную значениях</string>
+    <string name="calibration_hand_body">ISF %1$s на единицу · инсулин: начало %2$d, пик %3$d, конец %4$d мин. Форма действия со временем измеряется по вашим собственным дозам.</string>
+    <string name="calibration_hand_body_isf_only">ISF %1$s на единицу, введён вручную. Форма действия со временем измеряется по вашим собственным дозам.</string>
+    <string name="calibration_measured_title">Действие инсулина измерено по вашим дозам</string>
+    <string name="calibration_measured_body">%1$d доз за %2$d дней. ISF %3$s на единицу — по-прежнему ваше введённое вручную значение.</string>
+    <string name="calibration_change">Изменить</string>
+
+    <!-- More -> Body -->
+    <string name="settings_screen_carb_override_label">Подъём на 10 г углеводов, %1$s (необязательно)</string>
+    <string name="settings_screen_carb_override_hint">Пусто: действует оценка по весу выше.</string>
+</resources>

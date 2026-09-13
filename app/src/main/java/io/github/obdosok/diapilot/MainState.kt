@@ -66,11 +66,12 @@ import io.github.obdosok.diapilot.data.FoodCalculationRegistry
 import io.github.obdosok.diapilot.data.FoodEraSettings
 import io.github.obdosok.diapilot.data.ForecastLedger
 import io.github.obdosok.diapilot.data.Forecaster
+import io.github.obdosok.diapilot.data.ModelCalibration
 import io.github.obdosok.diapilot.data.HealthConnectSync
 import io.github.obdosok.diapilot.data.HistoryFoodProjectionCache
 import io.github.obdosok.diapilot.data.HybridFoodReadout
 import io.github.obdosok.diapilot.data.HybridRuntimeMetrics
-import io.github.obdosok.diapilot.data.HybridShadowRegistry
+import io.github.obdosok.diapilot.data.PhysioForecastRegistry
 import io.github.obdosok.diapilot.data.HybridWhatIfProfile
 import io.github.obdosok.diapilot.data.LedgerRetention
 import io.github.obdosok.diapilot.data.ManualInsulinRuntime
@@ -723,7 +724,13 @@ internal suspend fun loadState(
     // The RETROSPECTIVE uses of the same engine are untouched: the stored
     // forecast a long-press replays, the day decomposition and the measured
     // insulin curve all still build and read `model` above.
-    val forecastResult = if (Edition.prospective &&
+    //
+    // THE UNCALIBRATED INSTALL LOSES IT IN THE SAME PLACE. Until the first-run
+    // pages are completed the only person model on the phone is the bundled
+    // example, so `ModelCalibration.forecastAllowed` — the edition gate with
+    // that fact folded in — keeps `prediction` empty, and the Today card says
+    // why instead of the chart drawing a line nobody entered.
+    val forecastResult = if (ModelCalibration.forecastAllowed(context, store) &&
         last != null && now - last.tsMs <= 36L * 3_600_000 && model != null
     ) {
         timed("  Forecaster.forecast") { Forecaster.forecast(
@@ -908,7 +915,7 @@ internal suspend fun loadState(
     lap("receipts+deviation+suggestions+activity")
     val whatIfAnchor = forecastResult?.points?.firstOrNull()?.tsMs
     val selectedWhatIfProfile = whatIfAnchor
-        ?.let(HybridShadowRegistry::physioWhatIf)
+        ?.let(PhysioForecastRegistry::physioWhatIf)
     val chartBolusRows=store.bolusesAll(chartWindow,chartToBound)
     val physioForCounterfactual=PhysioRuntime.artifact(store,now)
     val counterfactualPeople=chartBolusRows.filter{it.units>0&&!com.diapilot.core.analysis.isPrimePurpose(it.purpose)}.mapNotNull{b->
@@ -919,10 +926,10 @@ internal suspend fun loadState(
         person?.let{b.tsMs to (b to it)}
     }.toMap()
     val counterfactualKernels=counterfactualPeople.mapValues{(_,pair)->
-        com.diapilot.core.hybrid.HybridForecastEngine(pair.second).insulinKernelPoints(pair.first.units)
+        com.diapilot.core.hybrid.physioForecastEngine(pair.second).insulinKernelPoints(pair.first.units)
     }
     val counterfactualLandmarks=counterfactualPeople.mapValues{(_,pair)->
-        com.diapilot.core.hybrid.HybridForecastEngine(pair.second).insulinLandmarks(pair.first.units).let{
+        com.diapilot.core.hybrid.physioForecastEngine(pair.second).insulinLandmarks(pair.first.units).let{
             Triple(it.onsetMin,it.ratePeakMin,it.effectEndMin)
         }
     }

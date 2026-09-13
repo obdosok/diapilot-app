@@ -1,14 +1,27 @@
 /**
- * Local insulin-on-board: sum of the remaining fraction of every recent
- * bolus. xDrip's IOB stopped being usable the day doses started arriving
- * from the pen over NFC — xDrip never sees them, so DiaPilot computes IOB
- * itself over its own store (pen + watch + manual + synced history).
+ * The POPULATION insulin-activity curve — the standard OpenAPS/AAPS
+ * exponential, parameterized by total duration (DIA) and time-to-peak, with
+ * defaults for a rapid-acting analog (NovoRapid): DIA 5 h, peak ~75 min.
  *
- * Model: the standard exponential insulin-activity curve (OpenAPS/AAPS),
- * parameterized by total duration (DIA) and time-to-peak. Defaults fit a
- * rapid-acting analog (NovoRapid): DIA 5 h, peak ~75 min.
+ * THIS IS NOT THE FORECAST'S CURVE. The line on screen, the hypo alert and the
+ * IOB readouts in `HybridRuntimeMetrics` read `HybridForecastEngine.insulinCdf`
+ * — the person model's knots or its parametric triangles. What keeps this file
+ * alive is the FITTING side: `ParametricKernel.kt` fits DIA and peak of this
+ * shape to the clean-correction corpus, and `EpisodeKernelV1.kt` uses it as
+ * the per-episode kernel family. Both call [iobFraction] with fitted
+ * parameters, never the defaults.
  *
- * Display/analytics only — never a dose recommendation.
+ * [iobUnits] — the sum over boluses with the population defaults — has no
+ * caller in `app/src/main` or `core/src/main` (only `IobTest`); it stays as the
+ * reference implementation of the shape and is what docs/architecture.md §9
+ * once listed as removed — the FUNCTION is still here, the CALLERS are gone.
+ * `HybridRuntimeMetrics.iobUnits` is a different function on the forecast's
+ * own curve.
+ *
+ * History: xDrip's IOB stopped being usable the day doses started arriving
+ * from the pen over NFC — xDrip never sees them — so DiaPilot computed IOB
+ * itself over its own store with this curve, until the person model replaced
+ * it. Display/analytics only — never a dose recommendation.
  */
 package com.diapilot.core.analysis
 

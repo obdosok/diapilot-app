@@ -353,7 +353,7 @@ object TwinCache {
                 Settings.carbSensOverrideMmolPerG(context),
                 marks.stamp(),
                 Stage9EpisodeRuntime.CACHE_VERSION,
-                HybridShadowRegistry.modelSha256().orEmpty(),
+                PhysioForecastRegistry.modelSha256().orEmpty(),
                 FoodEraSettings.current().startMs,
             )
         cached?.let { if (now - builtAtMs < TTL_MS && builtKey == key) return it }
@@ -585,7 +585,7 @@ object TwinCache {
                 insulinKernel(calReadings, episodes, weights = epWeights)
             } else {
                 priorPerson?.let {
-                    com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(1.0)
+                    com.diapilot.core.hybrid.physioForecastEngine(it).insulinKernelPoints(1.0)
                 } ?: emptyList()
             }
         if (learned.isEmpty()) return null
@@ -659,7 +659,7 @@ object TwinCache {
                     cal.get(java.util.Calendar.HOUR_OF_DAY) + cal.get(java.util.Calendar.MINUTE) / 60.0
                 val person = deconvPhysio?.personModelAt(hour) ?: deconvLegacy
                 person?.let {
-                    com.diapilot.core.hybrid.HybridForecastEngine(it).insulinKernelPoints(b.units)
+                    com.diapilot.core.hybrid.physioForecastEngine(it).insulinKernelPoints(b.units)
                 } ?: kernel
             }
         }
@@ -975,7 +975,7 @@ object TwinCache {
                     (deconvPhysio?.personModelAt(hour.toDouble()) ?: deconvLegacy)?.let { person ->
                         hour to
                             com.diapilot.core.hybrid
-                                .HybridForecastEngine(person)
+                                .physioForecastEngine(person)
                                 .insulinKernelPoints(1.0)
                     }
                 }
@@ -1281,7 +1281,11 @@ object TwinCache {
                 // be exported/inspected without re-deriving it by hand.
                 try {
                     DiagnosticsExport.write(context, store, it, now)
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // The bench file is optional; the model build is not. Log
+                    // and go on, so a full disk never costs a forecast.
+                    Log.w(TAG, "diag.json export failed", e)
+                }
             }
     }
 }

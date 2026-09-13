@@ -50,7 +50,7 @@ class HistoryCacheClusterKeyTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { com.diapilot.core.hybrid.HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "history-cache-cluster-key")
+        PhysioForecastRegistry.install(model, "history-cache-cluster-key")
         val artifact = requireNotNull(PhysioRuntime.artifact())
         return HybridRuntimeMetrics.foodReadoutsForModel(
             artifact.personModelAt(19.0), notes, macroTiming = artifact.macroTiming, physioArtifact = artifact,

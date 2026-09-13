@@ -71,11 +71,99 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         // source is, and hanging it off one sensor-direct switch left every
         // other phone to go blind in silence (docs/audit.md, P7).
 
+        // NO xDRIP, NO POLL. Port 17580 is a socket, not a trusted peer: with
+        // xDrip absent, whatever answers there is something else, and this
+        // run would store its glucose and — through the fuse, but still —
+        // its insulin. The same precondition the broadcast receiver applies
+        // (see [XdripBgReceiver.handle]); logged once, not every 15 minutes,
+        // because the ring in [DiagLog] holds 800 lines and this line would
+        // say the same thing 96 times a day.
+        val pollXdrip = xdripPollAllowed(applicationContext)
+        if (pollXdrip) {
+            try {
+                pollXdripWebService(store, ownBle, deep, sgvCount, treatmentsCount, prefsAll)
+                anySuccess = true
+            } catch (e: Exception) {
+                DiagLog.w(TAG, "xDrip web-service poll failed: ${e.message}")
+            }
+        }
+
+        // 4. Physiology from Health Connect (no-op until permissions granted).
+        try {
+            HealthConnectSync.sync(applicationContext, store)
+        } catch (e: Exception) {
+            DiagLog.w(TAG, "HC sync failed: ${e.message}")
+        }
+
+        // THE PERIODIC BACKSTOP, and the only line of it.
+        //
+        // OUTSIDE the `anySuccess` branch on purpose: a phone whose web
+        // service never answers is exactly the phone whose alerts nothing else
+        // evaluates, and the stall notification matters most when the poll
+        // itself is failing. This worker is the app's existing 15-minute
+        // periodic work (see [schedule]) and runs in both editions, so it
+        // covers a phone whose only source is this poll, a phone whose stream
+        // has gone quiet, and a confirmed low that must keep re-firing while
+        // no new reading arrives. The tick de-duplicates, so the one-shot
+        // [pollNow] each accepted broadcast triggers costs nothing. It fires
+        // whether or not xDrip is installed: the poll was skipped, the
+        // alerts were not.
+        AlertTick.fire(applicationContext, AlertTick.Source.WEB_POLL)
+
+        if (anySuccess) {
+            val now = System.currentTimeMillis()
+            prefsAll.edit().putLong(PREF_LAST_POLL_TS, now).apply()
+            // Only the tail can have changed. The previous implementation
+            // rescanned 14 days every 15 minutes (~1,300 overlapping scans a
+            // fortnight) even when xDrip returned the same points.
+            val watermark = prefsAll.getLong(PREF_MEAL_SCAN_WATERMARK, 0L)
+            val scanFrom = if (watermark > 0L) {
+                watermark - MEAL_SCAN_OVERLAP_MS
+            } else {
+                now - FIRST_MEAL_SCAN_WINDOW_MS
+            }
+            val found = scanMeals(store, scanFrom, now)
+            prefsAll.edit().putLong(PREF_MEAL_SCAN_WATERMARK, now).apply()
+            val quiet = com.diapilot.core.collector.promoteQuietMeals(store, now)
+            DiagLog.d(TAG, "meal scan: $found events, $quiet quiet successes promoted")
+            notifyFreshMeals(now)
+            // Second, independent driver for closed-episode receipts.
+            //
+            // The collector heartbeat is the primary one, but it only fires on
+            // an OOP2 broadcast — so a sensor gap, a killed service or a warm-up
+            // period would stall learning exactly the way the screen-only path
+            // did. This worker is periodic and survives all three. The runtime's
+            // own throttle makes the overlap free.
+            Result.success()
+        } else if (!pollXdrip) {
+            // Nothing to retry: the peer is not there, and WorkManager's
+            // back-off would only reschedule the same skip.
+            Result.success()
+        } else {
+            Result.retry()
+        }
+    }
+
+    /**
+     * The three xDrip feeds of one run. Throws only if the caller's own
+     * bookkeeping fails; each feed catches its own I/O so one endpoint that is
+     * down does not cost the other two. Returns normally when at least one feed
+     * answered — the caller counts that as a successful run.
+     */
+    private fun pollXdripWebService(
+        store: com.diapilot.core.collector.CollectorStore,
+        ownBle: Boolean,
+        deep: Boolean,
+        sgvCount: Int,
+        treatmentsCount: Int,
+        prefsAll: android.content.SharedPreferences,
+    ) {
+        var anySuccess = false
         // 1. Glucose backfill from sgv.json (confirmed reachable in the phone browser).
         try {
             if (!ownBle) {
                 fetch("$BASE_URL/sgv.json?count=$sgvCount")?.let { json ->
-                    val readings = parseSgvEntries(jsonToMaps(json))
+                    val readings = parseSgvEntries(jsonToMaps(json), System.currentTimeMillis())
                     readings.forEach(store::upsertReading)
                     DiagLog.d(TAG, "sgv.json: ${readings.size} readings backfilled (deep=$deep)")
                     if (deep) prefsAll.edit().putBoolean(PREF_DEEP_DONE, true).apply()
@@ -93,7 +181,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
             fetch("$BASE_URL/pebble")?.let { json ->
                 val bgs = JSONObject(json).optJSONArray("bgs")
                 if (bgs != null && bgs.length() > 0) {
-                    val now = parsePebbleBg(bgs.getJSONObject(0).toMap())
+                    val now = parsePebbleBg(bgs.getJSONObject(0).toMap(), System.currentTimeMillis())
                     if (!ownBle) now.reading?.let(store::upsertReading)
                     now.iobUnits?.let { iob ->
                         applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -163,55 +251,7 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
         } catch (e: Exception) {
             DiagLog.w(TAG, "treatments poll failed: ${e.message}")
         }
-
-        // 4. Physiology from Health Connect (no-op until permissions granted).
-        try {
-            HealthConnectSync.sync(applicationContext, store)
-        } catch (e: Exception) {
-            DiagLog.w(TAG, "HC sync failed: ${e.message}")
-        }
-
-        // THE PERIODIC BACKSTOP, and the only line of it.
-        //
-        // OUTSIDE the `anySuccess` branch on purpose: a phone whose web
-        // service never answers is exactly the phone whose alerts nothing else
-        // evaluates, and the stall notification matters most when the poll
-        // itself is failing. This worker is the app's existing 15-minute
-        // periodic work (see [schedule]) and runs in both editions, so it
-        // covers a phone whose only source is this poll, a phone whose stream
-        // has gone quiet, and a confirmed low that must keep re-firing while
-        // no new reading arrives. The tick de-duplicates, so the one-shot
-        // [pollNow] each accepted broadcast triggers costs nothing.
-        AlertTick.fire(applicationContext, AlertTick.Source.WEB_POLL)
-
-        if (anySuccess) {
-            val now = System.currentTimeMillis()
-            prefsAll.edit().putLong(PREF_LAST_POLL_TS, now).apply()
-            // Only the tail can have changed. The previous implementation
-            // rescanned 14 days every 15 minutes (~1,300 overlapping scans a
-            // fortnight) even when xDrip returned the same points.
-            val watermark = prefsAll.getLong(PREF_MEAL_SCAN_WATERMARK, 0L)
-            val scanFrom = if (watermark > 0L) {
-                watermark - MEAL_SCAN_OVERLAP_MS
-            } else {
-                now - FIRST_MEAL_SCAN_WINDOW_MS
-            }
-            val found = scanMeals(store, scanFrom, now)
-            prefsAll.edit().putLong(PREF_MEAL_SCAN_WATERMARK, now).apply()
-            val quiet = com.diapilot.core.collector.promoteQuietMeals(store, now)
-            DiagLog.d(TAG, "meal scan: $found events, $quiet quiet successes promoted")
-            notifyFreshMeals(now)
-            // Second, independent driver for closed-episode receipts.
-            //
-            // The collector heartbeat is the primary one, but it only fires on
-            // an OOP2 broadcast — so a sensor gap, a killed service or a warm-up
-            // period would stall learning exactly the way the screen-only path
-            // did. This worker is periodic and survives all three. The runtime's
-            // own throttle makes the overlap free.
-            Result.success()
-        } else {
-            Result.retry()
-        }
+        if (!anySuccess) throw java.io.IOException("no xDrip endpoint answered")
     }
 
     /**
@@ -305,6 +345,32 @@ class TreatmentsPollWorker(context: Context, params: WorkerParameters) :
     companion object {
         private const val TAG = "TreatmentsPollWorker"
         private const val BASE_URL = "http://127.0.0.1:17580"
+
+        /** Whether the last run said "skipped" — so the next skip is silent
+         *  and the first poll after an install is announced once too. */
+        @Volatile private var skipLogged = false
+
+        /**
+         * May this run read 127.0.0.1:17580 at all? True when xDrip is
+         * installed. Kept apart from the worker body so the decision — and its
+         * once-only logging — is testable without WorkManager.
+         */
+        internal fun xdripPollAllowed(context: Context): Boolean {
+            val installed = XdripApp.installed(context)
+            if (!installed && !skipLogged) {
+                DiagLog.w(TAG, "xDrip is not installed — web-service poll skipped until it is")
+                skipLogged = true
+            } else if (installed && skipLogged) {
+                DiagLog.i(TAG, "xDrip installed — web-service poll resumed")
+                skipLogged = false
+            }
+            return installed
+        }
+
+        /** Tests only: forget whether the skip was announced. */
+        internal fun resetSkipLog() {
+            skipLogged = false
+        }
         private const val SGV_COUNT = 288          // ~24h of 5-min readings
         private const val SGV_COUNT_DEEP = 4032    // ~14 days, for first run / catch-up
         private const val TREATMENTS_COUNT = 100

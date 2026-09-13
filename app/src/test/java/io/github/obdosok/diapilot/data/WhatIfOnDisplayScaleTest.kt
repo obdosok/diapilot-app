@@ -42,8 +42,8 @@ class WhatIfOnDisplayScaleTest {
     private fun profile(scale: Double): HybridWhatIfProfile {
         val model = context.assets.open("models/person_model_v11_runtime.json")
             .use { HybridPersonModelJson.read(it) }
-        HybridShadowRegistry.install(model, "whatif-scale")
-        HybridShadowRegistry.updateWhatIf(
+        PhysioForecastRegistry.install(model, "whatif-scale")
+        PhysioForecastRegistry.updateWhatIf(
             anchorTsMs = 1_787_000_000_000L,
             activityExposure = 0.0,
             baseline = emptyList(),
@@ -51,7 +51,7 @@ class WhatIfOnDisplayScaleTest {
             physio = true,
             displayScale = scale,
         )
-        return requireNotNull(HybridShadowRegistry.physioWhatIf(1_787_000_000_000L))
+        return requireNotNull(PhysioForecastRegistry.physioWhatIf(1_787_000_000_000L))
     }
 
     @Test
