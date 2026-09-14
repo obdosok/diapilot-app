@@ -83,7 +83,19 @@ touching logic. Keep a translation's meaning and tone close to the English
 source, and do not translate `translatable="false"` strings (placeholders,
 technical identifiers).
 
-## License
+## License and contributor agreement
 
-DiaPilot is licensed under GPL-3.0 (see `LICENSE`). By submitting a
-contribution, you agree it is provided under the same license.
+DiaPilot is licensed under GPL-3.0 (see `LICENSE`).
+
+Before a pull request is merged, its author agrees to the following:
+
+> You confirm that you wrote the contribution, or otherwise have the right to
+> submit it. You license it to the project under GPL-3.0, and you also grant
+> the project maintainer a perpetual, worldwide, non-exclusive, royalty-free,
+> irrevocable license to use, modify and relicense the contribution under other
+> terms, including in versions of the software that are not open source. You
+> keep the copyright in your contribution.
+
+Code ported from other projects, such as the xDrip+ ports, keeps its original
+license and cannot be relicensed. Mark it in the file header, as the existing
+ports do.

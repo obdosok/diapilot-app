@@ -1,6 +1,6 @@
 # DiaPilot
 
-[![CI](https://github.com/obdosok/diapilot/actions/workflows/ci.yml/badge.svg?branch=public)](https://github.com/obdosok/diapilot/actions/workflows/ci.yml)
+[![CI](https://github.com/obdosok/diapilot-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/obdosok/diapilot-app/actions/workflows/ci.yml)
 
 A personal assistant for living with type 1 diabetes. It collects data without
 the discipline of manual logging, explains what is happening, and makes the
@@ -91,7 +91,7 @@ draws no forecast and fires no predictive alert — only the alerts computed fro
 the readings themselves. Do not install this expecting a finished product, and
 do not rely on it for a treatment decision.
 
-- **[`docs/audit.md`](docs/audit.md)** — an external read of this snapshot:
+- **[`docs/audit.md`](docs/audit.md)** — an AI-assisted audit of this snapshot:
   every known defect by number, with severity and a file reference. Security,
   model, architecture, and release readiness. Read it before the code.
 - **[`docs/roadmap.md`](docs/roadmap.md)** — where this is going, in two
@@ -400,7 +400,31 @@ proposes a dose.
 
 ## How it was built
 
-DiaPilot was developed AI-native, with Claude Code as a pair throughout, and
-with the verification discipline that requires: contract tests against an
-independent reference, a deterministic core that owns every number, and an LLM
-confined to explanation.
+DiaPilot was developed AI-native over several months, with Claude Code as a
+pair throughout, and with the verification discipline that requires: contract
+tests against an independent reference, a deterministic core that owns every
+number, and an LLM confined to explanation. That development history is not
+published because it contains the maintainer's own medical data; this
+repository starts from a scrubbed snapshot.
+
+The public history is the publication work itself, done over a few days in
+September 2026: comments translated to English, personal data removed,
+security fixes, internationalisation, editions and tests. Most of it was
+written by AI coding agents (Claude) under the maintainer's direction. The
+history groups that work into one commit per work package, and each commit
+carries the co-author lines of the agent commits it combines. Nothing was
+merged on an agent's word:
+
+- every change kept the full test suite green, with golden files pinned;
+- mechanical checks proved that comment-only changes touched no code, that
+  moving prose into documents lost no number, and that an import cleanup did
+  nothing else;
+- the full history was scanned for personal data and secrets before
+  publishing, and CI runs a secret scan on every push.
+
+The audit in [`docs/audit.md`](docs/audit.md) was also AI-assisted and is not
+an independent third-party review. Each finding cites a file and line and is
+closed only with a test. Product and safety decisions — what the store edition
+may say, how the insulin tail is bounded, which alerts fire — are the
+maintainer's. Not every diff has had line-by-line human review; the audit lists
+the known gaps.

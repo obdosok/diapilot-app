@@ -1,6 +1,6 @@
 # Audit — September 2026
 
-An external read of the `public` snapshot: code quality, security, the
+An AI-assisted read of the `public` snapshot, performed with Claude: code quality, security, the
 forecast model, architecture, and release readiness. Everything below was
 checked against the code at commit `0122a82`; file references are to that
 tree. `./gradlew :core:test` was run (844 tests, 0 failures).
@@ -8,7 +8,7 @@ tree. `./gradlew :core:test` was run (844 tests, 0 failures).
 Severity: **H** — harms a third-party user today; **M** — must be closed
 before a release to strangers; **L** — hygiene.
 
-**Second read, September 2026.** An independent re-audit of the tree after
+**Second read, September 2026.** A second AI-assisted pass over the tree after
 phase B checked every Status cell against the code rather than against this
 file, and found three of them overstated: S3 and S4 said Closed while the
 web-service poll and the OOP2 minute stream were still bounded only by `> 0`,
@@ -191,7 +191,7 @@ runtime that fed nothing. The debt is known and chosen.
 | P7 | H | Closed (phaseB/b9) | **No alert could fire without OOPAlgorithm2.** `HypoAlertNotifier.maybeNotify` — the predictive low *and* the reading-driven low, sustained low, sensor artifact and sustained high — `RapidFallNotifier.maybeNotify` and `CompanionSync.pushIfDue` had exactly one caller each, and it was the tail of the OOP2 minute receiver. The stall notification had one too, inside the poll worker's `if (ownBle)`. So on a phone without that third-party app — every stranger's phone, and the whole point of the store edition — the app kept collecting, drawing, updating the widget and answering the watch while no alarm of any kind could fire, and nothing on any screen said so. Not a finding phase B created; re-derived at its gate as "decision 1" and closed here. b9 introduced one entry point (`collect/AlertTick.kt`) called from every path a reading arrives on, plus the existing 15-minute `TreatmentsPollWorker` as the periodic backstop, and gave the Data sources screen a leading Alerts row that states whether an alarm can fire and why not. | `app/.../collect/AlertTick.kt`, and its callers `CollectorService.kt:216`, `XdripBgReceiver.kt:91`, `TreatmentsPollWorker.kt:185`, `MainActivity.kt:261,1131,1148`; `collect/DataSources.kt` |
 
 **What phase B closed here (b9), and what it deliberately changed.** P7 is the
-only finding in this file that was not in the original external read: it was
+only finding in this file that was not in the original AI-assisted read: it was
 re-derived at the phase-B gate and is closed by the branch that added it. One
 entry point, `collect/AlertTick.kt`, now evaluates the whole alert set — low,
 high, rapid fall, stall — plus the companion push and the widget, and is called
